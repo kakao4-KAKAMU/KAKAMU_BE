@@ -1,30 +1,22 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
-
 import os
-import time
 
-# 운영 환경을 위한 커넥션 풀 설정
+# 1. settings.DATABASE_URL을 사용하여 엔진 생성
+# (settings.py에서 이미 POSTGRES_SERVER 등을 읽어 URL을 만들었으므로 이를 믿고 사용합니다.)
 engine = create_engine(
     settings.DATABASE_URL,
     pool_size=20,           # 동시 연결 수 상향
     max_overflow=10,
     pool_recycle=3600,
-    pool_pre_ping=True      # 연결 유효성 체크
+    pool_pre_ping=True      # 연결 유효성 체크 (네트워크 불안정 대비)
 )
 
-# 환경 변수에서 URL을 가져오되, 기본값은 로컬/K8s 서비스 이름에 맞춥니다.
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:password@db:5432/main_db")
-
-# 연결 시도 중 에러가 날 수 있으므로 엔진 생성을 신중히 합니다.
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    pool_pre_ping=True  # 연결이 끊겼는지 미리 확인하는 옵션
-)
-
+# 2. SessionLocal 클래스 생성
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# 3. 의존성 주입을 위한 DB 세션 함수
 def get_db():
     db = SessionLocal()
     try:
