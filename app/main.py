@@ -3,8 +3,10 @@ from sqlalchemy.orm import Session
 from app.db.session import engine, get_db
 from app.db.base import Base
 
+from app.models import models
+
 # DB 테이블 생성 (Alembic 사용 전 빠른 확인용)
-# Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="KAKAMU_BE API")
 
