@@ -26,4 +26,5 @@ websockets
 
 # Validation & Utilities
 pydantic[email]
+pydantic-settings
 python-dotenv
