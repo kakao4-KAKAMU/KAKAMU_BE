@@ -1,15 +1,18 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import os
+from app.core.config import settings
 
-# 환경 변수나 설정 파일에서 DB URL을 가져옵니다.
-# 예: postgresql://admin:password@localhost:5432/main_db
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:password@db:5432/main_db")
+# 운영 환경을 위한 커넥션 풀 설정
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_size=20,           # 동시 연결 수 상향
+    max_overflow=10,
+    pool_recycle=3600,
+    pool_pre_ping=True      # 연결 유효성 체크
+)
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# FastAPI Dependency로 사용할 세션 생성 함수
 def get_db():
     db = SessionLocal()
     try:

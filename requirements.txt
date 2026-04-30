@@ -16,9 +16,9 @@ python-multipart
 Pillow
 
 # Asynchronous & Messaging
-kafka-python
-aiokafka
-redis
+# kafka-python
+# aiokafka
+# redis
 
 # Real-time Communication (WebSocket/SSE)
 # FastAPI 기본 내장 기능을 사용하나 가독성을 위해 명시

@@ -1,4 +1,5 @@
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 
-# 모든 SQLAlchemy 모델이 상속받을 Base 클래스
-Base = declarative_base()
+# SQLAlchemy 2.0 스타일
+class Base(DeclarativeBase):
+    pass
