@@ -1,15 +1,20 @@
 import os
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "KAKAMU_BE"
-    # K8s Secret이나 ConfigMap에서 주입받을 변수들
-    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "admin")
-    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "password")
-    POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "db-service") # K8s Service 이름
-    POSTGRES_PORT: str = os.getenv("POSTGRES_PORT", "5432")
-    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "main_db")
-    
-    DATABASE_URL: str = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_SERVER}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    # 환경 변수 이름을 컨테이너 설정과 대소문자까지 일치시킵니다.
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_SERVER: str
+    POSTGRES_PORT: str = "5432"
+    POSTGRES_DB: str
+
+    # DATABASE_URL을 프로퍼티로 만들어서 호출될 때 환경 변수들이 합쳐지도록 합니다.
+    @property
+    def DATABASE_URL(self) -> str:
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+    # 환경 변수 우선순위 및 대소문자 설정
+    model_config = SettingsConfigDict(case_sensitive=True)
 
 settings = Settings()
