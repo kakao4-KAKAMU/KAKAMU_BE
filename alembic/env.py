@@ -2,6 +2,10 @@ import os
 import sys
 from logging.config import fileConfig
 
+from app.core.config import settings  # DB URL을 가져오기 위함
+from app.db.base import Base          # SQLAlchemy Base 클래스
+from app.models.models import *      # 모든 모델을 메모리에 로드하여 감지 가능하게 함
+
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
@@ -14,14 +18,7 @@ from alembic import context
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..')))
 
 # -------------------------------------------------------------------------
-# 2. 프로젝트 관련 모듈 임포트
-# -------------------------------------------------------------------------
-from app.core.config import settings  # DB URL을 가져오기 위함
-from app.db.base import Base          # SQLAlchemy Base 클래스
-from app.models import models         # 모든 모델을 메모리에 로드하여 감지 가능하게 함
-
-# -------------------------------------------------------------------------
-# 3. Alembic 설정 객체 및 로깅
+# 2. Alembic 설정 객체 및 로깅
 # -------------------------------------------------------------------------
 # Alembic 설정 객체 (alembic.ini의 값들을 참조함)
 config = context.config
@@ -31,13 +28,13 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # -------------------------------------------------------------------------
-# 4. 핵심 설정: 메타데이터 및 DB URL 동적 지정
+# 3. 핵심 설정: 메타데이터 및 DB URL 동적 지정
 # -------------------------------------------------------------------------
 # 모델의 변경 사항을 감지하기 위한 메타데이터 지정
 target_metadata = Base.metadata
 
 # alembic.ini의 sqlalchemy.url 대신 환경 변수(settings.DATABASE_URL)를 사용하도록 설정
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.get_database_url())
 
 
 def run_migrations_offline() -> None:
@@ -65,6 +62,7 @@ def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args={"client_encoding": "utf8"}
     )
 
     with connectable.connect() as connection:

@@ -1,15 +1,31 @@
+# app/core/config.py[cite: 2, 3]
 import os
+from typing import Optional
 from pydantic_settings import BaseSettings
+from pydantic import Field
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "KAKAMU_BE"
-    # K8s Secret이나 ConfigMap에서 주입받을 변수들
-    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "admin")
-    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "password")
-    POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "db-service") # K8s Service 이름
-    POSTGRES_PORT: str = os.getenv("POSTGRES_PORT", "5432")
-    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "main_db")
     
-    DATABASE_URL: str = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_SERVER}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    # Optional로 변경하여 값이 없을 때 에러가 나는 것을 방지합니다.
+    DATABASE_URL: Optional[str] = Field(default=None, env="DATABASE_URL")
+    
+    POSTGRES_USER: str = Field(default="admin", env="POSTGRES_USER")
+    POSTGRES_PASSWORD: str = Field(default="password", env="POSTGRES_PASSWORD")
+    POSTGRES_SERVER: str = Field(default="db", env="POSTGRES_SERVER")
+    POSTGRES_PORT: str = Field(default="5432", env="POSTGRES_PORT")
+    POSTGRES_DB: str = Field(default="main_db", env="POSTGRES_DB")
+
+    def get_database_url(self) -> str:
+        # 주입된 URL이 있으면 그것을 반환하고, 없으면 생성합니다.[cite: 2, 3]
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+    class Config:
+        # .env 파일을 읽어오도록 설정합니다. 파일이 프로젝트 루트에 있어야 합니다.
+        env_file = ".env"
+        case_sensitive = True
+        extra = "ignore" # 정의되지 않은 추가 환경 변수는 무시합니다.
 
 settings = Settings()
