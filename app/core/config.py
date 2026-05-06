@@ -1,20 +1,33 @@
+# app/core/config.py[cite: 2, 3]
 import os
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
+from pydantic_settings import BaseSettings
+from pydantic import Field
 
 class Settings(BaseSettings):
-    # 환경 변수 이름을 컨테이너 설정과 대소문자까지 일치시킵니다.
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_SERVER: str
-    POSTGRES_PORT: str = "5432"
-    POSTGRES_DB: str
+    PROJECT_NAME: str = "KAKAMU_BE"
+    
+    # Optional로 변경하여 값이 없을 때 에러가 나는 것을 방지합니다.
+    DATABASE_URL: Optional[str] = Field(default=None, env="DATABASE_URL")
+    
+    POSTGRES_USER: str = Field(default="admin", env="POSTGRES_USER")
+    POSTGRES_PASSWORD: str = Field(default="password", env="POSTGRES_PASSWORD")
+    POSTGRES_SERVER: str = Field(default="db", env="POSTGRES_SERVER")
+    POSTGRES_PORT: str = Field(default="5432", env="POSTGRES_PORT")
+    POSTGRES_DB: str = Field(default="main_db", env="POSTGRES_DB")
+    
+    REDIS_URL: str
 
-    # DATABASE_URL을 프로퍼티로 만들어서 호출될 때 환경 변수들이 합쳐지도록 합니다.
-    @property
-    def DATABASE_URL(self) -> str:
+    def get_database_url(self) -> str:
+        # 주입된 URL이 있으면 그것을 반환하고, 없으면 생성합니다.[cite: 2, 3]
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
-    # 환경 변수 우선순위 및 대소문자 설정
-    model_config = SettingsConfigDict(case_sensitive=True)
+    class Config:
+        # .env 파일을 읽어오도록 설정합니다. 파일이 프로젝트 루트에 있어야 합니다.
+        env_file = ".env"
+        case_sensitive = True
+        extra = "ignore" # 정의되지 않은 추가 환경 변수는 무시합니다.
 
 settings = Settings()
