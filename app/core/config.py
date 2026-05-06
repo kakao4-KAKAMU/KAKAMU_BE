@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = Field(default="db", env="POSTGRES_SERVER")
     POSTGRES_PORT: str = Field(default="5432", env="POSTGRES_PORT")
     POSTGRES_DB: str = Field(default="main_db", env="POSTGRES_DB")
+    
+    REDIS_URL: str
 
     def get_database_url(self) -> str:
         # 주입된 URL이 있으면 그것을 반환하고, 없으면 생성합니다.[cite: 2, 3]
