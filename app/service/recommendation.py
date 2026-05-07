@@ -1,0 +1,43 @@
+import time
+from typing import List, Dict, Any
+from app.core.redis import redis_client
+
+class RecommendationService:
+    def __init__(self):
+        # app.core.redis에서 생성한 비동기 클라이언트를 사용합니다.
+        self.redis = redis_client
+
+    async def record_activity(self, persona_id: int, movie_id: int, action: str):
+        """페르소나의 실시간 활동(클릭/시청)을 Redis Sorted Set에 기록"""
+        activity_key = f"kakamu:persona:{persona_id}:activities"
+        timestamp = int(time.time())
+        
+        # movie_id를 스코어(시간)와 함께 저장
+        await self.redis.zadd(activity_key, {str(movie_id): timestamp})
+        # 최신 50개만 남기고 삭제 (메모리 최적화)
+        await self.redis.zremrangebyrank(activity_key, 0, -51)
+
+    async def update_persona_preference(self, persona_id: int, genres: List[str]):
+        """활동 기반으로 페르소나의 장르 선호도 점수를 증가시킴 (Hash)"""
+        pref_key = f"kakamu:persona:{persona_id}:preferences"
+        for genre in genres:
+            await self.redis.hincrby(pref_key, genre, 1)
+
+    async def get_persona_context(self, persona_id: int) -> Dict[str, Any]:
+        """추천 엔진에 전달할 유저의 최신 상태(Context)를 한 번에 가져옴"""
+        activity_key = f"kakamu:persona:{persona_id}:activities"
+        pref_key = f"kakamu:persona:{persona_id}:preferences"
+
+        # 최근 본 영화 리스트 (최신순 10개)
+        recent_movies = await self.redis.zrevrange(activity_key, 0, 9)
+        # 장르 선호도 전체 데이터
+        preferences = await self.redis.hgetall(pref_key)
+
+        return {
+            "persona_id": persona_id,
+            "recent_movie_ids": recent_movies,
+            "genre_preferences": preferences
+        }
+
+# 싱글톤 인스턴스
+recommendation_service = RecommendationService()
