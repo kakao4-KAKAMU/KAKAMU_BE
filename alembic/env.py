@@ -25,7 +25,7 @@ config = context.config
 
 # 로깅 설정 적용
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # -------------------------------------------------------------------------
 # 3. 핵심 설정: 메타데이터 및 DB URL 동적 지정
