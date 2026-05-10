@@ -3,6 +3,9 @@ name: Build and Push Docker Image
 on:
   push:
     branches: [ "main" ] # main 브랜치로 push (merge) 될 때 동작
+    paths-ignores: # 아래 파일은 제외
+      - '**.md'
+      - '.gitignore'
 
 jobs:
   build-and-push:
@@ -31,7 +34,7 @@ jobs:
       uses: actions/checkout@v4 # helm repo 코드 다운
       with:
         repository: kakao4-KAKAMU/kakamu-helm # 헬름 차트 깃허브 레포
-        token: ${{ secrets.REPO_TOKEN }} # 레포 권한이 있는 토큰
+        token: ${{ secrets.HELM_REPO_TOKEN }} # 레포 권한이 있는 토큰
         path: helm-charts
           
     - name: Update Helm Values # 백엔드 values.yaml 이미지 태그값 검증 후 변경
@@ -42,7 +45,12 @@ jobs:
         git config --global user.email "action@github.com"
         git config --global user.name "GitHub Action"
         git add values.yaml
-        git diff --quiet && git diff --staged --quiet || git commit -m "update image tag to ${{ github.run_number }} from ${{ github.repository }}" 
-        git push origin main
+        
+        if ! git diff --cached --quiet; then
+          git commit -m "update backend image tag to 1.${{ github.run_number }}"
+          git push origin main
+        else
+          echo "No changes to commit"
+        fi        
         
         
