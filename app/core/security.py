@@ -1,15 +1,21 @@
 from datetime import datetime, timedelta, timezone
-from passlib.context import CryptContext
+import hashlib
+import bcrypt
 import jwt
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    # 1단계: 긴 비밀번호를 SHA-256으로 해시 (64바이트 고정)
+    password_hash = hashlib.sha256(password.encode()).hexdigest().encode()
+    # 2단계: bcrypt로 다시 해싱
+    hashed = bcrypt.hashpw(password_hash, bcrypt.gensalt())
+    return hashed.decode()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    # 1단계: SHA-256으로 변환
+    password_hash = hashlib.sha256(plain_password.encode()).hexdigest().encode()
+    # 2단계: bcrypt 검증
+    return bcrypt.checkpw(password_hash, hashed_password.encode())
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
