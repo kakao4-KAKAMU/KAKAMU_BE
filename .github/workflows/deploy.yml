@@ -33,7 +33,7 @@ jobs:
     - name: Checkout Helm Chart Repo
       uses: actions/checkout@v4 # helm repo 코드 다운
       with:
-        repository: kakao4-KAKAMU/kakamu-helm # 헬름 차트 깃허브 레포
+        repository: kakao4-KAKAMU/kakamu_helm # 헬름 차트 깃허브 레포
         token: ${{ secrets.HELM_REPO_TOKEN }} # 레포 권한이 있는 토큰
         path: helm-charts
           
