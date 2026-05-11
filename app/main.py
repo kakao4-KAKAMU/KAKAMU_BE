@@ -1,15 +1,38 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
-from sqlalchemy.orm import Session
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import create_engine, text
+from urllib.parse import urlparse
 
-from app.db.session import engine, get_db
-from app.db.base import Base
-from app.models import models
 from app.core.config import settings
 from app.core.redis import redis_client
+from app.api.api import api_router
+
+def create_database_if_not_exists():
+    """데이터베이스가 존재하지 않으면 생성합니다."""
+    db_url = settings.DATABASE_URL
+    parsed = urlparse(db_url)
+    db_name = parsed.path.lstrip('/')
+    
+    # postgres 데이터베이스에 연결하여 데이터베이스 생성
+    postgres_url = db_url.replace(f"/{db_name}", "/postgres")
+    
+    try:
+        # CREATE DATABASE는 트랜잭션 내에서 실행할 수 없으므로 AUTOCOMMIT 모드 적용
+        engine = create_engine(postgres_url, isolation_level="AUTOCOMMIT")
+        with engine.connect() as conn:
+            result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{db_name}'"))
+            if not result.fetchone():
+                print(f"Creating database {db_name}...")
+                conn.execute(text(f"CREATE DATABASE {db_name}"))
+                print(f"Database {db_name} created!")
+            else:
+                print(f"Database {db_name} already exists.")
+    except Exception as e:
+        print(f"Failed to create database: {e}")
 
 def run_migrations():
     """애플리케이션 시작 시 Alembic 마이그레이션을 자동으로 실행합니다."""
@@ -31,6 +54,7 @@ def run_migrations():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 앱 시작 시 실행될 로직 (Startup)
+    create_database_if_not_exists()
     run_migrations()
     
     try:
@@ -46,28 +70,25 @@ async def lifespan(app: FastAPI):
     # 앱 종료 시 실행될 로직 (Shutdown)이 필요하다면 여기에 작성
     print("Shutting down...")
 
-app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    description="FILMA 백엔드 API 문서",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    lifespan=lifespan,
+)
 
-@app.get("/health")
-def health_check():
-    """쿠버네티스 상태 확인용 엔드포인트"""
-    return {"status": "healthy", "version": "1.0.0"}
+# --- CORS 설정 ---
+# 프론트엔드 웹 브라우저에서 백엔드 API를 호출할 수 있도록 접근을 허용합니다.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 개발 단계에서는 모든 도메인(*)을 허용합니다. 운영 시에는 ["http://localhost:3000", "https://내도메인.com"] 형태로 제한하는 것이 좋습니다.
+    allow_credentials=True,
+    allow_methods=["*"],  # GET, POST, PUT, DELETE 등 모든 HTTP 메서드 허용
+    allow_headers=["*"],  # 모든 HTTP 헤더 허용
+)
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to KAKAMU_BE Platform"}
-
-# DB 연결 테스트용 엔드포인트
-@app.get("/db-test")
-def test_db(db: Session = Depends(get_db)):
-    return {"status": "Database connection successful"}
-
-@app.get("/redis-test")
-async def test_redis():
-    try:
-        # 이미 상단에서 가져온 redis_client 사용
-        await redis_client.set("test_key", "Hello Redis!", ex=60) # 60초 후 만료 예시
-        value = await redis_client.get("test_key")
-        return {"status": "success", "value": value}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+# 중앙 라우터 허브 등록
+app.include_router(api_router)

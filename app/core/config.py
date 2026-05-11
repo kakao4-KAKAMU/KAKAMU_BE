@@ -17,10 +17,15 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = Field(default="main_db", env="POSTGRES_DB")
     
     REDIS_URL: str
+    
+    # JWT Settings
+    SECRET_KEY: str = Field(default="supersecretkey_change_in_production", env="SECRET_KEY")
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 7 days
 
     def get_database_url(self) -> str:
-        # 주입된 URL이 있으면 그것을 반환하고, 없으면 생성합니다.[cite: 2, 3]
-        if self.DATABASE_URL:
+        # 주입된 URL이 있으면 그것을 반환하고, 없으면 생성합니다. (단, 템플릿 변수가 포함된 경우 제외)
+        if self.DATABASE_URL and "${" not in self.DATABASE_URL:
             return self.DATABASE_URL
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 

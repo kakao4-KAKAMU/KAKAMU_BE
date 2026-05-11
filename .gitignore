@@ -4,6 +4,7 @@
 .env.*
 *.env
 !.env.example  # (권장) 설정 가이드용 파일은 예외로 허용
+firebase-adminsdk.json
 
 # 2. Python 관련 캐시 및 환경
 __pycache__/
