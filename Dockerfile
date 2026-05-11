@@ -23,4 +23,4 @@ ENV PYTHONUNBUFFERED=1
 
 # 7. 실행 명령 (Gunicorn과 Uvicorn 조합으로 운영 성능 확보)
 # -w 4: 워커 프로세스 수 (CPU 코어 수에 맞춰 조절)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m" ,"uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
