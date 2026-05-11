@@ -10,7 +10,11 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     pass
 
-class UserRegister(UserBase):
+class UserRegister(BaseModel):
+    username: str
+    nickname: str
+    ci_value: str
+    firebase_id_token: str
     email: EmailStr
     password: str
 

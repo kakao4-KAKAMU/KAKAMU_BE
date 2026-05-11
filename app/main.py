@@ -1,6 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
@@ -20,13 +21,13 @@ def create_database_if_not_exists():
     postgres_url = db_url.replace(f"/{db_name}", "/postgres")
     
     try:
-        engine = create_engine(postgres_url)
+        # CREATE DATABASE는 트랜잭션 내에서 실행할 수 없으므로 AUTOCOMMIT 모드 적용
+        engine = create_engine(postgres_url, isolation_level="AUTOCOMMIT")
         with engine.connect() as conn:
             result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{db_name}'"))
             if not result.fetchone():
                 print(f"Creating database {db_name}...")
                 conn.execute(text(f"CREATE DATABASE {db_name}"))
-                conn.commit()
                 print(f"Database {db_name} created!")
             else:
                 print(f"Database {db_name} already exists.")
@@ -70,6 +71,16 @@ async def lifespan(app: FastAPI):
     print("Shutting down...")
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+
+# --- CORS 설정 ---
+# 프론트엔드 웹 브라우저에서 백엔드 API를 호출할 수 있도록 접근을 허용합니다.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 개발 단계에서는 모든 도메인(*)을 허용합니다. 운영 시에는 ["http://localhost:3000", "https://내도메인.com"] 형태로 제한하는 것이 좋습니다.
+    allow_credentials=True,
+    allow_methods=["*"],  # GET, POST, PUT, DELETE 등 모든 HTTP 메서드 허용
+    allow_headers=["*"],  # 모든 HTTP 헤더 허용
+)
 
 # 중앙 라우터 허브 등록
 app.include_router(api_router)
