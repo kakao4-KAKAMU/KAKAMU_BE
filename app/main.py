@@ -70,7 +70,15 @@ async def lifespan(app: FastAPI):
     # 앱 종료 시 실행될 로직 (Shutdown)이 필요하다면 여기에 작성
     print("Shutting down...")
 
-app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    description="FILMA 백엔드 API 문서",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    lifespan=lifespan,
+)
 
 # --- CORS 설정 ---
 # 프론트엔드 웹 브라우저에서 백엔드 API를 호출할 수 있도록 접근을 허용합니다.
