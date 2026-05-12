@@ -35,7 +35,7 @@ def register_user(user_in: UserRegister, db: Session = Depends(get_db)):
         if db.query(User).filter(User.ci_value == user_in.ci_value).first():
             raise HTTPException(status_code=400, detail="User with this CI value already exists")
             
-        # 이메일 중복 체크 (LocalAuth)
+        # 이메일 중복 체크 (LocalAuth 전용)
         if db.query(LocalAuth).filter(LocalAuth.email == user_in.email).first():
             raise HTTPException(status_code=400, detail="Email already registered")
         
