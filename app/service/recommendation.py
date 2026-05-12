@@ -1,7 +1,6 @@
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 from app.core.redis import redis_client
 from app.models.models import EntityRelationshipLog
 
