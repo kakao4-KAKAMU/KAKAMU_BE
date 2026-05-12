@@ -35,6 +35,7 @@ class SocialAuth(Base):
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
     provider = Column(String(20), nullable=False)    
     provider_user_id = Column(String(255), nullable=False)    
+    email = Column(String(100), nullable=True) # 소셜 플랫폼에서 받은 이메일
     connected_at = Column(DateTime, server_default=func.now())    
 
     user = relationship("User", back_populates="social_auths")    

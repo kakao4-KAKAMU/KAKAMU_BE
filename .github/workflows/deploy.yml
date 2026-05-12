@@ -20,6 +20,10 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
+    - name: Create firebase-adminsdk.json file
+      run: |
+        echo '${{ secrets.FIREBASE_ADMINSDK_JSON }}' > firebase-adminsdk.json
+
     - name: Build and push # 3. 도커 이미지 빌드하고 도커 허브로 push
       uses: docker/build-push-action@v5
       with:
