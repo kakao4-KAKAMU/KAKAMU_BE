@@ -1,5 +1,4 @@
 # app/core/config.py[cite: 2, 3]
-import os
 from typing import Optional
 from pydantic_settings import BaseSettings
 from pydantic import Field

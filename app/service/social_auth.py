@@ -14,11 +14,14 @@ async def get_kakao_access_token(auth_code: str, rest_api_key: str, redirect_uri
         "code": auth_code
     }
     
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, headers=headers, data=data)
-        if response.status_code != 200:
-            raise HTTPException(status_code=400, detail="카카오 액세스 토큰 발급에 실패했습니다.")
-        return response.json().get("access_token")
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, data=data)
+            if response.status_code != 200:
+                raise HTTPException(status_code=400, detail={"code": "KAKAO_TOKEN_ISSUE_FAILED", "message": "카카오 액세스 토큰 발급에 실패했습니다."})
+            return response.json().get("access_token")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=500, detail={"code": "KAKAO_API_CONNECTION_ERROR", "message": f"카카오 API 서버 통신 에러: {str(e)}"})
 
 async def get_kakao_user_info(access_token: str) -> dict:
     """카카오 서버에 접근하여 액세스 토큰의 유효성을 검증하고 유저 정보를 가져옵니다."""
@@ -28,8 +31,11 @@ async def get_kakao_user_info(access_token: str) -> dict:
         "Content-type": "application/x-www-form-urlencoded;charset=utf-8"
     }
     
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=headers)
-        if response.status_code != 200:
-            raise HTTPException(status_code=401, detail="유효하지 않은 카카오 토큰입니다.")
-        return response.json()
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            if response.status_code != 200:
+                raise HTTPException(status_code=401, detail={"code": "INVALID_KAKAO_TOKEN", "message": "유효하지 않은 카카오 토큰입니다."})
+            return response.json()
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=500, detail={"code": "KAKAO_API_CONNECTION_ERROR", "message": f"카카오 API 서버 통신 에러: {str(e)}"})

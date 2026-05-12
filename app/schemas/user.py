@@ -7,9 +7,6 @@ class UserBase(BaseModel):
     phone: str
     ci_value: str
 
-class UserCreate(UserBase):
-    pass
-
 class UserRegister(BaseModel):
     username: str
     nickname: str
