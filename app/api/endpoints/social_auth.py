@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.social_auth import SocialLoginRequest, TokenResponse, SocialRegisterRequest
+from app.schemas.social_auth import SocialLoginRequest, TokenResponse
 from app.service.social_auth import get_kakao_user_info, get_kakao_access_token
-from app.models.models import User, SocialAuth
+from app.models.models import SocialAuth
 from app.core.security import create_access_token
 from app.core.config import settings
 
@@ -60,44 +60,3 @@ async def social_login(request: SocialLoginRequest, db: Session = Depends(get_db
     except Exception as e:
         print(f"Social Login Error: {str(e)}")
         raise HTTPException(status_code=500, detail={"code": "LOGIN_UNEXPECTED_ERROR", "message": f"An unexpected error occurred: {str(e)}"})
-
-@router.post("/register", response_model=TokenResponse)
-def social_register(request: SocialRegisterRequest, db: Session = Depends(get_db)):
-    """추가 정보를 받아 User와 SocialAuth를 생성하고 JWT를 발급합니다."""
-    try:
-        # 1. 중복 체크
-        if db.query(User).filter(User.phone == request.phone).first():
-            raise HTTPException(status_code=400, detail={"code": "DUPLICATE_PHONE_NUMBER", "message": "이미 가입된 전화번호입니다."})
-        if db.query(User).filter(User.ci_value == request.ci_value).first():
-            raise HTTPException(status_code=400, detail={"code": "DUPLICATE_CI_VALUE", "message": "이미 가입된 본인인증 정보입니다."})
-            
-        # 2. User 테이블 생성
-        new_user = User(
-            username=request.username,
-            nickname=request.nickname,
-            phone=request.phone,
-            ci_value=request.ci_value
-        )
-        db.add(new_user)
-        db.flush() # new_user의 id를 얻기 위해 flush
-        
-        # 3. SocialAuth 테이블 연동 정보 생성
-        new_social = SocialAuth(
-            user_id=new_user.id,
-            provider=request.provider,
-            provider_user_id=request.provider_user_id,
-            email=request.email
-        )
-        db.add(new_social)
-        
-        db.commit()
-        
-        # 4. JWT 토큰 발급
-        access_token = create_access_token(data={"sub": str(new_user.id)})
-        return TokenResponse(access_token=access_token, is_new_user=False)
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        print(f"Social Register Error: {str(e)}")
-        raise HTTPException(status_code=500, detail={"code": "REGISTRATION_FAILED", "message": f"An unexpected error occurred: {str(e)}"})

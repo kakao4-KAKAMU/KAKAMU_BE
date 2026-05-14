@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Numeric, SmallInteger, BigInteger, JSON, Double
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Numeric, SmallInteger, BigInteger, JSON, Double, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base import Base # 프로젝트의 Base 클래스 경로에 맞춰 수정
@@ -9,8 +9,8 @@ class User(Base):
     __tablename__ = "user"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)    
     ci_value = Column(String(255), unique=True, nullable=False)    
-    username = Column(String(150), nullable=False)    
     phone = Column(String(20), nullable=False)    
+    username = Column(String(150), nullable=False)    
     nickname = Column(String(150), nullable=False)    
     created_at = Column(DateTime, server_default=func.now())    
     updated_at = Column(DateTime, onupdate=func.now())    
@@ -23,7 +23,7 @@ class LocalAuth(Base):
     __tablename__ = "local_auth"
     auth_id = Column(BigInteger, primary_key=True, autoincrement=True)    
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
-    email = Column(String(100), nullable=False)    
+    email = Column(String(100), unique=True, nullable=False)    
     password_hash = Column(String(255), nullable=False)    
     email_verified = Column(SmallInteger, default=0, nullable=False)    
 
@@ -39,6 +39,10 @@ class SocialAuth(Base):
     connected_at = Column(DateTime, server_default=func.now())    
 
     user = relationship("User", back_populates="social_auths")    
+
+    __table_args__ = (
+        UniqueConstraint('provider', 'email', name='uq_social_auth_provider_email'),
+    )
 
 # --- 2. 페르소나(프로필) 및 소셜 기능 테이블 ---
 
