@@ -12,7 +12,7 @@ class RecommendationService:
     async def record_ml_relationship_log(
         self, 
         db: Session, 
-        profile_id: int, 
+        persona_id: int, 
         target_type: str, 
         target_id: int, 
         action: str, 
@@ -34,7 +34,7 @@ class RecommendationService:
 
         # 3. 새로운 로그를 무조건 추가 (Append-Only)
         new_log = EntityRelationshipLog(
-            profile_id=profile_id,
+            persona_id=persona_id,
             relation_type=log_action,
             target_type=target_type,
             target_id=target_id,
