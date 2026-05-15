@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Numeric, SmallInteger, BigInteger, JSON, Double, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Numeric, SmallInteger, BigInteger, JSON, Double, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base import Base # 프로젝트의 Base 클래스 경로에 맞춰 수정
@@ -87,15 +87,20 @@ class Post(Base):
     __tablename__ = "post"
     id = Column(Integer, primary_key=True)    
     persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
-    movie_id = Column(Integer, ForeignKey("movie.id", ondelete="CASCADE"))
+    title = Column(String(255), nullable=False)    
     content = Column(Text)    
-    image_url = Column(String(500))    
+    image_urls = Column(JSON) # 최대 5장 이미지 배열 저장용    
+    is_spoiler = Column(SmallInteger, default=0) # 0: 일반, 1: 스포일러    
+    status = Column(String(20), default="ACTIVE") # ACTIVE, INACTIVE    
     is_analyzed = Column(SmallInteger, default=0)    
     created_at = Column(DateTime, server_default=func.now())    
+    updated_at = Column(DateTime, onupdate=func.now())    
 
     persona = relationship("Persona", back_populates="posts")    
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")    
-    movie = relationship("Movie", back_populates="posts")
+    movies = relationship("Movie", secondary="post_movie", back_populates="posts")    
+    hashtags = relationship("Hashtag", secondary="post_hashtag", back_populates="posts")    
+    mentions = relationship("Persona", secondary="post_mention", backref="mentioned_in_posts")    
 
 class Movie(Base):
     __tablename__ = "movie"
@@ -107,7 +112,7 @@ class Movie(Base):
     poster_url = Column(String(500))    
     
     genres = relationship("Genre", secondary="movie_genre", back_populates="movies")
-    posts = relationship("Post", back_populates="movie", cascade="all, delete-orphan")
+    posts = relationship("Post", secondary="post_movie", back_populates="movies")
     staff = relationship("People", secondary="movie_staff", back_populates="movies")
 
 class Genre(Base):
@@ -133,26 +138,35 @@ class Comment(Base):
     id = Column(Integer, primary_key=True)    
     post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), nullable=False)    
     persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
+    parent_id = Column(Integer, ForeignKey("comment.id", ondelete="CASCADE"), nullable=True) # 대댓글용 계층 구조    
     content = Column(String(1000))    
+    is_spoiler = Column(SmallInteger, default=0) # 0: 일반, 1: 스포일러    
+    status = Column(String(20), default="ACTIVE") # ACTIVE, INACTIVE    
     created_at = Column(DateTime, server_default=func.now())    
+    updated_at = Column(DateTime, onupdate=func.now())    
     is_pinned = Column(SmallInteger, default=0)    
     is_analyzed = Column(SmallInteger, default=0)    
 
     post = relationship("Post", back_populates="comments")    
     persona = relationship("Persona", back_populates="comments")    
+    replies = relationship("Comment", back_populates="parent", cascade="all, delete-orphan")    
+    parent = relationship("Comment", back_populates="replies", remote_side=[id])    
+    mentions = relationship("Persona", secondary="comment_mention", backref="mentioned_in_comments")    
 
-class InteractionLike(Base): # ERD 상의 'like' 테이블
-    __tablename__ = "interaction"
-    post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), primary_key=True)    
-    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
+class LikeLog(Base):
+    __tablename__ = "like_log"
+    id = Column(Integer, primary_key=True, autoincrement=True)    
+    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
+    target_type = Column(String(20), nullable=False) # 'POST', 'COMMENT' 등    
+    target_id = Column(Integer, nullable=False)    
+    is_active = Column(SmallInteger, default=1) # 1: 좋아요, 0: 취소됨    
     created_at = Column(DateTime, server_default=func.now())    
-    is_analyzed = Column(SmallInteger, default=0)    
+    updated_at = Column(DateTime, onupdate=func.now())    
 
-class CommentLike(Base):
-    __tablename__ = "comment_like"
-    comment_id = Column(Integer, ForeignKey("comment.id", ondelete="CASCADE"), primary_key=True)    
-    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
-    created_at = Column(DateTime, server_default=func.now())    
+    __table_args__ = (
+        UniqueConstraint('persona_id', 'target_type', 'target_id', name='uq_likelog_persona_target'),
+        Index('ix_likelog_target', 'target_type', 'target_id'),
+    )
 
 class EntityRelationshipLog(Base):
     __tablename__ = "entity_relationship_log"
@@ -165,6 +179,10 @@ class EntityRelationshipLog(Base):
     weight = Column(Double)    
     created_at = Column(DateTime, server_default=func.now())    
 
+    __table_args__ = (
+        Index('ix_entity_log_target', 'target_type', 'target_id'),
+    )
+
 class SemanticAnalysis(Base):
     __tablename__ = "semantic_analysis"
     id = Column(Integer, primary_key=True)    
@@ -173,7 +191,38 @@ class SemanticAnalysis(Base):
     summary = Column(Text)    
     keywords = Column(JSON) # JSON 타입 반영 
 
+    __table_args__ = (
+        Index('ix_semantic_target', 'target_type', 'target_id'),
+    )
+
 # --- 5. 중간 다리(Link) 테이블들 ---
+
+class PostMovie(Base):
+    __tablename__ = "post_movie"
+    post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), primary_key=True)    
+    movie_id = Column(Integer, ForeignKey("movie.id", ondelete="CASCADE"), primary_key=True)    
+
+class Hashtag(Base):
+    __tablename__ = "hashtag"
+    id = Column(Integer, primary_key=True, autoincrement=True)    
+    normalized_keyword = Column(String(100), unique=True, nullable=False)    
+
+    posts = relationship("Post", secondary="post_hashtag", back_populates="hashtags")    
+
+class PostHashtag(Base):
+    __tablename__ = "post_hashtag"
+    post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), primary_key=True)    
+    hashtag_id = Column(Integer, ForeignKey("hashtag.id", ondelete="CASCADE"), primary_key=True)    
+
+class PostMention(Base):
+    __tablename__ = "post_mention"
+    post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), primary_key=True)    
+    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
+
+class CommentMention(Base):
+    __tablename__ = "comment_mention"
+    comment_id = Column(Integer, ForeignKey("comment.id", ondelete="CASCADE"), primary_key=True)    
+    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
 
 class MovieGenre(Base):
     __tablename__ = "movie_genre"
