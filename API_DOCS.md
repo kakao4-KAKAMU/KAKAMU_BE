@@ -11,31 +11,24 @@
 | `GET` | `/db-test` | PostgreSQL 데이터베이스 연결 상태 테스트 |
 | `GET` | `/redis-test` | Redis 연결 및 읽기/쓰기 테스트 |
 
-## 2. Local Auth (일반 계정 인증)
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/local-auth/login` | 이메일과 비밀번호를 사용하여 일반 로그인 (JWT 발급) |
-
-## 3. Social Auth (소셜 계정 인증)
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/social-auth/login` | 인가 코드(code) 또는 액세스 토큰(token)으로 소셜 로그인 처리 |
-
-## 4. Users (사용자 관리 및 회원가입)
+## 2. Users & Auth (회원가입 및 로그인 통합)
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/users/register/local` | 일반 회원가입 (Firebase 번호 인증 + 이메일/비밀번호) |
 | `POST` | `/users/register/social` | 소셜 회원가입 (CI 조합 기반의 계정 통합 및 소셜 연동) |
+| `POST` | `/users/login/local` | 이메일과 비밀번호를 사용하여 일반 로그인 (JWT 발급) |
+| `POST` | `/users/login/social` | 인가 코드(code) 또는 액세스 토큰(token)으로 소셜 로그인 처리 |
+| `POST` | `/users/login/refresh` | 만료된 액세스 토큰 재발급 (리프레시 토큰 검증) |
 | `GET` | `/users/me` | JWT 토큰을 기반으로 현재 로그인된 사용자의 정보 조회 |
 | `GET` | `/users/{user_id}` | 특정 `user_id`를 가진 사용자 정보 조회 |
 
-## 5. Movies (영화 및 추천 시스템)
+## 3. Movies (영화 및 추천 시스템)
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/movies/{movie_id}/watch` | 선택된 페르소나의 영화 시청 행동을 기록 (취향 업데이트) |
 | `GET` | `/movies/recommend` | 현재 활성화된 페르소나의 컨텍스트를 기반으로 맞춤형 영화 추천 |
 
-## 6. Test (개발 및 테스트용)
+## 4. Test (개발 및 테스트용)
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/test/activity` | 페르소나 활동 강제 기록 테스트 (Redis 데이터 갱신) |

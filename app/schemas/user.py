@@ -1,27 +1,10 @@
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from datetime import datetime
 
 class UserBase(BaseModel):
-    username: str
-    nickname: str
-    phone: str
-    ci_value: str
-
-class UserRegister(BaseModel):
-    username: str
-    nickname: str
-    ci_value: str
-    firebase_id_token: str
-    email: EmailStr
-    password: str
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+    username: str = Field(..., max_length=50)
+    nickname: str = Field(..., max_length=50)
+    phone: str = Field(..., max_length=20)
 
 class UserResponse(UserBase):
     id: int

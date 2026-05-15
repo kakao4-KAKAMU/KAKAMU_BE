@@ -20,7 +20,8 @@ class Settings(BaseSettings):
     # JWT Settings
     SECRET_KEY: str = Field(default="supersecretkey_change_in_production", env="SECRET_KEY")
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 3 # 3시간 (보안을 위해 짧게 설정)
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 14 # 14일 (로그인 유지용)
     
     # Social Auth
     KAKAO_REST_API_KEY: str = Field(default="", env="KAKAO_REST_API_KEY")
