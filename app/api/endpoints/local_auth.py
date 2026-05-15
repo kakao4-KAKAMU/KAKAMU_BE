@@ -1,3 +1,4 @@
+import hashlib
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -13,7 +14,9 @@ def login_user(user_in: UserLogin, db: Session = Depends(get_db)):
     try:
         local_auth = db.query(LocalAuth).filter(LocalAuth.email == user_in.email).first()
         
-        if not local_auth or not verify_password(user_in.password, local_auth.password_hash):
+        # SHA-256 + BCrypt 검증: 입력된 비밀번호를 SHA-256으로 해싱한 후, 저장된 BCrypt 해시와 비교
+        sha256_password = hashlib.sha256(user_in.password.encode('utf-8')).hexdigest()
+        if not local_auth or not verify_password(sha256_password, local_auth.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={"code": "LOGIN_FAILED", "message": "Incorrect email or password"},
