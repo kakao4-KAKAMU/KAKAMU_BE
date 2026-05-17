@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import Any
 
 from app.db.session import get_db
@@ -52,7 +53,38 @@ def create_post(
 
         db.commit()
         return {"status": "success", "post_id": new_post.id}
+    except IntegrityError as e:
+        db.rollback()
+        print(f"Create Post Integrity Error: {str(e)}")
+        raise HTTPException(status_code=400, detail="잘못된 참조 데이터가 포함되어 있습니다. (예: 존재하지 않는 영화 ID)")
     except Exception as e:
         db.rollback()
         print(f"Create Post Error: {str(e)}")
         raise HTTPException(status_code=500, detail="게시물 작성 중 서버 오류가 발생했습니다.")
+
+# --- 차후 백엔드에서 이미지를 직접 업로드 받아야 할 경우를 대비한 예시 코드 ---
+# from fastapi import File, UploadFile
+# from typing import List
+#
+# @router.post("/upload-images", status_code=201)
+# async def upload_images_directly(
+#     files: List[UploadFile] = File(...),
+#     persona_id: int = Depends(get_current_persona)
+# ) -> Any:
+#     """
+#     [참고용] 프론트엔드에서 클라우드로 직접 업로드(Direct Upload)하지 않고,
+#     백엔드 서버를 거쳐서 이미지를 업로드해야 할 경우 사용하는 엔드포인트 예시입니다.
+#     """
+#     uploaded_urls = []
+#     for file in files:
+#         # 1. 파일 확장자 및 MIME 타입 유효성 검사 (Zero-Trust)
+#         if file.content_type not in ["image/jpeg", "image/png", "image/gif"]:
+#             raise HTTPException(status_code=400, detail="지원하지 않는 이미지 형식입니다.")
+#             
+#         # 2. 파일 저장 로직 (예: AWS S3, Google Cloud Storage, 또는 로컬 디스크)
+#         # file_content = await file.read()
+#         # url = await upload_to_storage(file_content, file.filename)
+#         # uploaded_urls.append(url)
+#         pass
+#         
+#     return {"status": "success", "urls": uploaded_urls}
