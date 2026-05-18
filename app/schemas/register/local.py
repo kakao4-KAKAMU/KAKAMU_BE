@@ -1,5 +1,10 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
 import re
+from typing import Optional
+
+class LocalLinkRequest(BaseModel):
+    email: Optional[EmailStr] = Field(default=None, description="연동할 이메일 (미입력 시 소셜 계정의 이메일 자동 사용)")
+    password: str = Field(..., min_length=8, description="연동할 비밀번호")
 
 class UserRegister(BaseModel):
     username: str = Field(..., min_length=2, max_length=50, description="사용자 실명 (2~50자)")
