@@ -3,7 +3,7 @@ from http.client import HTTPException
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
@@ -51,14 +51,20 @@ def new_persona_profile(
             detail = f"이미 존재하는 닉네임과 태그 조합입니다.({persona_data.nickname})"
         )
 
-    
+    # 페르소나 계정이 있는 지 검사
+    count_stmt = select(func.count(Persona.id)).where(Persona.user_id == user.id )
+    persona_count = db.scalar(count_stmt)
+
+    is_main_value = 1 if persona_count == 1 else 0
+
+
     try:
         new_profile = Persona(
             user_id = user.id,
             nickname = name,
             profile_msg = persona_data.profile_msg,
             persona_type = persona_data.persona_type,
-            is_main = 1,
+            is_main = is_main_value,
             preference_status = "on", # 현재 활성화된 페르소나 프로필 (on, off)
             tag=tag,
             proflie_image_url = persona_data.proflie_image_url,
