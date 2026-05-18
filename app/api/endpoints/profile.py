@@ -14,7 +14,7 @@ from pydantic import BaseModel
 import re
 router = APIRouter()
 
-# 엔드포인트 /new_persona, 응답은 PersonaResponse 구조로, 상태 코드는 201
+# 페르소나 계정 생성, 엔드포인트 /new_persona, 응답은 PersonaResponse 구조로, 상태 코드는 201
 @router.post("/new_persona", response_model=PersonaResponse, status_code=201)
 def new_persona_profile(
         persona_data: PersonaCreate, # 사용자 입력 데이터
@@ -90,8 +90,20 @@ def new_persona_profile(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"데이터베이스 저장 중 오류 발생")
 
-# 고려해야 할 것
-# 1. 닉네임과 태그가 중복된 경우
-# 2. 두번째 계정을 만들 때 preference_status, is_main 값 설정
+# 페르소나 수정, 수정된 값만 받게하기
+@router.patch("/persona/{persona_id}")
+def edit_persona_profile(
+        persona_id: int,
+        persona_edit_data: PersonaEdit,
+        db: Session = Depends(get_db)
+):
+    db_persona = db.get(Persona, persona_id) # 기존 페르소나 데이터 가져오기
+
+    # 수정한 값만 딕셔너리로 추출
+    update_data = persona_edit_data.model_dump(exclude_unset=True)
+
+    for key, value in update_data.items():
+        setattr(db_persona, key, value)
+
 
 
