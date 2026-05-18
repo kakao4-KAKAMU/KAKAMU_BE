@@ -14,8 +14,7 @@ async def social_login(request: SocialLoginRequest, db: Session = Depends(get_db
     """소셜 토큰을 검증하고, 기존 회원이면 JWT 발급, 신규 회원이면 회원가입 유도 응답을 보냅니다."""
     try:
         if request.provider == "kakao":
-            access_token = request.provided_token
-            user_info = await get_kakao_user_info(access_token)
+            user_info = await get_kakao_user_info(request.provided_token)
             provider_user_id = str(user_info.get("id"))
             email = user_info.get("kakao_account", {}).get("email")
         else:

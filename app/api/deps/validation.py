@@ -38,10 +38,16 @@ async def validate_social_registration(request: SocialRegisterRequest, db: Sessi
     else:
         raise HTTPException(status_code=400, detail={"code": "UNSUPPORTED_PROVIDER", "message": "지원하지 않는 소셜 플랫폼입니다."})
 
-    ci_string = f"{request.username}{request.phone}"
+    # 2. Firebase 전화번호 검증 (조작 방지)
+    phone_number = verify_firebase_token(request.firebase_id_token)
+    if not phone_number:
+        raise HTTPException(status_code=400, detail={"code": "INVALID_FIREBASE_TOKEN", "message": "Invalid or expired Firebase token"})
+        
+    formatted_phone = phone_number.replace("+82", "0") if phone_number.startswith("+82") else phone_number
+    ci_string = f"{request.username}{formatted_phone}"
     ci_value = hashlib.sha256(ci_string.encode('utf-8')).hexdigest()
     
     if request.email and db.query(SocialAuth).filter(SocialAuth.provider == request.provider, SocialAuth.email == request.email).first():
         raise HTTPException(status_code=400, detail={"code": "DUPLICATE_EMAIL", "message": "이미 등록된 이메일입니다."})
         
-    return {"request": request, "provider_user_id": provider_user_id, "ci_value": ci_value}
+    return {"request": request, "provider_user_id": provider_user_id, "ci_value": ci_value, "formatted_phone": formatted_phone}
