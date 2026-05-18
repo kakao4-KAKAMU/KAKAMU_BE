@@ -20,3 +20,9 @@ class UserWithProfileResponse(BaseModel):
     profiles: List[ProfileResponse] = [] # User 모델의 relationship을 통해 자동 매핑됨
 
     model_config = ConfigDict(from_attributes=True)
+
+# 프로필 수정
+class ProfileUpdate(BaseModel):
+    nickname: Optional[str] = None
+    profile_msg: Optional[str] = None
+    profile_image_url: Optional[str] = None
