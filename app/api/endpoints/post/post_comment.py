@@ -36,7 +36,7 @@ def create_comment(post_id: int, comment_in: CommentCreate, db: Session = Depend
     db.commit()
     return {"status": "success", "comment_id": new_comment.id}
 
-@router.get("/")
+@router.get("/{post_id}/comments")
 def get_comments(post_id: int, db: Session = Depends(get_db)):
     """게시물의 댓글 목록을 조회합니다. 스포일러 댓글은 내용이 마스킹 처리됩니다."""
     comments = db.query(Comment).filter(

@@ -1,7 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import user, movie, system, test, post, comment, like
-from app.api.endpoints import movie, system, test, post, user, comment, like, relation
-
+from app.api.endpoints import user, movie, system, test, post, comment, like, relation
 
 api_router = APIRouter()
 api_router.include_router(system.router, tags=["System"])
