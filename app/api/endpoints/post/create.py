@@ -7,7 +7,7 @@ import re
 from app.db.session import get_db
 from app.api.deps import get_current_persona
 from app.schemas.post.create import PostCreate
-from app.models import Post, PostMovie, Hashtag, PostHashtag, Persona, PostMention
+from app.models.models import Post, PostMovie, Hashtag, PostHashtag, Persona, PostMention
 from app.utils.parser import parse_content
 from app.service.recommendation import recommendation_service
 

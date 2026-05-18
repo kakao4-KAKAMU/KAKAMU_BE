@@ -3,11 +3,12 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import get_current_persona
 from app.schemas.post.comment import CommentCreate
-from app.models import Comment, Post, Persona, CommentMention
+from app.models.models import Comment, Post, Persona, CommentMention
 from app.utils.parser import parse_content
 
 router = APIRouter()
 
+@router.post("/", status_code=201)
 @router.post("/", status_code=201)
 def create_comment(post_id: int, comment_in: CommentCreate, db: Session = Depends(get_db), persona_id: int = Depends(get_current_persona)):
     """게시물에 댓글(또는 대댓글)을 작성합니다."""
@@ -36,7 +37,7 @@ def create_comment(post_id: int, comment_in: CommentCreate, db: Session = Depend
     db.commit()
     return {"status": "success", "comment_id": new_comment.id}
 
-@router.get("/{post_id}/comments")
+@router.get("/")
 def get_comments(post_id: int, db: Session = Depends(get_db)):
     """게시물의 댓글 목록을 조회합니다. 스포일러 댓글은 내용이 마스킹 처리됩니다."""
     comments = db.query(Comment).filter(

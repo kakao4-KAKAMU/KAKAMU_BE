@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import get_current_persona
 from app.schemas.post.like import LikeToggleRequest
-from app.models import LikeLog, Post, Comment
+from app.models.models import LikeLog, Post, Comment
 from app.service.recommendation import recommendation_service
 from app.core.redis import redis_client
 
