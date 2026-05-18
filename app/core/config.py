@@ -1,5 +1,4 @@
 # app/core/config.py[cite: 2, 3]
-import os
 from typing import Optional
 from pydantic_settings import BaseSettings
 from pydantic import Field
@@ -22,6 +21,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(default="supersecretkey_change_in_production", env="SECRET_KEY")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 7 days
+    
+    # Social Auth
+    KAKAO_REST_API_KEY: str = Field(default="", env="KAKAO_REST_API_KEY")
 
     def get_database_url(self) -> str:
         # 주입된 URL이 있으면 그것을 반환하고, 없으면 생성합니다. (단, 템플릿 변수가 포함된 경우 제외)

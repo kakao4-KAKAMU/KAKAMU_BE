@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Numeric, SmallInteger, BigInteger, JSON, Double
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Numeric, SmallInteger, BigInteger, JSON, Double, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base import Base # 프로젝트의 Base 클래스 경로에 맞춰 수정
@@ -9,13 +9,13 @@ class User(Base):
     __tablename__ = "user"
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)    
     ci_value = Column(String(255), unique=True, nullable=False)    
-    username = Column(String(150), nullable=False)    
     phone = Column(String(20), nullable=False)    
+    username = Column(String(150), nullable=False)    
     nickname = Column(String(150), nullable=False)    
     created_at = Column(DateTime, server_default=func.now())    
     updated_at = Column(DateTime, onupdate=func.now())    
 
-    profiles = relationship("Profile", back_populates="user", cascade="all, delete-orphan")    
+    personas = relationship("Persona", back_populates="user", cascade="all, delete-orphan")    
     local_auths = relationship("LocalAuth", back_populates="user", cascade="all, delete-orphan")    
     social_auths = relationship("SocialAuth", back_populates="user", cascade="all, delete-orphan")    
 
@@ -23,7 +23,7 @@ class LocalAuth(Base):
     __tablename__ = "local_auth"
     auth_id = Column(BigInteger, primary_key=True, autoincrement=True)    
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
-    email = Column(String(100), nullable=False)    
+    email = Column(String(100), unique=True, nullable=False)    
     password_hash = Column(String(255), nullable=False)    
     email_verified = Column(SmallInteger, default=0, nullable=False)    
 
@@ -35,52 +35,65 @@ class SocialAuth(Base):
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
     provider = Column(String(20), nullable=False)    
     provider_user_id = Column(String(255), nullable=False)    
+    email = Column(String(100), nullable=True) # 소셜 플랫폼에서 받은 이메일
     connected_at = Column(DateTime, server_default=func.now())    
 
     user = relationship("User", back_populates="social_auths")    
 
+    __table_args__ = (
+        UniqueConstraint('provider', 'email', name='uq_social_auth_provider_email'),
+    )
+
 # --- 2. 페르소나(프로필) 및 소셜 기능 테이블 ---
 
-class Profile(Base):
-    __tablename__ = "profile"
+class Persona(Base):
+    __tablename__ = "persona"
     id = Column(Integer, primary_key=True, autoincrement=True)    
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
-    nickname = Column(String(50))    
+    nickname = Column(String(50), nullable=False) # 2~12자 정책 적용
+    tag = Column(String(10), nullable=False) # 3~5자리 숫자/영문 (ex. KR1)
+    profile_image_url = Column(String(500)) # 페르소나별 독립 프로필 이미지 노출용
     profile_msg = Column(String(200))    
     persona_type = Column(String(50))    
     is_main = Column(SmallInteger, default=0)    
     preference_status = Column(Text)    
+    status = Column(String(20), default="ACTIVE") # 'ACTIVE' 또는 'DELETED' 상태 관리
+    deleted_at = Column(DateTime, nullable=True) # 삭제 요청 유예 기간(30일) 체크용
 
-    user = relationship("User", back_populates="profiles")    
-    posts = relationship("Post", back_populates="profile", cascade="all, delete-orphan")    
-    comments = relationship("Comment", back_populates="profile", cascade="all, delete-orphan")    
+    user = relationship("User", back_populates="personas")    
+    posts = relationship("Post", back_populates="persona", cascade="all, delete-orphan")    
+    comments = relationship("Comment", back_populates="persona", cascade="all, delete-orphan")    
     
     # Follow 관계 (Self-referential N:M)
     following = relationship("Follow", foreign_keys="Follow.follower_id", back_populates="follower", cascade="all, delete-orphan")    
-    followers = relationship("Follow", foreign_keys="Follow.following_id", back_populates="following_user", cascade="all, delete-orphan")    
+    followers = relationship("Follow", foreign_keys="Follow.following_id", back_populates="following_persona", cascade="all, delete-orphan")    
+
+    __table_args__ = (
+        UniqueConstraint('nickname', 'tag', name='uq_persona_nickname_tag'),
+    )
 
 class Follow(Base):
     __tablename__ = "follow"
-    follower_id = Column(Integer, ForeignKey("profile.id", ondelete="CASCADE"), primary_key=True)    
-    following_id = Column(Integer, ForeignKey("profile.id", ondelete="CASCADE"), primary_key=True)    
+    follower_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
+    following_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
     created_at = Column(DateTime, server_default=func.now())    
 
-    follower = relationship("Profile", foreign_keys=[follower_id], back_populates="following")    
-    following_user = relationship("Profile", foreign_keys=[following_id], back_populates="followers")    
+    follower = relationship("Persona", foreign_keys=[follower_id], back_populates="following")    
+    following_persona = relationship("Persona", foreign_keys=[following_id], back_populates="followers")    
 
 # --- 3. 게시물 및 영화 정보 테이블 ---
 
 class Post(Base):
     __tablename__ = "post"
     id = Column(Integer, primary_key=True)    
-    profile_id = Column(Integer, ForeignKey("profile.id", ondelete="CASCADE"), nullable=False)    
+    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
     movie_id = Column(Integer, ForeignKey("movie.id", ondelete="CASCADE"))
     content = Column(Text)    
     image_url = Column(String(500))    
     is_analyzed = Column(SmallInteger, default=0)    
     created_at = Column(DateTime, server_default=func.now())    
 
-    profile = relationship("Profile", back_populates="posts")    
+    persona = relationship("Persona", back_populates="posts")    
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")    
     movie = relationship("Movie", back_populates="posts")
 
@@ -119,32 +132,32 @@ class Comment(Base):
     __tablename__ = "comment"
     id = Column(Integer, primary_key=True)    
     post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), nullable=False)    
-    profile_id = Column(Integer, ForeignKey("profile.id", ondelete="CASCADE"), nullable=False)    
+    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
     content = Column(String(1000))    
     created_at = Column(DateTime, server_default=func.now())    
     is_pinned = Column(SmallInteger, default=0)    
     is_analyzed = Column(SmallInteger, default=0)    
 
     post = relationship("Post", back_populates="comments")    
-    profile = relationship("Profile", back_populates="comments")    
+    persona = relationship("Persona", back_populates="comments")    
 
 class InteractionLike(Base): # ERD 상의 'like' 테이블
     __tablename__ = "interaction"
     post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), primary_key=True)    
-    profile_id = Column(Integer, ForeignKey("profile.id", ondelete="CASCADE"), primary_key=True)    
+    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
     created_at = Column(DateTime, server_default=func.now())    
     is_analyzed = Column(SmallInteger, default=0)    
 
 class CommentLike(Base):
     __tablename__ = "comment_like"
     comment_id = Column(Integer, ForeignKey("comment.id", ondelete="CASCADE"), primary_key=True)    
-    profile_id = Column(Integer, ForeignKey("profile.id", ondelete="CASCADE"), primary_key=True)    
+    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
     created_at = Column(DateTime, server_default=func.now())    
 
 class EntityRelationshipLog(Base):
     __tablename__ = "entity_relationship_log"
     id = Column(Integer, primary_key=True)    
-    profile_id = Column(Integer, ForeignKey("profile.id", ondelete="CASCADE"), nullable=False)    
+    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
     relation_type = Column(String(30))    
     target_type = Column(String(30))    
     target_id = Column(Integer)    
@@ -175,11 +188,11 @@ class MovieStaff(Base):
 
 class FavGenre(Base):
     __tablename__ = "fav_genre"
-    profile_id = Column(Integer, ForeignKey("profile.id", ondelete="CASCADE"), primary_key=True)    
+    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
     genre_id = Column(Integer, ForeignKey("genre.id", ondelete="CASCADE"), primary_key=True)    
 
 class FavPeople(Base):
     __tablename__ = "fav_people"
-    profile_id = Column(Integer, ForeignKey("profile.id", ondelete="CASCADE"), primary_key=True)    
+    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
     people_id = Column(Integer, ForeignKey("people.id", ondelete="CASCADE"), primary_key=True)    
     type = Column(String(30))    
