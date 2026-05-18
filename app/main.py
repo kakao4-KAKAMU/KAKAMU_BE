@@ -84,9 +84,9 @@ app = FastAPI(
 # 프론트엔드 웹 브라우저에서 백엔드 API를 호출할 수 있도록 접근을 허용합니다.
 app.add_middleware(
     CORSMiddleware,
-    # allow_credentials=True 일 때는 명시적인 도메인을 지정해야 합니다. (보안 정책)
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8000"],
-    allow_credentials=True,
+    # 모든 도메인을 허용합니다. (주의: allow_credentials=True와 함께 사용할 수 없습니다)
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],  # GET, POST, PUT, DELETE 등 모든 HTTP 메서드 허용
     allow_headers=["*"],  # 모든 HTTP 헤더 허용
 )
