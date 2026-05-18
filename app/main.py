@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from alembic import command
@@ -9,6 +10,7 @@ from urllib.parse import urlparse
 from app.core.config import settings
 from app.core.redis import redis_client
 from app.api.api import api_router
+from app.service.sync_task import stat_sync_worker
 
 def create_database_if_not_exists():
     """데이터베이스가 존재하지 않으면 생성합니다."""
@@ -62,8 +64,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Redis connection failed: {e}")
         
+    # 백그라운드 워커 실행 (Redis -> DB 주기적 동기화 시작)
+    sync_task = asyncio.create_task(stat_sync_worker())
+
     yield
     
+    sync_task.cancel() # 서버 종료 시 워커 중지
     await redis_client.close()
     
     # 앱 종료 시 실행될 로직 (Shutdown)이 필요하다면 여기에 작성
@@ -85,6 +91,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     # 모든 도메인을 허용합니다. (주의: allow_credentials=True와 함께 사용할 수 없습니다)
+    # prod 브랜치에서는 수정 필요(특정 도메인만 허용)
     allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],  # GET, POST, PUT, DELETE 등 모든 HTTP 메서드 허용

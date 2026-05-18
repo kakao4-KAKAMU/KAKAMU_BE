@@ -8,11 +8,12 @@ from app.api.deps import get_current_persona
 from app.schemas.post import PostCreate
 from app.models.models import Post, PostMovie, Hashtag, PostHashtag, Persona, PostMention
 from app.utils.parser import parse_content
+from app.service.recommendation import recommendation_service
 
 router = APIRouter()
 
 @router.post("/", status_code=201)
-def create_post(
+async def create_post(
     post_in: PostCreate,
     db: Session = Depends(get_db),
     persona_id: int = Depends(get_current_persona) # 현재 활성화된 페르소나 ID
@@ -34,6 +35,10 @@ def create_post(
 
         hashtags, mentions = parse_content(post_in.content)
 
+        # 해시태그 최대 10개 제한 정책 적용
+        if len(hashtags) > 10:
+            raise HTTPException(status_code=400, detail="해시태그는 최대 10개까지만 등록할 수 있습니다.")
+
         for tag_keyword in hashtags:
             hashtag_obj = db.query(Hashtag).filter(Hashtag.normalized_keyword == tag_keyword).first()
             if not hashtag_obj:
@@ -52,6 +57,13 @@ def create_post(
                 db.add(PostMention(post_id=new_post.id, persona_id=target_persona.id))
 
         db.commit()
+        
+        # 추천 알고리즘 로깅: 게시물 작성 시 태깅된 공식 영화들에 대해 능동적 가중치 반영 (베이스 스코어 2.0 등 부여)
+        for m_id in post_in.movie_ids:
+            await recommendation_service.record_ml_relationship_log(
+                db, persona_id, "MOVIE", m_id, "create_post", base_score=2.0
+            )
+            
         return {"status": "success", "post_id": new_post.id}
     except IntegrityError as e:
         db.rollback()

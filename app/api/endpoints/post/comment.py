@@ -36,17 +36,27 @@ def create_comment(post_id: int, comment_in: CommentCreate, db: Session = Depend
     db.commit()
     return {"status": "success", "comment_id": new_comment.id}
 
-@router.delete("/comments/{comment_id}")
-def delete_comment(comment_id: int, db: Session = Depends(get_db), persona_id: int = Depends(get_current_persona)):
-    """댓글을 소프트 삭제합니다. 하위에 대댓글이 있으면 내용만 치환합니다."""
-    comment = db.query(Comment).filter(Comment.id == comment_id, Comment.persona_id == persona_id).first()
-    if not comment:
-        raise HTTPException(status_code=404, detail="댓글을 찾을 수 없거나 권한이 없습니다.")
-        
-    replies_count = db.query(Comment).filter(Comment.parent_id == comment.id, Comment.status == "ACTIVE").count()
-    if replies_count > 0:
-        comment.content = "삭제된 댓글입니다"
+@router.get("/{post_id}/comments")
+def get_comments(post_id: int, db: Session = Depends(get_db)):
+    """게시물의 댓글 목록을 조회합니다. 스포일러 댓글은 내용이 마스킹 처리됩니다."""
+    comments = db.query(Comment).filter(
+        Comment.post_id == post_id, 
+        Comment.status == "ACTIVE"
+    ).order_by(Comment.created_at.asc()).all()
     
-    comment.status = "INACTIVE"
-    db.commit()
-    return {"status": "success"}
+    result = []
+    for c in comments:
+        author = c.persona
+        author_name = "알 수 없음" if not author or author.status == "DELETED" else f"{author.nickname}#{author.tag}"
+        
+        is_spoiler = c.is_spoiler == 1
+        
+        result.append({
+            "id": c.id,
+            "parent_id": c.parent_id,
+            "author": author_name,
+            "content": "*** 스포일러 주의! 클릭하여 확인하세요. ***" if is_spoiler else c.content,
+            "is_spoiler": is_spoiler,
+            "created_at": c.created_at
+        })
+    return {"status": "success", "comments": result}
