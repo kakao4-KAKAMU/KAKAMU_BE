@@ -1,8 +1,9 @@
 from fastapi import APIRouter
-from . import register, login, profile
+from . import register, login
+# from . import profile
 
 router = APIRouter()
 
 router.include_router(register.router, prefix="/register")
 router.include_router(login.router, prefix="/login")
-router.include_router(profile.router)
+# router.include_router(profile.router)

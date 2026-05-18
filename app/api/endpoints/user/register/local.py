@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.schemas.user import UserResponse
-from app.schemas.register.local import UserRegister
-from app.models.models import User, LocalAuth
+from app.schemas.register.local import UserRegister, LocalLinkRequest
+from app.models.models import User, LocalAuth, SocialAuth
 from app.core.security import get_password_hash
 from app.api.deps import validate_local_registration, get_current_user
 
@@ -36,23 +36,30 @@ def register_local_user(db: Session = Depends(get_db), val_data: dict = Depends(
 
 @router.post("/local/link", response_model=UserResponse)
 def link_local_user(
+    request: LocalLinkRequest,
     db: Session = Depends(get_db), 
-    val_data: dict = Depends(validate_local_registration),
     current_user: User = Depends(get_current_user)
 ):
-    """로그인된 상태에서 전화번호 재인증을 거쳐 이메일(로컬) 계정을 추가 연동합니다."""
-    user_in: UserRegister = val_data["user_in"]
-    ci_value = val_data["ci_value"]
+    """로그인된 상태에서 이메일(로컬) 계정을 추가 연동합니다. (본인인증 생략)"""
     
-    # 1. 로그인된 유저의 본인인증 정보(ci_value)와 방금 재인증한 정보가 일치하는지 철저히 검증 (타인 명의 연동 차단)
-    if current_user.ci_value != ci_value:
-        raise HTTPException(status_code=400, detail={"code": "CI_MISMATCH", "message": "입력하신 본인인증 정보가 현재 로그인된 계정의 정보와 일치하지 않습니다."})
-        
+    # 1. 사용할 이메일 결정 (입력값이 없으면 기존 소셜 계정에서 끌어오기)
+    link_email = request.email
+    if not link_email:
+        social_auth = db.query(SocialAuth).filter(SocialAuth.user_id == current_user.id).first()
+        if social_auth and social_auth.email:
+            link_email = social_auth.email
+        else:
+            raise HTTPException(status_code=400, detail={"code": "EMAIL_REQUIRED", "message": "소셜 계정에 등록된 이메일이 없습니다. 연동할 이메일을 직접 입력해주세요."})
+            
     # 2. 이미 로컬 계정이 연동되어 있는지 확인
     if db.query(LocalAuth).filter(LocalAuth.user_id == current_user.id).first():
         raise HTTPException(status_code=400, detail={"code": "LOCAL_AUTH_ALREADY_LINKED", "message": "이미 이메일 로그인 정보가 연동되어 있습니다."})
         
-    db.add(LocalAuth(user_id=current_user.id, email=user_in.email, password_hash=get_password_hash(user_in.password)))
+    # 3. 다른 사용자가 이미 이 이메일을 사용 중인지 확인
+    if db.query(LocalAuth).filter(LocalAuth.email == link_email).first():
+        raise HTTPException(status_code=400, detail={"code": "DUPLICATE_EMAIL", "message": "이미 등록된 이메일입니다."})
+        
+    db.add(LocalAuth(user_id=current_user.id, email=link_email, password_hash=get_password_hash(request.password)))
     db.commit()
     db.refresh(current_user)
     return current_user
