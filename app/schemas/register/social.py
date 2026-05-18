@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional
 
 class SocialRegisterRequest(BaseModel):
@@ -9,3 +9,11 @@ class SocialRegisterRequest(BaseModel):
     nickname: str = Field(..., min_length=2, max_length=50, description="서비스 내 닉네임")
     firebase_id_token: str = Field(..., description="Firebase 번호 인증 완료 시 발급된 ID 토큰")
     email: Optional[EmailStr] = Field(default=None, description="소셜 계정에 연동된 이메일 (선택 동의 시)")
+
+    @field_validator('username', 'nickname')
+    @classmethod
+    def strip_and_check_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("공백으로만 이루어질 수 없습니다.")
+        return v
