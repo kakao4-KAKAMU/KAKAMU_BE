@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.redis import redis_client
+from sqlalchemy import text
 
 router = APIRouter()
 
@@ -17,7 +18,16 @@ def read_root():
 # DB 연결 테스트용 엔드포인트
 @router.get("/db-test")
 def test_db(db: Session = Depends(get_db)):
-    return {"status": "Database connection successful"}
+    try:
+        # 실제로 가벼운 쿼리를 날려 커넥션이 진짜 살아있는지 확인
+        db.execute(text("SELECT 1"))
+        return {"status": "Database connection successful"}
+    except Exception as e:
+        # DB가 죽었다면 500 에러를 던짐.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database connection failed"
+        )
 
 @router.get("/redis-test")
 async def test_redis():
