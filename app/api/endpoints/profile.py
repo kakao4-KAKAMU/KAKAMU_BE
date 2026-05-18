@@ -53,9 +53,18 @@ def new_persona_profile(
 
     # 페르소나 계정이 있는 지 검사
     count_stmt = select(func.count(Persona.id)).where(Persona.user_id == user.id )
-    persona_count = db.scalar(count_stmt)
+    persona_count = db.scalar(count_stmt) # 페르소나 계정 개수 반환
 
-    is_main_value = 1 if persona_count == 1 else 0
+
+    if persona_count >= 5: # 계정이 5개 이상이면 생성 금지
+        raise HTTPException(
+            status_code = 400,
+            detail = f"페르소나 계정은 최대 5개 생성 가능합니다."
+        )
+    elif persona_count == 0: # 계정이 0개면 메인 계정으로 설정
+        is_main_value = 1
+    else:
+        is_main_value = 0
 
 
     try:
