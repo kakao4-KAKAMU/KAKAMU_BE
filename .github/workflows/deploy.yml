@@ -2,7 +2,7 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches: [ "main" ] # main 브랜치로 push (merge) 될 때 동작
+    branches: [ "dev" ] # main 브랜치로 push (merge) 될 때 동작
     paths-ignores: # 아래 파일은 제외
       - '**.md'
       - '.gitignore'
