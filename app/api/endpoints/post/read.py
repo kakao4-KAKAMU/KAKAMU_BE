@@ -1,14 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models.models import Post
+from app.models import Post
 
 router = APIRouter()
 
 @router.get("/")
-def get_posts(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
-    """게시물 피드를 조회합니다. 스포일러 게시물은 본문과 제목이 마스킹됩니다."""
-    posts = db.query(Post).filter(Post.status == "ACTIVE").order_by(Post.created_at.desc()).offset(skip).limit(limit).all()
+def get_posts(
+    cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"), 
+    limit: int = Query(20, le=100), 
+    db: Session = Depends(get_db)
+):
+    """게시물 피드를 무한 스크롤(Cursor-based) 방식으로 조회합니다. 스포일러 게시물은 본문과 제목이 마스킹됩니다."""
+    query = db.query(Post).filter(Post.status == "ACTIVE")
+    if cursor:
+        query = query.filter(Post.id < cursor)
+    
+    posts = query.order_by(Post.id.desc()).limit(limit).all()
     
     result = []
     for post in posts:
@@ -31,7 +40,13 @@ def get_posts(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
             # 영화 태그는 스포일러 상관없이 가시 정보로 노출 (정책 반영)
             "movies": [{"id": m.id, "title": m.title} for m in post.movies]
         })
-    return result
+    
+    next_cursor = result[-1]["id"] if result else None
+    return {
+        "items": result,
+        "next_cursor": next_cursor,
+        "has_next": len(result) == limit
+    }
 
 @router.get("/{post_id}")
 def get_post_detail(post_id: int, db: Session = Depends(get_db)):

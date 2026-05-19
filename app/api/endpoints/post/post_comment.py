@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import get_current_persona
 from app.schemas.post.comment import CommentCreate
-from app.models.models import Comment, Post, Persona, CommentMention
+from app.models import Comment, Post, Persona, CommentMention
 from app.utils.parser import parse_content
 
 router = APIRouter()

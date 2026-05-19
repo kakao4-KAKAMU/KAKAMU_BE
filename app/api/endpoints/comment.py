@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import get_current_persona
-from app.models.models import Comment
+from app.models import Comment
 
 router = APIRouter()
 

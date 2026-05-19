@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import get_current_persona
 from app.schemas.post.update import PostUpdate
-from app.models.models import Post, PostMovie
+from app.models import Post, PostMovie
 from app.utils.parser import parse_content
 
 router = APIRouter()

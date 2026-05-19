@@ -2,7 +2,7 @@ import time
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from app.core.redis import redis_client
-from app.models.models import EntityRelationshipLog
+from app.models import EntityRelationshipLog
 
 class RecommendationService:
     def __init__(self):
