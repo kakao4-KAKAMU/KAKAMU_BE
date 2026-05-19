@@ -20,6 +20,9 @@ def verify_firebase_token(id_token: str) -> str | None:
     Firebase 프론트엔드에서 넘어온 id_token을 검증하고, 
     유효하면 전화번호를 반환합니다.
     """
+    # if id_token == "test_code":
+    #     return "+821012345678"
+
     try:
         decoded_token = auth.verify_id_token(id_token)
         phone_number = decoded_token.get('phone_number')
