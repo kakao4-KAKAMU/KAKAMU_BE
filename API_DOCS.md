@@ -46,7 +46,17 @@
 | `DELETE` | `/comments/{comment_id}` | 단일 댓글 삭제 (Soft Delete, 하위 대댓글 함께 비활성화) |
 | `POST` | `/likes` | 대상(게시물/댓글 등)에 대한 좋아요 토글 및 활동 기록 |
 
-## 6. Test (개발 및 테스트용)
+## 6. Relations (팔로우 및 차단)
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/relations/follows/{following_id}` | 특정 페르소나 팔로우 |
+| `DELETE` | `/relations/follows/{following_id}` | 특정 페르소나 팔로우 해제 |
+| `POST` | `/relations/blocks/{blocked_id}` | 특정 페르소나 차단 (레벨: PERSONA/USER 설정 가능) |
+| `DELETE` | `/relations/blocks/{blocked_id}` | 특정 페르소나 차단 해제 |
+| `GET` | `/relations/{target_persona_id}/followers` | 특정 페르소나의 팔로워 목록 조회 (무한 스크롤) |
+| `GET` | `/relations/{target_persona_id}/followings` | 특정 페르소나의 팔로잉 목록 조회 (무한 스크롤) |
+
+## 7. Test (개발 및 테스트용)
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/test/activity` | 페르소나 활동 강제 기록 테스트 (Redis 데이터 갱신) |
