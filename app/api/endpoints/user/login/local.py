@@ -22,7 +22,8 @@ def login_local(request: LocalLoginRequest, db: Session = Depends(get_db)):
         
     # 3. JWT 토큰 발급
     user_id = str(local_auth.user_id)
-    access_token = create_access_token(data={"sub": user_id})
-    refresh_token = create_refresh_token(data={"sub": user_id})
+    # 어떤 방식으로 로그인했는지(provider) 토큰에 포함합니다.
+    access_token = create_access_token(data={"sub": user_id, "provider": "local"})
+    refresh_token = create_refresh_token(data={"sub": user_id, "provider": "local"})
     
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}

@@ -26,8 +26,8 @@ async def social_login(request: SocialLoginRequest, db: Session = Depends(get_db
         ).first()
         
         if social_auth:
-            access_token = create_access_token(data={"sub": str(social_auth.user_id)})
-            refresh_token = create_refresh_token(data={"sub": str(social_auth.user_id)})
+            access_token = create_access_token(data={"sub": str(social_auth.user_id), "provider": request.provider})
+            refresh_token = create_refresh_token(data={"sub": str(social_auth.user_id), "provider": request.provider})
             return TokenResponse(access_token=access_token, refresh_token=refresh_token, is_new_user=False)
         else:
             return TokenResponse(
