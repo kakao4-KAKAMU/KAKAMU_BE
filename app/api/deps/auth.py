@@ -6,7 +6,7 @@ from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.models.models import User
+from app.models import User
 
 security = HTTPBearer()
 

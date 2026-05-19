@@ -7,7 +7,7 @@ from app.core.security import verify_password, create_access_token, create_refre
 
 router = APIRouter()
 
-@router.post("/", response_model=Token)
+@router.post("/local", response_model=Token)
 def login_local(request: LocalLoginRequest, db: Session = Depends(get_db)):
     """JSON 형식(LocalLoginRequest)으로 이메일과 비밀번호를 받아 일반 로그인을 처리합니다."""
     
