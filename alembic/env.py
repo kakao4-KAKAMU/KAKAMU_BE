@@ -4,7 +4,7 @@ from logging.config import fileConfig
 
 from app.core.config import settings  # DB URL을 가져오기 위함
 from app.db.base import Base          # SQLAlchemy Base 클래스
-from app.models.models import *      # 모든 모델을 메모리에 로드하여 감지 가능하게 함
+from app.models import *             # 모든 모델을 메모리에 로드하여 감지 가능하게 함
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool

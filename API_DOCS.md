@@ -28,7 +28,25 @@
 | `POST` | `/movies/{movie_id}/watch` | 선택된 페르소나의 영화 시청 행동을 기록 (취향 업데이트) |
 | `GET` | `/movies/recommend` | 현재 활성화된 페르소나의 컨텍스트를 기반으로 맞춤형 영화 추천 |
 
-## 4. Test (개발 및 테스트용)
+## 4. Posts (게시물 관리)
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/posts` | 게시물 피드 조회 (무한 스크롤, `cursor` 기반, 스포일러 마스킹) |
+| `POST` | `/posts` | 새 게시물 작성 (해시태그/멘션 파싱 및 영화 추천 가중치 반영) |
+| `GET` | `/posts/{post_id}` | 특정 게시물 상세 조회 (스포일러 마스킹 해제) |
+| `PUT` | `/posts/{post_id}` | 게시물 수정 (작성자 본인만 가능) |
+| `DELETE` | `/posts/{post_id}` | 게시물 삭제 (Soft Delete, **하위 댓글도 모두 비활성화 처리**) |
+| `GET` | `/posts/{post_id}/comments` | 특정 게시물의 댓글 목록 조회 |
+| `POST` | `/posts/{post_id}/comments` | 특정 게시물에 댓글 및 대댓글 작성 |
+
+## 5. Comments & Likes (단일 댓글 관리 및 좋아요)
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/comments/{comment_id}` | 단일 댓글 상세 조회 (스포일러 원본 확인용) |
+| `DELETE` | `/comments/{comment_id}` | 단일 댓글 삭제 (Soft Delete, 하위 대댓글 함께 비활성화) |
+| `POST` | `/likes` | 대상(게시물/댓글 등)에 대한 좋아요 토글 및 활동 기록 |
+
+## 6. Test (개발 및 테스트용)
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/test/activity` | 페르소나 활동 강제 기록 테스트 (Redis 데이터 갱신) |

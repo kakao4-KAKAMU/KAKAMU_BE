@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models.models import LocalAuth
+from app.models import LocalAuth
 from app.schemas.login.local import LocalLoginRequest, Token
 from app.core.security import verify_password, create_access_token, create_refresh_token
 

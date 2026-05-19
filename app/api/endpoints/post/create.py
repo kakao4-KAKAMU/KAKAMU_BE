@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import Any
+import re
 
 from app.db.session import get_db
 from app.api.deps import get_current_persona
 from app.schemas.post.create import PostCreate
-from app.models.models import Post, PostMovie, Hashtag, PostHashtag, Persona, PostMention
+from app.models import Post, PostMovie, Hashtag, PostHashtag, Persona, PostMention
 from app.utils.parser import parse_content
 from app.service.recommendation import recommendation_service
 
@@ -39,10 +40,22 @@ async def create_post(
         if len(hashtags) > 10:
             raise HTTPException(status_code=400, detail="해시태그는 최대 10개까지만 등록할 수 있습니다.")
 
+        # 본문 내 동일한 해시태그 중복 입력 방지 (예: #영화 #영화 -> 1개로 취급)
+        normalized_set = set()
         for tag_keyword in hashtags:
-            hashtag_obj = db.query(Hashtag).filter(Hashtag.normalized_keyword == tag_keyword).first()
+            # 정규화: 특수문자 및 공백 제거, 영문 대문자는 소문자로 통일
+            clean_keyword = re.sub(r'[^\w가-힣]', '', tag_keyword).lower()
+            
+            # 정규화 후 빈 문자열이 된 경우(예: 특수문자만 있던 태그) 제외
+            if not clean_keyword:
+                continue
+                
+            normalized_set.add(clean_keyword)
+
+        for clean_keyword in normalized_set:
+            hashtag_obj = db.query(Hashtag).filter(Hashtag.normalized_keyword == clean_keyword).first()
             if not hashtag_obj:
-                hashtag_obj = Hashtag(normalized_keyword=tag_keyword)
+                hashtag_obj = Hashtag(normalized_keyword=clean_keyword)
                 db.add(hashtag_obj)
                 db.flush()
             db.add(PostHashtag(post_id=new_post.id, hashtag_id=hashtag_obj.id))
