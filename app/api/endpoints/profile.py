@@ -1,19 +1,17 @@
-import string
-from http.client import HTTPException
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_, func
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models.models import Persona
-from schemas.profile import PersonaCreate, PersonaResponse, PersonaEdit
-from app.service import profile as profile_service
-from pydantic import BaseModel
-import re
+from app.schemas.profile import PersonaCreate, PersonaResponse, PersonaEdit
+
+from app.service.persona import PersonaService
+
 router = APIRouter()
 
+@router.post("/new_persona234")
+def new_persona_profile2():
+    return {"ok": True}
 # 페르소나 계정 생성, 엔드포인트 /new_persona, 응답은 PersonaResponse 구조로, 상태 코드는 201
 @router.post("/new_persona", response_model=PersonaResponse, status_code=201)
 def new_persona_profile(
@@ -21,74 +19,8 @@ def new_persona_profile(
         user: dict = Depends(get_current_user), # 현재 액세스 토큰으로 인증된 user 정보
         db: Session = Depends(get_db),
 ):
-    # 닉네임 형식 검사 : 닉네임#태그
-    if '#' not in persona_data.nickname:
-        raise HTTPException(
-            status_code=400,
-            detail="닉네임 형식이 틀립니다. '닉네임#태그' 형태로 입력하세요. "
-        )
+    return PersonaService.create_new_persona(db=db, persona_data=persona_data,user_id=user.id)
 
-    name, tag = persona_data.nickname.split('#', 1)
-    # 태그 형식 검사
-    if not re.fullmatch(r'[A-Za-z0-9]{3,5}', tag): # 대소문자, 0~9, 3글자에서 5글자
-        raise HTTPException(
-            status_code=400,
-            detail="태그 형식이 틀립니다. 태그는 숫자와 영어만 가능하며 3~5글자여야 합니다."
-        )
-    # persona 테이블에서 닉네임이 존재하는 지 검사
-    exist_stmt = select(Persona).where(
-        and_(
-            Persona.nickname == name, # and 연산으로 name, tag 비교
-            Persona.tag == tag
-        )
-    )
-
-    existing_persona = db.scalar(exist_stmt)  # 존재하는지 확인, scalar는 없으면 None 반환
-
-    if existing_persona:
-        raise HTTPException(
-            status_code = 400, # 중복된 닉네임있으면 400 에러 발생
-            detail = f"이미 존재하는 닉네임과 태그 조합입니다.({persona_data.nickname})"
-        )
-
-    # 페르소나 계정이 있는 지 검사
-    count_stmt = select(func.count(Persona.id)).where(Persona.user_id == user.id )
-    persona_count = db.scalar(count_stmt) # 페르소나 계정 개수 반환
-
-
-    if persona_count >= 5: # 계정이 5개 이상이면 생성 금지
-        raise HTTPException(
-            status_code = 400,
-            detail = f"페르소나 계정은 최대 5개 생성 가능합니다."
-        )
-    elif persona_count == 0: # 계정이 0개면 메인 계정으로 설정
-        is_main_value = 1
-    else:
-        is_main_value = 0
-
-
-    try:
-        new_profile = Persona(
-            user_id = user.id,
-            nickname = name,
-            profile_msg = persona_data.profile_msg,
-            persona_type = persona_data.persona_type,
-            is_main = is_main_value,
-            preference_status = "on", # 현재 활성화된 페르소나 프로필 (on, off)
-            tag=tag,
-            proflie_image_url = persona_data.proflie_image_url,
-            status = "ACTIVE",
-            delete_at = None
-        )
-
-        db.add(new_profile)
-        db.commit()
-        db.refresh(new_profile)
-
-        return new_profile # schemas/profile.py에 정의한
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"데이터베이스 저장 중 오류 발생")
 
 # 페르소나 수정, 수정된 값만 받게하기
 @router.patch("/persona/{persona_id}")
@@ -97,13 +29,7 @@ def edit_persona_profile(
         persona_edit_data: PersonaEdit,
         db: Session = Depends(get_db)
 ):
-    db_persona = db.get(Persona, persona_id) # 기존 페르소나 데이터 가져오기
-
-    # 수정한 값만 딕셔너리로 추출
-    update_data = persona_edit_data.model_dump(exclude_unset=True)
-
-    for key, value in update_data.items():
-        setattr(db_persona, key, value)
+    return PersonaService.update_persona(db=db, persona_id=persona_id,edit_data=persona_edit_data)
 
 
-
+# 페르소나 삭제
