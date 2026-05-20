@@ -1,17 +1,17 @@
 import redis
 
-from app.core.redis import redis_client
 import re
 from fastapi import HTTPException, status
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 from app.models.models import Persona
 from app.schemas.profile import PersonaEdit
+from app.service.profile.read_persona import PersonaReadService
 
 class PersonaUpdateService:
 
     @staticmethod
-    def update_persona(db: Session, persona_id: int, edit_data: PersonaEdit, user_id: int) -> Persona:
+    async def update_persona(db: Session,redis_client, persona_id: int, edit_data: PersonaEdit, user_id: int) -> Persona:
         db_persona = db.get(Persona, persona_id) # persona_id로 Persona 테이블 찾음
 
 
@@ -68,6 +68,13 @@ class PersonaUpdateService:
 
             db.commit()
             db.refresh(db_persona)
+            # 페르소나 기간 연장 로직 호출
+            await PersonaReadService.get_current_active_persona_id(
+                db = db,
+                redis_client = redis_client,
+                user_id = user_id
+            )
+
             return db_persona
         except Exception as e:
             db.rollback()
