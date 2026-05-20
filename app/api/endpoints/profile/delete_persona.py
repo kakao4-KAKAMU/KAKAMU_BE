@@ -7,7 +7,7 @@ from app.core.redis import get_redis
 from app.db.session import get_db
 from app.schemas.profile import PersonaCreate, PersonaResponse
 
-from app.service.persona import PersonaService
+from app.service.profile import PersonaService
 
 router = APIRouter()
 
