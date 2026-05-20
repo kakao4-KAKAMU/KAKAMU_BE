@@ -84,7 +84,7 @@ class PersonaCreateService:
             db.add(new_profile)
             db.flush() # 페르소나 id 생성
 
-            redis_key = f"user:{user_id}:current_persona"
+            redis_key = f"kakamu:user:{user_id}:current_persona"
             await redis_client.set(redis_key,new_profile.id, ex=259200)
             db.commit()
             db.refresh(new_profile)
