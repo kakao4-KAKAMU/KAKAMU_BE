@@ -2,7 +2,7 @@ import redis
 
 import re
 from fastapi import HTTPException, status
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, update
 from sqlalchemy.orm import Session
 from app.models.models import Persona
 from app.schemas.profile import PersonaEdit
@@ -10,6 +10,7 @@ from app.service.profile.read_persona import PersonaReadService
 
 class PersonaUpdateService:
 
+    # 특정 페르소나 수정
     @staticmethod
     async def update_persona(db: Session,redis_client, persona_id: int, edit_data: PersonaEdit, user_id: int) -> Persona:
         db_persona = db.get(Persona, persona_id) # persona_id로 Persona 테이블 찾음
@@ -79,3 +80,57 @@ class PersonaUpdateService:
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"데이터베이스 저장 중 오류 발생 {str(e)}")
+
+    # 특정 페르소나 활성화 (전환)
+    @staticmethod
+    async def activate_persona(
+            db: Session,
+            redis_client,
+            user_id: int,
+            persona_id: int
+    ) -> Persona:
+        redis_key = f"kakamu:user:{user_id}:current_persona"
+        THREE_DAY = 259200
+
+        target_stmt = select(Persona).where(
+            Persona.id == persona_id,
+            Persona.user_id == user_id,
+            Persona.status == "ACTIVE"
+        )
+
+        target_persona = db.scalar(target_stmt)
+
+        if not target_persona:
+            raise HTTPException(
+                status_code=404,
+                detail="활성화할 페르소나를 찾을 수 없습니다."
+            )
+
+        try:
+            # 해당 유저의 기존 활성 페르소나 전부 off
+            db.execute(
+                update(Persona)
+                .where(
+                    Persona.user_id == user_id,
+                    Persona.status == "ACTIVE"
+                )
+                .values(preference_status="off")
+            )
+
+            # 선택한 페르소나만 on
+            target_persona.preference_status = "on"
+
+            db.commit()
+            db.refresh(target_persona)
+
+            # Redis 현재 페르소나도 갱신
+            await redis_client.set(redis_key, target_persona.id, ex=THREE_DAY)
+
+            return target_persona
+
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"페르소나 활성화 중 오류 발생: {str(e)}"
+            )
