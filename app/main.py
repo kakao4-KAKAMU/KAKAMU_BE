@@ -6,7 +6,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, text
 from urllib.parse import urlparse
 
-from starlette.staticfiles import StaticFiles
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.redis import redis_client
@@ -98,4 +98,4 @@ app.include_router(api_router)
 
 # static 폴더 서빙 추가
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
