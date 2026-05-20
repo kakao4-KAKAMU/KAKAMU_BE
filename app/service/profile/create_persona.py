@@ -12,6 +12,7 @@ class PersonaCreateService:
 
     @staticmethod
     async def create_new_persona(db: Session,redis_client: redis.Redis, persona_data: PersonaCreate, user_id: int) -> Persona:
+        DEFAULT_PROFILE_IMAGE_URL = "/static/default_profile_image.png"
         # 닉네임 형식 검사 : 닉네임#태그
         if '#' not in persona_data.nickname:
             raise HTTPException(
@@ -67,6 +68,7 @@ class PersonaCreateService:
                 .where(and_(Persona.user_id == user_id, Persona.status != "DELETED"))
                 .values(preference_status="off")
             )
+            profile_image_url = persona_data.profile_image_url or DEFAULT_PROFILE_IMAGE_URL
             new_profile = Persona(
                 user_id=user_id,
                 nickname=name,
@@ -75,7 +77,7 @@ class PersonaCreateService:
                 is_main=is_main_value,
                 preference_status="on",  # 현재 활성화된 페르소나 프로필 (on, off)
                 tag=tag,
-                profile_image_url=persona_data.profile_image_url,
+                profile_image_url=profile_image_url,
                 status="ACTIVE",
                 deleted_at=None
             )

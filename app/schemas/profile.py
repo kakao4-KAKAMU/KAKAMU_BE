@@ -5,7 +5,7 @@ from typing import List, Optional
 class PersonaCreate(BaseModel):
     nickname: str # 닉네임
     persona_type: str # 좋아하는 장르, 영화 배우
-    profile_image_url: str # 이미지 url, 기본 프로필 이미지 url 필요
+    profile_image_url: Optional[str] = None # 이미지 url, 기본 프로필 이미지 url 필요
     profile_msg: str = ""
 
 
