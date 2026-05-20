@@ -57,7 +57,7 @@ class PersonaReadService:
 
         # 그 페르소나로 다시 redis에 등록
         if active_id:
-            await redis_client.expire(redis_key,active_id, ex=THREE_DAY)
+            await redis_client.set(redis_key,active_id, ex=THREE_DAY)
             return active_id
 
         return None
