@@ -13,7 +13,7 @@ from app.service.profile import PersonaService
 router = APIRouter()
 
 
-@router.post("/new_persona", response_model=PersonaResponse, status_code=201)
+@router.post("/persona", response_model=PersonaResponse, status_code=201)
 async def new_persona_profile(
         persona_data: PersonaCreate, # 사용자 입력 데이터
         user: User = Depends(get_current_user), # 현재 액세스 토큰으로 인증된 user 정보
