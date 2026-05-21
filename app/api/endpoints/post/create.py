@@ -61,7 +61,9 @@ async def create_post(
             db.add(PostHashtag(post_id=new_post.id, hashtag_id=hashtag_obj.id))
 
         for mention_str in mentions:
-            nickname, tag = mention_str.split("#")
+            if "#" not in mention_str:
+                continue
+            nickname, tag = mention_str.split("#", 1)
             
             target_persona = db.query(Persona).filter(
                 Persona.nickname == nickname, Persona.tag == tag, Persona.status == "ACTIVE"

@@ -4,13 +4,15 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import get_current_persona
 from app.schemas.post.update import PostUpdate
-from app.models import Post, PostMovie
+from app.models import Post, PostMovie, Hashtag, PostHashtag, Persona, PostMention
 from app.utils.parser import parse_content
+from app.service.recommendation import recommendation_service
+import re
 
 router = APIRouter()
 
 @router.put("/{post_id}")
-def update_post(
+async def update_post(
     post_id: int,
     post_in: PostUpdate,
     db: Session = Depends(get_db),
@@ -38,14 +40,49 @@ def update_post(
 
     # 영화 태그 수정 로직 (기존 태그 삭제 후 재등록 - Hard Delete or Inactive)
     if post_in.movie_ids is not None:
+        # 1. 기존 태그 추천 가중치 롤백
+        existing_movies = db.query(PostMovie).filter(PostMovie.post_id == post.id).all()
+        for em in existing_movies:
+            await recommendation_service.record_ml_relationship_log(
+                db, persona_id, "MOVIE", em.movie_id, "create_post", base_score=2.0, is_undo=True
+            )
+            
         db.query(PostMovie).filter(PostMovie.post_id == post.id).delete()
         for m_id in post_in.movie_ids:
             db.add(PostMovie(post_id=post.id, movie_id=m_id))
+            # 2. 새 태그 추천 가중치 반영
+            await recommendation_service.record_ml_relationship_log(
+                db, persona_id, "MOVIE", m_id, "create_post", base_score=2.0
+            )
             
-    # 참고: 본문(content)이 수정된 경우 해시태그/멘션도 다시 추출하여 연결하는 로직이 추가로 필요합니다.
-    # if post_in.content is not None:
-    #     hashtags, mentions = parse_content(post_in.content)
-    #     # 기존 연결 삭제 후 재연결 로직 추가...
+    # 본문(content)이 수정된 경우 해시태그/멘션도 다시 추출하여 연결
+    if post_in.content is not None:
+        db.query(PostHashtag).filter(PostHashtag.post_id == post.id).delete()
+        db.query(PostMention).filter(PostMention.post_id == post.id).delete()
+        
+        hashtags, mentions = parse_content(post_in.content)
+        
+        normalized_set = set()
+        for tag_keyword in hashtags:
+            clean_keyword = re.sub(r'[^\w가-힣]', '', tag_keyword).lower()
+            if clean_keyword:
+                normalized_set.add(clean_keyword)
+                
+        for clean_keyword in list(normalized_set)[:10]: # 최대 10개 제한 적용
+            hashtag_obj = db.query(Hashtag).filter(Hashtag.normalized_keyword == clean_keyword).first()
+            if not hashtag_obj:
+                hashtag_obj = Hashtag(normalized_keyword=clean_keyword)
+                db.add(hashtag_obj)
+                db.flush()
+            db.add(PostHashtag(post_id=post.id, hashtag_id=hashtag_obj.id))
+            
+        for mention_str in mentions:
+            if "#" not in mention_str:
+                continue
+            nickname, tag = mention_str.split("#", 1)
+            target_persona = db.query(Persona).filter(Persona.nickname == nickname, Persona.tag == tag, Persona.status == "ACTIVE").first()
+            if target_persona:
+                db.add(PostMention(post_id=post.id, persona_id=target_persona.id))
 
     db.commit()
     return {"status": "success", "post_id": post.id}

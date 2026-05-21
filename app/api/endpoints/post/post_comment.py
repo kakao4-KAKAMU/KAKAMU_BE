@@ -9,7 +9,6 @@ from app.utils.parser import parse_content
 router = APIRouter()
 
 @router.post("/", status_code=201)
-@router.post("/", status_code=201)
 def create_comment(post_id: int, comment_in: CommentCreate, db: Session = Depends(get_db), persona_id: int = Depends(get_current_persona)):
     """게시물에 댓글(또는 대댓글)을 작성합니다."""
     post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()
@@ -29,7 +28,10 @@ def create_comment(post_id: int, comment_in: CommentCreate, db: Session = Depend
     # 댓글 내용에서 멘션 파싱 및 연동
     _, mentions = parse_content(comment_in.content)
     for mention_str in mentions:
-        nickname, tag = mention_str.split("#")
+        if "#" not in mention_str:
+            continue
+        # 최대 1번만 분리되도록 방어
+        nickname, tag = mention_str.split("#", 1)
         target_persona = db.query(Persona).filter(Persona.nickname == nickname, Persona.tag == tag, Persona.status == "ACTIVE").first()
         if target_persona:
             db.add(CommentMention(comment_id=new_comment.id, persona_id=target_persona.id))
@@ -55,6 +57,7 @@ def get_comments(post_id: int, db: Session = Depends(get_db)):
         result.append({
             "id": c.id,
             "parent_id": c.parent_id,
+            "author_id": None if not author or author.status == "DELETED" else author.id,
             "author": author_name,
             "content": "*** 스포일러 주의! 클릭하여 확인하세요. ***" if is_spoiler else c.content,
             "is_spoiler": is_spoiler,

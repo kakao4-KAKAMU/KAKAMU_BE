@@ -1,14 +1,17 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.db.session import get_db
 from app.service.recommendation import recommendation_service
-from app.service.profile import PersonaService as persona_service
+from app.service.persona import PersonaService
 from app.api.deps import get_current_persona
 
 router = APIRouter()
 
 @router.post("/{movie_id}/watch")
-async def watch_movie(movie_id: int, user_id: int):
+async def watch_movie(movie_id: int, user_id: int, db: Session = Depends(get_db)):
+    persona_service = PersonaService()
     # 1. 현재 어떤 페르소나로 접속 중인지 Redis에서 조회
-    persona_id = await persona_service.get_active_persona_id(user_id)
+    persona_id = await persona_service.get_current_active_persona_id(db, user_id)
     if not persona_id:
         return {"error": "페르소나를 먼저 선택하세요."}
 

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import get_current_persona
-from app.models import Comment
+from app.models import Comment, LikeLog
 
 router = APIRouter()
 
@@ -16,6 +16,9 @@ def delete_comment(comment_id: int, db: Session = Depends(get_db), persona_id: i
     # 부모 댓글 및 연관된 하위 대댓글 모두 비활성화
     comment.status = "INACTIVE"
     db.query(Comment).filter(Comment.parent_id == comment.id).update({"status": "INACTIVE"})
+    
+    # 댓글에 달린 좋아요 무효화
+    db.query(LikeLog).filter(LikeLog.target_type == "COMMENT", LikeLog.target_id == comment.id).update({"is_active": 0})
         
     db.commit()
     return {"status": "success"}
