@@ -7,3 +7,7 @@ redis_client = redis.from_url(
     decode_responses=True,
     encoding="utf-8"
 )
+# Redis 서버 관리
+async def get_redis():
+    async with redis_client as client:
+        yield client

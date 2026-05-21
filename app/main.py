@@ -6,6 +6,8 @@ from alembic.config import Config
 from sqlalchemy import create_engine, text
 from urllib.parse import urlparse
 
+from fastapi.staticfiles import StaticFiles
+
 from app.core.config import settings
 from app.core.redis import redis_client
 from app.api.api import api_router
@@ -93,3 +95,7 @@ app.add_middleware(
 
 # 중앙 라우터 허브 등록
 app.include_router(api_router)
+
+# static 폴더 서빙 추가
+
+app.mount("/static", StaticFiles(directory="app/static"), name="static")

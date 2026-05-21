@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from app.service.recommendation import recommendation_service
-from app.service.persona import persona_service
+from app.service.profile import PersonaService as persona_service
 from app.api.deps import get_current_persona
 
 router = APIRouter()
