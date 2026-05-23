@@ -5,11 +5,12 @@ from app.api.deps import get_current_persona
 from app.schemas.post.comment import CommentCreate
 from app.models import Comment, Post, Persona, CommentMention
 from app.utils.parser import parse_content
+from uuid import UUID
 
 router = APIRouter()
 
 @router.post("/", status_code=201)
-def create_comment(post_id: int, comment_in: CommentCreate, db: Session = Depends(get_db), persona_id: int = Depends(get_current_persona)):
+def create_comment(post_id: int, comment_in: CommentCreate, db: Session = Depends(get_db), persona_id: UUID = Depends(get_current_persona)):
     """게시물에 댓글(또는 대댓글)을 작성합니다."""
     post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()
     if not post:
@@ -59,7 +60,7 @@ def get_comments(post_id: int, db: Session = Depends(get_db)):
             "parent_id": c.parent_id,
             "author_id": None if not author or author.status == "DELETED" else author.id,
             "author": author_name,
-            "content": "*** 스포일러 주의! 클릭하여 확인하세요. ***" if is_spoiler else c.content,
+            "content": "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else c.content,
             "is_spoiler": is_spoiler,
             "created_at": c.created_at
         })

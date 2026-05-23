@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from app.db.session import get_db
 from app.api.deps import get_current_persona
@@ -12,7 +13,7 @@ router = APIRouter()
 async def delete_post(
     post_id: int,
     db: Session = Depends(get_db),
-    persona_id: int = Depends(get_current_persona)
+    persona_id: UUID = Depends(get_current_persona)
 ):
     """게시물을 서비스에서 즉시 숨김(Soft Delete) 처리합니다."""
     post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()

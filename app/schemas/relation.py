@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from enum import Enum
 from typing import List, Optional
+from uuid import UUID
 
 class BlockLevel(str, Enum):
     PERSONA = "PERSONA"
@@ -14,12 +15,12 @@ class BlockRequest(BaseModel):
     level: BlockLevel = BlockLevel.PERSONA
 
 class PersonaSimpleInfo(BaseModel):
-    id: int
+    id: UUID
     nickname: str
     tag: str
     profile_image_url: Optional[str] = None
 
 class FollowListResponse(BaseModel):
     items: List[PersonaSimpleInfo]
-    next_cursor: Optional[int] = None
+    next_cursor: Optional[UUID] = None
     has_next: bool

@@ -1,6 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from uuid import UUID
 from app.db.session import get_db
 from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block
 from app.api.deps import get_current_persona
@@ -12,7 +13,7 @@ def get_posts(
     cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"), 
     limit: int = Query(20, le=100), 
     db: Session = Depends(get_db),
-    current_persona_id: int = Depends(get_current_persona)
+    current_persona_id: UUID = Depends(get_current_persona)
 ):
     """게시물 피드를 무한 스크롤(Cursor-based) 방식으로 조회합니다. 스포일러 게시물은 본문과 제목이 마스킹됩니다."""
     

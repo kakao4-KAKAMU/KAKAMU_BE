@@ -104,7 +104,7 @@ class PersonaCreateService:
                 db.flush()
 
             redis_key = f"kakamu:user:{user_id}:current_persona"
-            await redis_client.set(redis_key,new_profile.id, ex=259200)
+            await redis_client.set(redis_key, str(new_profile.id), ex=259200)
             db.commit()
             db.refresh(new_profile)
 

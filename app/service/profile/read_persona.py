@@ -6,13 +6,14 @@ from sqlalchemy import select, and_, func, update
 from sqlalchemy.orm import Session
 from app.models import Persona
 from app.schemas.profile import PersonaCreate
-from typing import List
+from typing import List, Optional
+from uuid import UUID
 
 class PersonaReadService:
 
     # 내 모든 페르소나 조회
     @staticmethod
-    async def get_my_personas(db: Session, user_id: int) -> List[Persona]:
+    async def get_my_personas(db: Session, user_id: UUID) -> List[Persona]:
         stmt = select(Persona).where(
             Persona.user_id == user_id,
             Persona.status != "DELETED"
@@ -24,8 +25,8 @@ class PersonaReadService:
     @staticmethod
     async def get_persona_detail(
         db: Session,
-        user_id: int,
-        persona_id: int
+        user_id: UUID,
+        persona_id: UUID
     ) -> Persona:
         stmt = select(Persona).where(
             Persona.id == persona_id,
@@ -45,7 +46,7 @@ class PersonaReadService:
 
     # 현재 활성화 된 페르소나 계정 조회
     @staticmethod
-    async def get_current_persona(db: Session, redis_client, user_id: int):
+    async def get_current_persona(db: Session, redis_client, user_id: UUID):
         persona_id = await PersonaReadService.get_current_active_persona_id(
             db=db,
             redis_client=redis_client,
@@ -67,7 +68,7 @@ class PersonaReadService:
 
     # 현재 활성화 된 계정 가져오기 + 자동 기간 갱신
     @staticmethod
-    async def get_current_active_persona_id(db: Session,redis_client, user_id: int) -> int:
+    async def get_current_active_persona_id(db: Session,redis_client, user_id: UUID) -> Optional[UUID]:
         redis_key = f"kakamu:user:{user_id}:current_persona"
         THREE_DAY = 259200
 
@@ -77,7 +78,8 @@ class PersonaReadService:
         # redis에 값이 존재하면 만료 시간 3일 연장
         if cached_persona_id is not None:
             await redis_client.expire(redis_key, THREE_DAY)
-            return int(cached_persona_id)
+            # Redis에서 가져온 byte 문자열을 UUID로 변환
+            return UUID(cached_persona_id.decode('utf-8')) if isinstance(cached_persona_id, bytes) else UUID(str(cached_persona_id))
 
         # 만약 없으면 현재 "on" 상태의 페르소나 조회 후 페르소나 id만 조회
         stmt = select(Persona.id).where(
@@ -89,16 +91,16 @@ class PersonaReadService:
 
         # 그 페르소나로 다시 redis에 등록
         if active_id:
-            await redis_client.set(redis_key,active_id, ex=THREE_DAY)
+            await redis_client.set(redis_key, str(active_id), ex=THREE_DAY)
             return active_id
 
         return None
 
     @staticmethod
-    async def get_active_persona_id(redis_client,user_id: int):
+    async def get_active_persona_id(redis_client,user_id: UUID) -> Optional[UUID]:
         """
         현재 유저가 어떤 페르소나로 접속 중인지 가져옵니다.
         """
         key = f"kakamu:user:{user_id}:current_persona"
         persona_id = await redis_client.get(key)
-        return int(persona_id) if persona_id else None
+        return UUID(persona_id.decode('utf-8')) if isinstance(persona_id, bytes) else (UUID(str(persona_id)) if persona_id else None)

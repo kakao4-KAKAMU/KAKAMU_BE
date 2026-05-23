@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models import Persona, Follow, Block
+from uuid import UUID
 
 class RelationService:
-    async def follow(self, db: Session, follower_id: int, following_id: int):
+    async def follow(self, db: Session, follower_id: UUID, following_id: UUID):
         target = db.query(Persona).filter(Persona.id == following_id).first()
         if not target:
             raise HTTPException(status_code=404, detail="팔로우 대상 페르소나를 찾을 수 없습니다.")
@@ -26,7 +27,7 @@ class RelationService:
         db.commit()
         return {"status": "success", "message": "팔로우가 완료되었습니다."}
 
-    async def unfollow(self, db: Session, follower_id: int, following_id: int):
+    async def unfollow(self, db: Session, follower_id: UUID, following_id: UUID):
         existing = db.query(Follow).filter_by(follower_id=follower_id, following_id=following_id).first()
         if not existing:
             return {"status": "success", "message": "팔로우 상태가 아닙니다."}
@@ -35,7 +36,7 @@ class RelationService:
         db.commit()
         return {"status": "success", "message": "언팔로우 되었습니다."}
 
-    async def block(self, db: Session, blocker_id: int, blocked_id: int, level: str):
+    async def block(self, db: Session, blocker_id: UUID, blocked_id: UUID, level: str):
         target = db.query(Persona).filter(Persona.id == blocked_id).first()
         if not target:
             raise HTTPException(status_code=404, detail="차단 대상 페르소나를 찾을 수 없습니다.")
@@ -57,7 +58,7 @@ class RelationService:
         # USER 차단 시, 피드 조회나 검색 쿼리단에서 Block level='USER'일 때 target의 user_id를 참조해 전체 차단으로 적용하면 익명성을 유지할 수 있습니다.
         return {"status": "success", "message": "차단이 완료되었습니다."}
 
-    async def unblock(self, db: Session, blocker_id: int, blocked_id: int):
+    async def unblock(self, db: Session, blocker_id: UUID, blocked_id: UUID):
         existing = db.query(Block).filter_by(blocker_id=blocker_id, blocked_id=blocked_id).first()
         if not existing:
             return {"status": "success", "message": "차단된 상태가 아닙니다."}

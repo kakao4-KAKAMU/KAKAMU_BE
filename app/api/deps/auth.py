@@ -36,7 +36,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     except InvalidTokenError:
         raise credentials_exception
         
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
     return user
