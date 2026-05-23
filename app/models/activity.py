@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, SmallInteger, Numeric, Double, Text, JSON, UniqueConstraint, Index
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base import Base
@@ -7,7 +8,7 @@ class Comment(Base):
     __tablename__ = "comment"
     id = Column(Integer, primary_key=True)    
     post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), nullable=False)    
-    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
     parent_id = Column(Integer, ForeignKey("comment.id", ondelete="CASCADE"), nullable=True) 
     content = Column(String(1000))    
     is_spoiler = Column(SmallInteger, default=0) 
@@ -26,12 +27,12 @@ class Comment(Base):
 class CommentMention(Base):
     __tablename__ = "comment_mention"
     comment_id = Column(Integer, ForeignKey("comment.id", ondelete="CASCADE"), primary_key=True)    
-    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
 
 class LikeLog(Base):
     __tablename__ = "like_log"
     id = Column(Integer, primary_key=True, autoincrement=True)    
-    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
     target_type = Column(String(20), nullable=False) 
     target_id = Column(Integer, nullable=False)    
     is_active = Column(SmallInteger, default=1) 
@@ -46,7 +47,7 @@ class LikeLog(Base):
 class EntityRelationshipLog(Base):
     __tablename__ = "entity_relationship_log"
     id = Column(Integer, primary_key=True)    
-    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
     relation_type = Column(String(30))    
     target_type = Column(String(30))    
     target_id = Column(Integer)    

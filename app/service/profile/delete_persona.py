@@ -5,7 +5,7 @@ import re
 from fastapi import HTTPException, status
 from sqlalchemy import select, and_, func, update
 from sqlalchemy.orm import Session
-from app.models.models import Persona
+from app.models import Persona
 from app.schemas.profile import PersonaCreate
 
 class PersonaDeleteService:

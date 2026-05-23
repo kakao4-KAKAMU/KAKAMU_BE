@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from uuid import UUID
 from app.db.session import get_db
 from app.api.deps import get_current_persona
 from app.models import Comment, LikeLog
@@ -7,7 +8,7 @@ from app.models import Comment, LikeLog
 router = APIRouter()
 
 @router.delete("/{comment_id}")
-def delete_comment(comment_id: int, db: Session = Depends(get_db), persona_id: int = Depends(get_current_persona)):
+def delete_comment(comment_id: int, db: Session = Depends(get_db), persona_id: UUID = Depends(get_current_persona)):
     """댓글을 소프트 삭제합니다. 삭제 시 하위 대댓글도 모두 함께 비활성화(INACTIVE) 처리됩니다."""
     comment = db.query(Comment).filter(Comment.id == comment_id, Comment.persona_id == persona_id).first()
     if not comment:

@@ -1,5 +1,6 @@
 import time
 from typing import List, Dict, Any
+from uuid import UUID
 from sqlalchemy.orm import Session
 from app.core.redis import redis_client
 from app.models import EntityRelationshipLog
@@ -12,7 +13,7 @@ class RecommendationService:
     async def record_ml_relationship_log(
         self, 
         db: Session, 
-        persona_id: int, 
+        persona_id: UUID, 
         target_type: str, 
         target_id: int, 
         action: str, 
@@ -48,7 +49,7 @@ class RecommendationService:
         # 참고: 이 로그는 타인에 의해 target_id 원본이 삭제되더라도 
         # FK 제약조건이 없으므로 이 로그 테이블에 안전하게 남아 추천 알고리즘 훈련에 사용됩니다.
 
-    async def record_activity(self, persona_id: int, movie_id: int, action: str):
+    async def record_activity(self, persona_id: UUID, movie_id: int, action: str):
         """페르소나의 실시간 활동(클릭/시청)을 Redis Sorted Set에 기록"""
         activity_key = f"kakamu:persona:{persona_id}:activities"
         timestamp = int(time.time())
@@ -58,13 +59,13 @@ class RecommendationService:
         # 최신 50개만 남기고 삭제 (메모리 최적화)
         await self.redis.zremrangebyrank(activity_key, 0, -51)
 
-    async def update_persona_preference(self, persona_id: int, genres: List[str]):
+    async def update_persona_preference(self, persona_id: UUID, genres: List[str]):
         """활동 기반으로 페르소나의 장르 선호도 점수를 증가시킴 (Hash)"""
         pref_key = f"kakamu:persona:{persona_id}:preferences"
         for genre in genres:
             await self.redis.hincrby(pref_key, genre, 1)
 
-    async def get_persona_context(self, persona_id: int) -> Dict[str, Any]:
+    async def get_persona_context(self, persona_id: UUID) -> Dict[str, Any]:
         """추천 엔진에 전달할 유저의 최신 상태(Context)를 한 번에 가져옴"""
         activity_key = f"kakamu:persona:{persona_id}:activities"
         pref_key = f"kakamu:persona:{persona_id}:preferences"

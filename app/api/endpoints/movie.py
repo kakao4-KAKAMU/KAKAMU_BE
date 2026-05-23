@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from uuid import UUID
 from app.db.session import get_db
 from app.service.recommendation import recommendation_service
 from app.service.persona import PersonaService
@@ -8,7 +9,7 @@ from app.api.deps import get_current_persona
 router = APIRouter()
 
 @router.post("/{movie_id}/watch")
-async def watch_movie(movie_id: int, user_id: int, db: Session = Depends(get_db)):
+async def watch_movie(movie_id: int, user_id: UUID, db: Session = Depends(get_db)):
     persona_service = PersonaService()
     # 1. 현재 어떤 페르소나로 접속 중인지 Redis에서 조회
     persona_id = await persona_service.get_current_active_persona_id(db, user_id)
@@ -22,7 +23,7 @@ async def watch_movie(movie_id: int, user_id: int, db: Session = Depends(get_db)
     return {"message": f"Persona {persona_id} watched movie {movie_id}"}
 
 @router.get("/recommend")
-async def get_movies(active_persona_id: int = Depends(get_current_persona)):
+async def get_movies(active_persona_id: UUID = Depends(get_current_persona)):
     # 1. 이제 active_persona_id를 바로 사용 가능!
     # 2. 이 ID로 RecommendationService의 context를 불러옴
     context = await recommendation_service.get_recent_persona_context(active_persona_id)

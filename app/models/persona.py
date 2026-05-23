@@ -1,11 +1,13 @@
+import uuid
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, SmallInteger, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 class Persona(Base):
     __tablename__ = "persona"
-    id = Column(Integer, primary_key=True, autoincrement=True)    
-    user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)    
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
     nickname = Column(String(50), nullable=False) 
     tag = Column(String(10), nullable=False) 
     profile_image_url = Column(String(500)) 
@@ -23,17 +25,27 @@ class Persona(Base):
     following = relationship("Follow", foreign_keys="Follow.follower_id", back_populates="follower", cascade="all, delete-orphan")    
     followers = relationship("Follow", foreign_keys="Follow.following_id", back_populates="following_persona", cascade="all, delete-orphan")    
 
+    # 선호 취향 매핑 테이블들과의 관계 설정
+    fav_genres = relationship("FavGenre", cascade="all, delete-orphan")
+    fav_people = relationship("FavPeople", cascade="all, delete-orphan")
+    fav_movies = relationship("FavMovie", cascade="all, delete-orphan")
+
     __table_args__ = (
         UniqueConstraint('nickname', 'tag', name='uq_persona_nickname_tag'),
     )
 
 class FavGenre(Base):
     __tablename__ = "fav_genre"
-    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
     genre_id = Column(Integer, ForeignKey("genre.id", ondelete="CASCADE"), primary_key=True)    
 
 class FavPeople(Base):
     __tablename__ = "fav_people"
-    persona_id = Column(Integer, ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
     people_id = Column(Integer, ForeignKey("people.id", ondelete="CASCADE"), primary_key=True)    
     type = Column(String(30))    
+
+class FavMovie(Base):
+    __tablename__ = "fav_movie"
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
+    movie_id = Column(Integer, ForeignKey("movie.id", ondelete="CASCADE"), primary_key=True)    

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from app.db.session import get_db
 from app.api.deps import get_current_persona
@@ -16,7 +17,7 @@ async def update_post(
     post_id: int,
     post_in: PostUpdate,
     db: Session = Depends(get_db),
-    persona_id: int = Depends(get_current_persona)
+    persona_id: UUID = Depends(get_current_persona)
 ):
     """게시물을 수정합니다. 본문이 수정되면 '수정됨' 표시를 위한 갱신이 일어납니다."""
     post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()

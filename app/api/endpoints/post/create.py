@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import Any
+from uuid import UUID
 import re
 
 from app.db.session import get_db
@@ -17,7 +18,7 @@ router = APIRouter()
 async def create_post(
     post_in: PostCreate,
     db: Session = Depends(get_db),
-    persona_id: int = Depends(get_current_persona) # 현재 활성화된 페르소나 ID
+    persona_id: UUID = Depends(get_current_persona) # 현재 활성화된 페르소나 ID
 ) -> Any:
     """새로운 게시물을 작성하고 해시태그 및 멘션을 파싱하여 연결합니다."""
     try:

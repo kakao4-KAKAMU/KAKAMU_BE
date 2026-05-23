@@ -1,10 +1,11 @@
 import redis
 
 import re
+from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import select, and_, update
 from sqlalchemy.orm import Session
-from app.models.models import Persona
+from app.models import Persona
 from app.schemas.profile import PersonaEdit
 from app.service.profile.read_persona import PersonaReadService
 
@@ -12,7 +13,7 @@ class PersonaUpdateService:
 
     # 특정 페르소나 수정
     @staticmethod
-    async def update_persona(db: Session,redis_client, persona_id: int, edit_data: PersonaEdit, user_id: int) -> Persona:
+    async def update_persona(db: Session,redis_client, persona_id: UUID, edit_data: PersonaEdit, user_id: UUID) -> Persona:
         db_persona = db.get(Persona, persona_id) # persona_id로 Persona 테이블 찾음
 
 
@@ -86,8 +87,8 @@ class PersonaUpdateService:
     async def activate_persona(
             db: Session,
             redis_client,
-            user_id: int,
-            persona_id: int
+            user_id: UUID,
+            persona_id: UUID
     ) -> Persona:
         redis_key = f"kakamu:user:{user_id}:current_persona"
         THREE_DAY = 259200
