@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.models import User
+from app.models import User
 from app.api.deps import get_current_user
 from app.core.redis import get_redis
 from app.db.session import get_db
