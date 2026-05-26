@@ -16,3 +16,7 @@ async def test_get_context(persona_id: int):
     """페르소나의 실시간 컨텍스트 조회 테스트"""
     context = await recommendation_service.get_persona_context(persona_id)
     return context
+
+@router.get("/test-500") # 강제 500 에러 코드 반환
+async def test_500():
+    return 1 / 0
