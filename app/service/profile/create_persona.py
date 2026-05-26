@@ -1,16 +1,15 @@
-import redis
-
 import re
+from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import select, and_, func, update
 from sqlalchemy.orm import Session
-from app.models.models import Persona
+from app.models import Persona
+from app.models import FavMovie, FavGenre, FavPeople
 from app.schemas.profile import PersonaCreate
 
 class PersonaCreateService:
-
     @staticmethod
-    async def create_new_persona(db: Session,redis_client: redis.Redis, persona_data: PersonaCreate, user_id: int) -> Persona:
+    async def create_new_persona(db: Session, persona_data: PersonaCreate, user_id: UUID) -> Persona:
         DEFAULT_PROFILE_IMAGE_URL = "/static/default_profile_image.png"
         # 닉네임 형식 검사 : 닉네임#태그
         if '#' not in persona_data.nickname:
@@ -84,8 +83,23 @@ class PersonaCreateService:
             db.add(new_profile)
             db.flush() # 페르소나 id 생성
 
-            redis_key = f"kakamu:user:{user_id}:current_persona"
-            await redis_client.set(redis_key,new_profile.id, ex=259200)
+            # 선호 취향(영화, 장르, 인물) 데이터가 넘어왔다면 DB에 저장
+            if persona_data.fav_movie_ids:
+                for movie_id in persona_data.fav_movie_ids:
+                    db.add(FavMovie(persona_id=new_profile.id, movie_id=movie_id))
+                    
+            if persona_data.fav_genre_ids:
+                for genre_id in persona_data.fav_genre_ids:
+                    db.add(FavGenre(persona_id=new_profile.id, genre_id=genre_id))
+                    
+            if persona_data.fav_people_ids:
+                for people_id in persona_data.fav_people_ids:
+                    # 인물의 type("ACTOR", "DIRECTOR" 등)이 필요하지만 우선 "FAVORITE"으로 통일하여 저장
+                    db.add(FavPeople(persona_id=new_profile.id, people_id=people_id, type="FAVORITE"))
+                    
+            if persona_data.fav_movie_ids or persona_data.fav_genre_ids or persona_data.fav_people_ids:
+                db.flush()
+
             db.commit()
             db.refresh(new_profile)
 
@@ -93,4 +107,3 @@ class PersonaCreateService:
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"데이터베이스 저장 중 오류 발생 {str(e)}")
-

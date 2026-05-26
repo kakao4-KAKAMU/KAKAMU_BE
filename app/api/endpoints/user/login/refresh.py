@@ -19,7 +19,9 @@ def refresh_access_token(request: RefreshRequest):
         if not user_id:
             raise HTTPException(status_code=401, detail={"code": "INVALID_TOKEN_PAYLOAD", "message": "토큰 내 사용자 정보가 없습니다."})
             
-        new_access_token = create_access_token(data={"sub": user_id})
+        provider = payload.get("provider", "unknown")
+        persona_id = payload.get("persona_id")
+        new_access_token = create_access_token(data={"sub": user_id, "provider": provider, "persona_id": persona_id})
         return {"access_token": new_access_token, "refresh_token": request.refresh_token, "token_type": "bearer"}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail={"code": "TOKEN_EXPIRED", "message": "리프레시 토큰이 만료되었습니다. 다시 로그인해주세요."})

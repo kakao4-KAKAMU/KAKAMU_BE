@@ -1,4 +1,5 @@
 import redis
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -13,11 +14,9 @@ from app.service.profile import PersonaService
 router = APIRouter()
 
 @router.delete("/persona/{persona_id}", status_code=204)
-async def delete_persona(
-        persona_id: int,
-        user:User = Depends(get_current_user),
-        db: Session = Depends(get_db),
-        redis_client : redis.Redis = Depends(get_redis)
+def delete_persona(
+    persona_id: UUID
+
 ):
     await PersonaService.delete_persona_soft(
         db = db,

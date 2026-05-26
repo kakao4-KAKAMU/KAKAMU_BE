@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.schemas.login.social import SocialLoginRequest, TokenResponse
 from app.service.social_auth import get_kakao_user_info
-from app.models.models import SocialAuth
+from app.models import SocialAuth, Persona
 from app.core.security import create_access_token, create_refresh_token
 
 router = APIRouter()
@@ -26,8 +26,11 @@ async def social_login(request: SocialLoginRequest, db: Session = Depends(get_db
         ).first()
         
         if social_auth:
-            access_token = create_access_token(data={"sub": str(social_auth.user_id)})
-            refresh_token = create_refresh_token(data={"sub": str(social_auth.user_id)})
+            # 로그인 시에는 페르소나를 자동으로 선택하지 않고 null 상태로 둡니다.
+            persona_id_str = None
+
+            access_token = create_access_token(data={"sub": str(social_auth.user_id), "provider": request.provider, "persona_id": persona_id_str})
+            refresh_token = create_refresh_token(data={"sub": str(social_auth.user_id), "provider": request.provider, "persona_id": persona_id_str})
             return TokenResponse(access_token=access_token, refresh_token=refresh_token, is_new_user=False)
         else:
             return TokenResponse(

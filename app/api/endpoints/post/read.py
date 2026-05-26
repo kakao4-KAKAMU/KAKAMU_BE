@@ -1,14 +1,37 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from uuid import UUID
 from app.db.session import get_db
-from app.models.models import Post
+from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block
+from app.api.deps import get_current_persona
 
 router = APIRouter()
 
 @router.get("/")
-def get_posts(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
-    """게시물 피드를 조회합니다. 스포일러 게시물은 본문과 제목이 마스킹됩니다."""
-    posts = db.query(Post).filter(Post.status == "ACTIVE").order_by(Post.created_at.desc()).offset(skip).limit(limit).all()
+def get_posts(
+    cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"), 
+    limit: int = Query(20, le=100), 
+    db: Session = Depends(get_db),
+    current_persona_id: UUID = Depends(get_current_persona)
+):
+    """게시물 피드를 무한 스크롤(Cursor-based) 방식으로 조회합니다. 스포일러 게시물은 본문과 제목이 마스킹됩니다."""
+    
+    # 1. 내가 차단한 페르소나와 나를 차단한 페르소나의 ID 목록 조회
+    blocked_by_me = db.query(Block.blocked_id).filter(Block.blocker_id == current_persona_id).all()
+    blocking_me = db.query(Block.blocker_id).filter(Block.blocked_id == current_persona_id).all()
+    excluded_persona_ids = [b[0] for b in blocked_by_me] + [b[0] for b in blocking_me]
+
+    query = db.query(Post).filter(Post.status == "ACTIVE")
+    
+    # 2. 차단 대상의 게시물은 피드에서 제외
+    if excluded_persona_ids:
+        query = query.filter(Post.persona_id.notin_(excluded_persona_ids))
+
+    if cursor:
+        query = query.filter(Post.id < cursor)
+    
+    posts = query.order_by(Post.id.desc()).limit(limit).all()
     
     result = []
     for post in posts:
@@ -19,8 +42,24 @@ def get_posts(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
         # 스포일러 마스킹 로직
         is_spoiler = post.is_spoiler == 1
         
+        # 해시태그 목록 조회
+        tags = db.query(Hashtag.normalized_keyword).join(
+            PostHashtag, Hashtag.id == PostHashtag.hashtag_id
+        ).filter(PostHashtag.post_id == post.id).all()
+        hashtag_list = [t[0] for t in tags]
+        
+        # 통계 데이터 (좋아요, 댓글 수) 조회
+        like_count = db.query(LikeLog).filter(
+            LikeLog.target_type == "POST", LikeLog.target_id == post.id, LikeLog.is_active == 1
+        ).count()
+        
+        comment_count = db.query(Comment).filter(
+            Comment.post_id == post.id, Comment.status == "ACTIVE"
+        ).count()
+
         result.append({
             "id": post.id,
+            "author_id": None if author.status == "DELETED" else author.id,
             "author": author_name,
             "author_image": None if author.status == "DELETED" else author.profile_image_url,
             "title": "*** 스포일러가 포함된 제목입니다 ***" if is_spoiler else post.title,
@@ -29,9 +68,18 @@ def get_posts(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
             "is_spoiler": is_spoiler,
             "created_at": post.created_at,
             # 영화 태그는 스포일러 상관없이 가시 정보로 노출 (정책 반영)
-            "movies": [{"id": m.id, "title": m.title} for m in post.movies]
+            "movies": [{"id": m.id, "title": m.title} for m in post.movies],
+            "hashtags": hashtag_list,
+            "like_count": like_count,
+            "comment_count": comment_count
         })
-    return result
+    
+    next_cursor = result[-1]["id"] if result else None
+    return {
+        "items": result,
+        "next_cursor": next_cursor,
+        "has_next": len(result) == limit
+    }
 
 @router.get("/{post_id}")
 def get_post_detail(post_id: int, db: Session = Depends(get_db)):
@@ -46,4 +94,32 @@ def get_post_detail(post_id: int, db: Session = Depends(get_db)):
     author = post.persona
     author_name = "알 수 없음" if author.status == "DELETED" else f"{author.nickname}#{author.tag}"
     
-    return {"id": post.id, "author": author_name, "title": post.title, "content": post.content, "image_urls": post.image_urls, "is_spoiler": post.is_spoiler == 1}
+    # 해시태그 목록 조회
+    tags = db.query(Hashtag.normalized_keyword).join(
+        PostHashtag, Hashtag.id == PostHashtag.hashtag_id
+    ).filter(PostHashtag.post_id == post.id).all()
+    hashtag_list = [t[0] for t in tags]
+    
+    # 통계 데이터 (좋아요, 댓글 수) 조회
+    like_count = db.query(LikeLog).filter(
+        LikeLog.target_type == "POST", LikeLog.target_id == post.id, LikeLog.is_active == 1
+    ).count()
+    comment_count = db.query(Comment).filter(
+        Comment.post_id == post.id, Comment.status == "ACTIVE"
+    ).count()
+
+    return {
+        "id": post.id, 
+        "author_id": None if author.status == "DELETED" else author.id,
+        "author": author_name, 
+        "author_image": None if author.status == "DELETED" else author.profile_image_url,
+        "title": post.title, 
+        "content": post.content, 
+        "image_urls": post.image_urls, 
+        "is_spoiler": post.is_spoiler == 1,
+        "movies": [{"id": m.id, "title": m.title} for m in post.movies],
+        "hashtags": hashtag_list,
+        "like_count": like_count,
+        "comment_count": comment_count,
+        "created_at": post.created_at
+    }

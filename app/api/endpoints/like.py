@@ -1,16 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from uuid import UUID
 from app.db.session import get_db
 from app.api.deps import get_current_persona
-from app.schemas.post import LikeToggleRequest
-from app.models.models import LikeLog, Post, Comment
+from app.schemas.post.like import LikeToggleRequest
+from app.models import LikeLog, Post, Comment
 from app.service.recommendation import recommendation_service
 from app.core.redis import redis_client
 
 router = APIRouter()
 
-@router.post("/likes")
-async def toggle_like(req: LikeToggleRequest, db: Session = Depends(get_db), persona_id: int = Depends(get_current_persona)):
+@router.post("/")
+async def toggle_like(req: LikeToggleRequest, db: Session = Depends(get_db), persona_id: UUID = Depends(get_current_persona)):
     """게시물 또는 댓글의 좋아요를 토글(Like/Unlike)하고 취향 가중치에 반영합니다."""
     # 타겟 조회
     if req.target_type == "POST":

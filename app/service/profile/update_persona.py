@@ -1,18 +1,18 @@
-import redis
-
 import re
+from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import select, and_, update
 from sqlalchemy.orm import Session
-from app.models.models import Persona
+from app.models import Persona
 from app.schemas.profile import PersonaEdit
 from app.service.profile.read_persona import PersonaReadService
+from app.core.security import create_access_token, create_refresh_token
 
 class PersonaUpdateService:
 
     # 특정 페르소나 수정
     @staticmethod
-    async def update_persona(db: Session,redis_client, persona_id: int, edit_data: PersonaEdit, user_id: int) -> Persona:
+    async def update_persona(db: Session,redis_client, persona_id: UUID, edit_data: PersonaEdit, user_id: UUID) -> Persona:
         db_persona = db.get(Persona, persona_id) # persona_id로 Persona 테이블 찾음
 
 
@@ -85,16 +85,13 @@ class PersonaUpdateService:
             raise HTTPException(status_code=500, detail=f"데이터베이스 저장 중 오류 발생 {str(e)}")
 
     # 특정 페르소나 활성화 (전환)
+    # 기존 Redis 로직을 제거하고 새로운 토큰을 발급하는 switch_persona 로직으로 통합합니다.
     @staticmethod
-    async def activate_persona(
+    async def switch_persona(
             db: Session,
-            redis_client,
-            user_id: int,
-            persona_id: int
-    ) -> Persona:
-        redis_key = f"kakamu:user:{user_id}:current_persona"
-        THREE_DAY = 259200
-
+            user_id: UUID,
+            persona_id: UUID
+    ) -> dict:
         target_stmt = select(Persona).where(
             Persona.id == persona_id,
             Persona.user_id == user_id,
@@ -124,12 +121,18 @@ class PersonaUpdateService:
             target_persona.preference_status = "on"
 
             db.commit()
-            db.refresh(target_persona)
 
-            # Redis 현재 페르소나도 갱신
-            await redis_client.set(redis_key, target_persona.id, ex=THREE_DAY)
-
-            return target_persona
+            # 변경된 페르소나 ID를 담아 새로운 액세스 토큰 및 리프레시 토큰 발급
+            new_access_token = create_access_token(data={"sub": str(user_id), "persona_id": str(persona_id)})
+            new_refresh_token = create_refresh_token(data={"sub": str(user_id), "persona_id": str(persona_id)})
+            
+            return {
+                "status": "success",
+                "active_persona_id": target_persona.id,
+                "access_token": new_access_token,
+                "refresh_token": new_refresh_token,
+                "token_type": "bearer"
+            }
 
         except Exception as e:
             db.rollback()
