@@ -14,6 +14,8 @@ from app.core.redis import redis_client
 from app.api.api import api_router
 from app.service.sync_task import stat_sync_worker
 
+from app.middleware.logging_middleware import LoggingMiddleware
+
 def create_database_if_not_exists():
     """데이터베이스가 존재하지 않으면 생성합니다."""
     db_url = settings.DATABASE_URL
@@ -99,6 +101,8 @@ app.add_middleware(
     allow_methods=["*"],  # GET, POST, PUT, DELETE 등 모든 HTTP 메서드 허용
     allow_headers=["*"],  # 모든 HTTP 헤더 허용
 )
+# 로그 미들웨어 등록
+app.add_middleware(LoggingMiddleware)
 
 # 중앙 라우터 허브 등록
 app.include_router(api_router)
