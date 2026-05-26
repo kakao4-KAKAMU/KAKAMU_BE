@@ -76,6 +76,9 @@ class PersonaUpdateService:
                 user_id = user_id
             )
 
+            redis_key = f"kakamu:user:{user_id}:current_persona"
+            await redis_client.set(redis_key, db_persona.id, ex=259200)
+
             return db_persona
         except Exception as e:
             db.rollback()
