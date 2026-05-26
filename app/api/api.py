@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import movie, system, test, post, user, comment, like, relation, search, persona
+from app.api.endpoints import movie, system, test, post, user, comment, like, relation, search, profile
 
 api_router = APIRouter()
 api_router.include_router(system.router, tags=["System"])
@@ -10,4 +10,4 @@ api_router.include_router(comment.router, prefix="/comments", tags=["Comments"])
 api_router.include_router(like.router, prefix="/likes", tags=["Likes"])
 api_router.include_router(relation.router, prefix="/relations", tags=["Relations"])
 api_router.include_router(search.router, tags=["Search"])
-api_router.include_router(persona.router, prefix="/personas", tags=["Personas"])
+api_router.include_router(profile.router, prefix="/personas", tags=["Personas"])

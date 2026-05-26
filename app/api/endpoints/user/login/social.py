@@ -26,13 +26,8 @@ async def social_login(request: SocialLoginRequest, db: Session = Depends(get_db
         ).first()
         
         if social_auth:
-            # 유저의 메인 페르소나 조회
-            main_persona = db.query(Persona).filter(
-                Persona.user_id == social_auth.user_id,
-                Persona.is_main == 1,
-                Persona.status == "ACTIVE"
-            ).first()
-            persona_id_str = str(main_persona.id) if main_persona else None
+            # 로그인 시에는 페르소나를 자동으로 선택하지 않고 null 상태로 둡니다.
+            persona_id_str = None
 
             access_token = create_access_token(data={"sub": str(social_auth.user_id), "provider": request.provider, "persona_id": persona_id_str})
             refresh_token = create_refresh_token(data={"sub": str(social_auth.user_id), "provider": request.provider, "persona_id": persona_id_str})

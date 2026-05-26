@@ -1,5 +1,3 @@
-import redis
-
 import re
 from uuid import UUID
 from fastapi import HTTPException, status
@@ -10,9 +8,8 @@ from app.models import FavMovie, FavGenre, FavPeople
 from app.schemas.profile import PersonaCreate
 
 class PersonaCreateService:
-
     @staticmethod
-    async def create_new_persona(db: Session,redis_client: redis.Redis, persona_data: PersonaCreate, user_id: UUID) -> Persona:
+    async def create_new_persona(db: Session, persona_data: PersonaCreate, user_id: UUID) -> Persona:
         DEFAULT_PROFILE_IMAGE_URL = "/static/default_profile_image.png"
         # 닉네임 형식 검사 : 닉네임#태그
         if '#' not in persona_data.nickname:
@@ -103,8 +100,6 @@ class PersonaCreateService:
             if persona_data.fav_movie_ids or persona_data.fav_genre_ids or persona_data.fav_people_ids:
                 db.flush()
 
-            redis_key = f"kakamu:user:{user_id}:current_persona"
-            await redis_client.set(redis_key, str(new_profile.id), ex=259200)
             db.commit()
             db.refresh(new_profile)
 

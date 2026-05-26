@@ -1,4 +1,5 @@
 import redis
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -13,5 +14,6 @@ router = APIRouter()
 
 @router.delete("/persona/{persona_id}", status_code=204)
 def delete_persona(
+    persona_id: UUID
 ):
     return None

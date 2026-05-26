@@ -1,5 +1,6 @@
 from typing import List
 import redis.asyncio as redis
+from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.core.redis import get_redis
-from app.models.models import User
+from app.models import User
 from app.schemas.profile import PersonaResponse
 from app.service.profile import PersonaService
 
@@ -41,7 +42,7 @@ async def get_current_persona(
 # 특정 페르소나만 조회
 @router.get("/personas/{persona_id}", response_model=PersonaResponse)
 async def get_persona_detail(
-    persona_id: int,
+    persona_id: UUID,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
