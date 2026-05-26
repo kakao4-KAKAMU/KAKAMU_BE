@@ -14,7 +14,7 @@ from app.service.profile import PersonaService
 router = APIRouter()
 
 @router.delete("/persona/{persona_id}", status_code=204)
-def delete_persona(
+async def delete_persona(
     persona_id: UUID
 
 ):
