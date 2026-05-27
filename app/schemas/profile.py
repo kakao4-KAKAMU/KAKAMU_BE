@@ -22,8 +22,6 @@ class PersonaResponse(BaseModel):
     tag: str
     profile_msg: Optional[str] = None
     persona_type: str
-    is_main: int
-    preference_status: str
     profile_image_url: str
 
     model_config = ConfigDict(from_attributes=True)

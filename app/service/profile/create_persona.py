@@ -1,7 +1,7 @@
 import re
 from uuid import UUID
 from fastapi import HTTPException, status
-from sqlalchemy import select, and_, func, update
+from sqlalchemy import select, and_, func
 from sqlalchemy.orm import Session
 from app.models import Persona
 from app.models import FavMovie, FavGenre, FavPeople
@@ -54,26 +54,14 @@ class PersonaCreateService:
                 status_code=400,
                 detail=f"페르소나 계정은 최대 5개 생성 가능합니다."
             )
-        elif persona_count == 0:  # 계정이 0개면 메인 계정으로 설정
-            is_main_value = 1
-        else:
-            is_main_value = 0
 
         try:
-            # 기존 페르소나를 비활성화하고 현재 생성중인 페르소나만 활성화
-            db.execute(
-                update(Persona)
-                .where(and_(Persona.user_id == user_id, Persona.status != "DELETED"))
-                .values(preference_status="off")
-            )
             profile_image_url = persona_data.profile_image_url or DEFAULT_PROFILE_IMAGE_URL
             new_profile = Persona(
                 user_id=user_id,
                 nickname=name,
                 profile_msg=persona_data.profile_msg,
                 persona_type=persona_data.persona_type,
-                is_main=is_main_value,
-                preference_status="on",  # 현재 활성화된 페르소나 프로필 (on, off)
                 tag=tag,
                 profile_image_url=profile_image_url,
                 status="ACTIVE",
