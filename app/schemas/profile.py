@@ -5,7 +5,7 @@ from uuid import UUID
 # 페르소나 프로필 생성
 class PersonaCreate(BaseModel):
     nickname: str # 닉네임
-    persona_type: str # 좋아하는 장르, 영화 배우
+    # persona_type: str # 별도 테이블 fav_genre, fav_movie, fav_people, 삭제 필요
     profile_image_url: Optional[str] = None # 이미지 url, 기본 프로필 이미지 url 필요
     profile_msg: str = ""
     
@@ -21,9 +21,9 @@ class PersonaResponse(BaseModel):
     nickname: str
     tag: str
     profile_msg: Optional[str] = None
-    persona_type: str
+    persona_type: Optional[str] = None
     is_main: int
-    preference_status: str
+    preference_status: Optional[str] = None
     profile_image_url: str
 
     model_config = ConfigDict(from_attributes=True)
