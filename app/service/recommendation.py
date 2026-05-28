@@ -1,4 +1,5 @@
 import time
+import json
 from typing import List, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -33,19 +34,19 @@ class RecommendationService:
         # 2. 로깅할 액션 이름 결정 (예: "like" -> 취소시 "undo_like")
         log_action = f"undo_{action}" if is_undo else action
 
-        # 3. 새로운 로그를 무조건 추가 (Append-Only)
-        new_log = EntityRelationshipLog(
-            persona_id=persona_id,
-            relation_type=log_action,
-            target_type=target_type,
-            target_id=target_id,
-            sentiment_score=final_score,
-            weight=1.0 # 기본 가중치
-        )
+        # 3. [최적화] 즉시 DB 트랜잭션을 열지 않고 Redis Queue(List)에 직렬화하여 적재
+        log_payload = {
+            "persona_id": str(persona_id),
+            "relation_type": log_action,
+            "target_type": target_type,
+            "target_id": target_id,
+            "sentiment_score": float(final_score),
+            "weight": 1.0
+        }
         
-        db.add(new_log)
-        db.commit()
-        
+        queue_key = "kakamu:queue:ml_logs"
+        await self.redis.rpush(queue_key, json.dumps(log_payload))
+
         # 참고: 이 로그는 타인에 의해 target_id 원본이 삭제되더라도 
         # FK 제약조건이 없으므로 이 로그 테이블에 안전하게 남아 추천 알고리즘 훈련에 사용됩니다.
 

@@ -62,6 +62,18 @@
 | `POST` | `/test/activity` | 페르소나 활동 강제 기록 테스트 (Redis 데이터 갱신) |
 | `GET` | `/test/context/{persona_id}` | 특정 페르소나의 실시간 컨텍스트(활동 기록 및 장르 선호도) 조회 |
 
+## 8. Search (통합 탐색 및 메타데이터)
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/search/for-you` | 통합 검색 - 추천(For You) 탭 게시물 (취향+정확도+인기도 기반 재정렬) |
+| `GET` | `/v1/search/live` | 통합 검색 - 실시간(Live) 탭 게시물 (커서 기반 무한 스크롤, 최신순) |
+| `GET` | `/v1/search/user` | 통합 검색 - 유저 탭 페르소나 목록 (본명 은닉, 복합 커서 기반 무한 스크롤) |
+| `GET` | `/v1/search/content` | 통합 검색 - 영화 정보 탭 (영화 메타데이터 검색, 정렬 및 무한 스크롤) |
+| `GET` | `/v1/search/movie` | 영화 상세 필터 검색 (이름, 연도, 장르 필터 및 정렬, Offset 페이징) |
+| `GET` | `/v1/search/person` | 인물(배우/감독) 검색 (직업 필터, 이름 정렬, Offset 페이징) |
+| `GET` | `/v1/genre/list` | 전체 영화 장르 목록 가나다순 조회 |
+| `GET` | `/v1/search/trend` | 일간 인기 검색어(트렌드) Top 10 순위 조회 |
+
 ---
 
 ### API Prefix 안내

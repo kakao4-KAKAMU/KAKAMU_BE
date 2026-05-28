@@ -7,12 +7,14 @@ from alembic.config import Config
 from sqlalchemy import create_engine, text
 from urllib.parse import urlparse
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.redis import redis_client
 from app.api.api import api_router
-from app.service.sync_task import stat_sync_worker
+from app.service.sync_task import stat_sync_worker, ml_log_sync_worker
+from app.worker.search_batch import run_daily_search_aggregation
 
 from app.middleware.logging_middleware import LoggingMiddleware
 
@@ -70,10 +72,18 @@ async def lifespan(app: FastAPI):
         
     # 백그라운드 워커 실행 (Redis -> DB 주기적 동기화 시작)
     sync_task = asyncio.create_task(stat_sync_worker())
+    ml_log_task = asyncio.create_task(ml_log_sync_worker())
+
+    # 매일 새벽 3시에 검색어 일일 통계 배치 실행
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(run_daily_search_aggregation, 'cron', hour=3, minute=0)
+    scheduler.start()
 
     yield
     
     sync_task.cancel() # 서버 종료 시 워커 중지
+    ml_log_task.cancel()
+    scheduler.shutdown()
     await redis_client.close()
     
     # 앱 종료 시 실행될 로직 (Shutdown)이 필요하다면 여기에 작성

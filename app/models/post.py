@@ -17,6 +17,9 @@ class Post(Base):
     created_at = Column(DateTime, server_default=func.now())    
     updated_at = Column(DateTime, onupdate=func.now())    
 
+    # [성능 최적화] 서브쿼리 대신 물리적 컬럼으로 관리 (Redis Sync Task가 5분 주기로 업데이트)
+    like_count = Column(Integer, default=0, nullable=False, index=True)
+
     persona = relationship("Persona", back_populates="posts")    
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")    
     movies = relationship("Movie", secondary="post_movie", back_populates="posts")    
