@@ -1,14 +1,9 @@
 from datetime import datetime,timezone
-
-import redis
-
-from app.core.redis import redis_client
-import re
 from fastapi import HTTPException, status
-from sqlalchemy import select, and_, func, update
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models import Persona
-from app.schemas.profile import PersonaCreate
+from uuid import UUID
 
 class PersonaDeleteService:
 
@@ -16,13 +11,9 @@ class PersonaDeleteService:
     @staticmethod
     async def delete_persona_soft(
             db: Session,
-            redis_client,
-            user_id: int,
-            persona_id: int
+            user_id: UUID,
+            persona_id: UUID
     ):
-
-        redis_key = f"kakamu:user:{user_id}:current_persona"
-        THREE_DAY = 259200
 
         stmt = select(Persona).where(
             Persona.id == persona_id,
@@ -37,41 +28,25 @@ class PersonaDeleteService:
                 status_code=404,
                 detail = "페르소나를 찾을 수 없습니다."
             )
-        # 삭제 시도하는 페르소나가 메인 페르소나인지 확인
-        if persona.is_main == 1:
+
+        # 남은 활성 페르소나 개수 확인 (최소 1개는 유지)
+        count_stmt = select(func.count(Persona.id)).where(
+            Persona.user_id == user_id,
+            Persona.status == "ACTIVE"
+        )
+        active_persona_count = db.scalar(count_stmt)
+
+        if active_persona_count <= 1:
             raise HTTPException(
                 status_code=400,
-                detail = f"메인 페르소나는 삭제 못합니다."
+                detail="최소 1개의 페르소나는 유지해야 하므로 삭제할 수 없습니다."
             )
 
         try:
 
             persona.status = "DELETED" # 페르소나 상태를 ACTIVE -> DELETED 로 변경
             persona.deleted_at = datetime.now(timezone.utc) # 현재 삭제 시도 시간 저장
-            persona.preference_status = "off" # 활성화 상태를 off 로 변경
-
-            # db.commit() # 현재 페르소나랑 관계없이 다 삭제 가능하다면 주석 제거
-            current_persona_id = await redis_client.get(redis_key) # redis에 저장된 페르소나 id를 가져옴
-
-            # 삭제 시도하는 페르소나 id와 현재 활성화 된 페르소나 id를 비교
-            if current_persona_id and int(current_persona_id) == persona_id:
-
-                # 페르소나 삭제 이후에는 메인 페르소나로 자동 전환
-                remain_stmt = select(Persona).where(
-                    Persona.is_main == 1,
-                    Persona.user_id == user_id
-                )
-
-
-                remain_persona = db.scalar(remain_stmt)
-
-                remain_persona.preference_status = "on"
-                db.commit()
-
-                # 현재 페르소나 (메인), redis에 저장
-                await redis_client.set(redis_key,
-                                       remain_persona.id,
-                                       ex=THREE_DAY)
+            db.commit()
 
         except Exception as e:
             db.rollback()
