@@ -55,7 +55,17 @@ uvicorn app.main:app --reload
 
 ---
 
-# 🚨 주요 에러 코드 안내 (Error Codes)
+# � API 인증 및 페르소나 헤더 안내
+본 프로젝트는 **상태 비저장(Stateless)** 아키텍처를 채택하고 있습니다. 페르소나의 이름으로 활동(글쓰기, 팔로우, 좋아요 등)하는 모든 API는 다음 두 가지를 요청 헤더(Header)에 포함해야 합니다.
+
+1. **Authorization Header**: `Bearer <Access_Token>` (유저 본인 인증)
+2. **X-Persona-Id Header**: `<현재 활성화된 페르소나의 UUID>` (페르소나 권한 인가)
+
+*💡 프론트엔드는 로그인 후 `/personas` API를 통해 페르소나 목록을 조회하고, 유저가 사용할 페르소나를 선택하면 해당 ID를 로컬 환경에 저장해 두었다가 매 API 호출 시 전송해야 합니다.*
+
+---
+
+# �🚨 주요 에러 코드 안내 (Error Codes)
 API 요청 시 발생할 수 있는 주요 예외 상황과 에러 코드(`code`)입니다. 클라이언트는 이 코드를 기반으로 적절한 예외 처리를 수행할 수 있습니다.
 
 | 분류 | Error Code | HTTP Status | Description (발생 원인) |

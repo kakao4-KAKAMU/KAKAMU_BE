@@ -1,20 +1,16 @@
 import re
 from uuid import UUID
-from fastapi import HTTPException, status
-from sqlalchemy import select, and_, update
+from fastapi import HTTPException
+from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 from app.models import Persona
 from app.schemas.profile import PersonaEdit
-from app.service.profile.read_persona import PersonaReadService
-from app.core.security import create_access_token, create_refresh_token
 
 class PersonaUpdateService:
-
     # 특정 페르소나 수정
     @staticmethod
-    async def update_persona(db: Session,redis_client, persona_id: UUID, edit_data: PersonaEdit, user_id: UUID) -> Persona:
+    async def update_persona(db: Session, persona_id: UUID, edit_data: PersonaEdit, user_id: UUID) -> Persona:
         db_persona = db.get(Persona, persona_id) # persona_id로 Persona 테이블 찾음
-
 
         if not db_persona:
             raise HTTPException(status_code=404, detail="존재하지 않는 페르소나 입니다.")
@@ -69,74 +65,8 @@ class PersonaUpdateService:
 
             db.commit()
             db.refresh(db_persona)
-            # 페르소나 기간 연장 로직 호출
-            await PersonaReadService.get_current_active_persona_id(
-                db = db,
-                redis_client = redis_client,
-                user_id = user_id
-            )
-
-            redis_key = f"kakamu:user:{user_id}:current_persona"
-            await redis_client.set(redis_key, db_persona.id, ex=259200)
 
             return db_persona
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"데이터베이스 저장 중 오류 발생 {str(e)}")
-
-    # 특정 페르소나 활성화 (전환)
-    # 기존 Redis 로직을 제거하고 새로운 토큰을 발급하는 switch_persona 로직으로 통합합니다.
-    @staticmethod
-    async def switch_persona(
-            db: Session,
-            user_id: UUID,
-            persona_id: UUID
-    ) -> dict:
-        target_stmt = select(Persona).where(
-            Persona.id == persona_id,
-            Persona.user_id == user_id,
-            Persona.status == "ACTIVE"
-        )
-
-        target_persona = db.scalar(target_stmt)
-
-        if not target_persona:
-            raise HTTPException(
-                status_code=404,
-                detail="활성화할 페르소나를 찾을 수 없습니다."
-            )
-
-        try:
-            # 해당 유저의 기존 활성 페르소나 전부 off
-            db.execute(
-                update(Persona)
-                .where(
-                    Persona.user_id == user_id,
-                    Persona.status == "ACTIVE"
-                )
-                .values(preference_status="off")
-            )
-
-            # 선택한 페르소나만 on
-            target_persona.preference_status = "on"
-
-            db.commit()
-
-            # 변경된 페르소나 ID를 담아 새로운 액세스 토큰 및 리프레시 토큰 발급
-            new_access_token = create_access_token(data={"sub": str(user_id), "persona_id": str(persona_id)})
-            new_refresh_token = create_refresh_token(data={"sub": str(user_id), "persona_id": str(persona_id)})
-            
-            return {
-                "status": "success",
-                "active_persona_id": target_persona.id,
-                "access_token": new_access_token,
-                "refresh_token": new_refresh_token,
-                "token_type": "bearer"
-            }
-
-        except Exception as e:
-            db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail=f"페르소나 활성화 중 오류 발생: {str(e)}"
-            )

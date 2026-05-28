@@ -12,9 +12,7 @@ class Persona(Base):
     tag = Column(String(10), nullable=False) 
     profile_image_url = Column(String(500)) 
     profile_msg = Column(String(200))    
-    persona_type = Column(String(50))    
-    is_main = Column(SmallInteger, default=0)    
-    preference_status = Column(Text)    
+    persona_type = Column(String(50))      
     status = Column(String(20), default="ACTIVE") 
     deleted_at = Column(DateTime, nullable=True) 
 

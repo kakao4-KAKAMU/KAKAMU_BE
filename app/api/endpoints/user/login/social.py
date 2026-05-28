@@ -26,11 +26,8 @@ async def social_login(request: SocialLoginRequest, db: Session = Depends(get_db
         ).first()
         
         if social_auth:
-            # 로그인 시에는 페르소나를 자동으로 선택하지 않고 null 상태로 둡니다.
-            persona_id_str = None
-
-            access_token = create_access_token(data={"sub": str(social_auth.user_id), "provider": request.provider, "persona_id": persona_id_str})
-            refresh_token = create_refresh_token(data={"sub": str(social_auth.user_id), "provider": request.provider, "persona_id": persona_id_str})
+            access_token = create_access_token(data={"sub": str(social_auth.user_id), "provider": request.provider})
+            refresh_token = create_refresh_token(data={"sub": str(social_auth.user_id), "provider": request.provider})
             return TokenResponse(access_token=access_token, refresh_token=refresh_token, is_new_user=False)
         else:
             return TokenResponse(
