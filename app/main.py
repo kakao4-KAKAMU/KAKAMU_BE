@@ -6,12 +6,13 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
 from urllib.parse import urlparse
-
+from app.core.tracing import setup_tracing
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.redis import redis_client
 from app.api.api import api_router
+from app.db.session import engine
 from app.service.sync_task import stat_sync_worker
 
 from app.middleware.logging_middleware import LoggingMiddleware
@@ -101,6 +102,7 @@ app.add_middleware(
     allow_methods=["*"],  # GET, POST, PUT, DELETE 등 모든 HTTP 메서드 허용
     allow_headers=["*"],  # 모든 HTTP 헤더 허용
 )
+setup_tracing(app)
 # 로그 미들웨어 등록
 app.add_middleware(LoggingMiddleware)
 

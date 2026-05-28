@@ -62,7 +62,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             # 에러 발생시 이 id로 바로 로그 찾기 가능
             return response # 완성된 응답을 클라이언트로 반환
 
-        except Exception:
+        except Exception as e:
             # 에러 발생 전까지 걸린 시간
             latency_ms = round((time.time() - start_time) * 1000, 2)
 
@@ -75,10 +75,13 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                         "request_id": request_id,
                         "method": request.method,
                         "path": request.url.path,
+                        "status_code": 500, # 상태 코드
                         "latency_ms": latency_ms,
+                        "exception_type": type(e).__name__, # exception 타입
+                        "error_message" : str(e) # 에러 메시지
                     }
                 },
-                exc_info=True, # 에러의 상세한 추적 이력도 로그에 포함
+                # exc_info=True, # 에러의 상세한 추적 이력 우선 제외 추후 traceback은 따로 저장
             )
 
             raise
