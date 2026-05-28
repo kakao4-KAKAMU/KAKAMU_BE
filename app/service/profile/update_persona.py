@@ -1,9 +1,9 @@
 import re,string,random
 from uuid import UUID
 from fastapi import HTTPException
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_,delete
 from sqlalchemy.orm import Session
-from app.models import Persona
+from app.models import Persona, FavMovie, FavGenre, FavPeople
 from app.schemas.profile import PersonaEdit
 from opentelemetry import trace
 tracer = trace.get_tracer(__name__)
@@ -79,6 +79,113 @@ class PersonaUpdateService:
 
                 # 처리했으니깐 삭제
                 del update_data["nickname"]
+
+            # 새로운 관심 영화 목록 '교체' 방식
+            if edit_data.fav_movie_ids is not None: # 새로운 관심 영화 목록이 들어오면
+                with tracer.start_as_current_span("persona.update.fav_movies") as movie_span:
+                    input_movie_ids = set(edit_data.fav_movie_ids) # 그 영화 아이디들을 집합으로 전환하고 저장
+
+                    existing_movie_ids = set(
+                        db.scalars(
+                            select(FavMovie.movie_id).where(
+                                FavMovie.persona_id == persona_id
+                            ) # favmovie 테이블에서 페르소나 id와 일치하는 모든 목록 가져옴.
+                        ).all()
+                    )
+
+                    delete_movie_ids = existing_movie_ids - input_movie_ids # 지워야 하는 목록 필터링
+                    add_movie_ids = input_movie_ids - existing_movie_ids # 추가해야 하는 목록 필터링
+
+                    movie_span.set_attribute("fav_movie.input_count", len(input_movie_ids))
+                    movie_span.set_attribute("fav_movie.existing_count", len(existing_movie_ids))
+                    movie_span.set_attribute("fav_movie.delete_count", len(delete_movie_ids))
+                    movie_span.set_attribute("fav_movie.add_count", len(add_movie_ids))
+
+                    if delete_movie_ids:
+                        db.execute(
+                            delete(FavMovie).where(
+                                FavMovie.persona_id == persona_id,
+                                FavMovie.movie_id.in_(delete_movie_ids)
+                            )
+                        ) # 영화 목록 삭제
+
+                    for movie_id in add_movie_ids:
+                        db.add(FavMovie(persona_id=persona_id, movie_id=movie_id)) # 새로운 목록 추가
+
+                    update_data.pop("fav_genre_ids", None) # 수동 처리 했으니 삭제
+
+            # 새로운 관심 장르 목록 '교체' 방식
+            if edit_data.fav_genre_ids is not None:
+                with tracer.start_as_current_span("persona.update.fav_genres") as genre_span:
+                    input_genre_ids = set(edit_data.fav_genre_ids)
+
+                    existing_genre_ids = set(
+                        db.scalars(
+                            select(FavGenre.genre_id).where(
+                                FavGenre.persona_id == persona_id
+                            )
+                        ).all()
+                    )
+
+                    delete_genre_ids = existing_genre_ids - input_genre_ids
+                    add_genre_ids = input_genre_ids - existing_genre_ids
+
+                    genre_span.set_attribute("fav_genre.input_count", len(input_genre_ids))
+                    genre_span.set_attribute("fav_genre.existing_count", len(existing_genre_ids))
+                    genre_span.set_attribute("fav_genre.delete_count", len(delete_genre_ids))
+                    genre_span.set_attribute("fav_genre.add_count", len(add_genre_ids))
+
+                    if delete_genre_ids:
+                        db.execute(
+                            delete(FavGenre).where(
+                                FavGenre.persona_id == persona_id,
+                                FavGenre.genre_id.in_(delete_genre_ids)
+                            )
+                        )
+
+                    for genre_id in add_genre_ids:
+                        db.add(FavGenre(persona_id=persona_id, genre_id=genre_id))
+
+                    update_data.pop("fav_genre_ids", None)
+
+            # 새로운 관심 인물 목록 '교체' 방식
+            if edit_data.fav_people_ids is not None:
+                with tracer.start_as_current_span("persona.update.fav_people") as people_span:
+                    input_people_ids = set(edit_data.fav_people_ids)
+
+                    existing_people_ids = set(
+                        db.scalars(
+                            select(FavPeople.people_id).where(
+                                FavPeople.persona_id == persona_id
+                            )
+                        ).all()
+                    )
+
+                    delete_people_ids = existing_people_ids - input_people_ids
+                    add_people_ids = input_people_ids - existing_people_ids
+
+                    people_span.set_attribute("fav_people.input_count", len(input_people_ids))
+                    people_span.set_attribute("fav_people.existing_count", len(existing_people_ids))
+                    people_span.set_attribute("fav_people.delete_count", len(delete_people_ids))
+                    people_span.set_attribute("fav_people.add_count", len(add_people_ids))
+
+                    if delete_people_ids:
+                        db.execute(
+                            delete(FavPeople).where(
+                                FavPeople.persona_id == persona_id,
+                                FavPeople.people_id.in_(delete_people_ids)
+                            )
+                        )
+
+                    for people_id in add_people_ids:
+                        db.add(
+                            FavPeople(
+                                persona_id=persona_id,
+                                people_id=people_id,
+                                type="FAVORITE"
+                            )
+                        )
+                    update_data.pop("fav_people_ids", None)
 
             # 나머지 일괄 처리
             try:
