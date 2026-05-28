@@ -63,3 +63,13 @@ urllib3==2.7.0
 uvicorn==0.46.0
 watchfiles==1.1.1
 websockets==16.0
+
+# OpenTelemetry tracing
+opentelemetry-api # 트레이스 api
+opentelemetry-sdk # 실제 트레이스 구현
+opentelemetry-exporter-otlp # 트레이스 전송
+
+# Auto instrumentation
+opentelemetry-instrumentation-fastapi # FastAPI 자동 추적
+opentelemetry-instrumentation-sqlalchemy # DB 자동 추적
+opentelemetry-instrumentation-redis # Redis 자동 추적
