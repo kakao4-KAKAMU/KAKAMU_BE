@@ -16,22 +16,24 @@ class PersonaCreate(BaseModel):
 
 # 개별 프로필(페르소나) 정보
 class PersonaResponse(BaseModel):
-    id: UUID
-    user_id: UUID
-    nickname: str
-    tag: str
-    profile_msg: Optional[str] = None
+    id: UUID # 페르소나 id
+    user_id: UUID # 유저 id
+    nickname: str # 닉네임
+    tag: str # 태그
+    profile_msg: Optional[str] = None # 프로필 메시지
     # persona_type: str
 #     persona_type: Optional[str] = None
-#     is_main: int
-#     preference_status: Optional[str] = None
-    profile_image_url: str
+    profile_image_url: str # 이미지 경로
 
     model_config = ConfigDict(from_attributes=True)
 
 # 페르소나 수정
 class PersonaEdit(BaseModel):
     nickname: Optional[str] = None
-    persona_type: Optional[str] = None
+    # persona_type: Optional[str] = None # 삭제 필요
     profile_image_url: Optional[str] = None
     profile_msg: Optional[str] = None
+
+    fav_movie_ids: Optional[List[int]] = None # 선호 영화 ID 목록
+    fav_genre_ids: Optional[List[int]] = None # 선호 장르 ID 목록
+    fav_people_ids: Optional[List[int]] = None # 선호 인물(배우/감독) ID 목록
