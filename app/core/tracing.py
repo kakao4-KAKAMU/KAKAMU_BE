@@ -37,10 +37,6 @@ def setup_tracing(app):
     )
 
     # 생성된 span을 바로 안 보내고 모아서 배치로 전송
-    trace.get_tracer_provider().add_span_processor(
-        BatchSpanProcessor(otlp_exporter)
-    )
-
     provider.add_span_processor(
         BatchSpanProcessor(otlp_exporter)
     )
@@ -51,9 +47,13 @@ def setup_tracing(app):
             BatchSpanProcessor(ConsoleSpanExporter())
         )
 
-     # 자동 instrumentation
-    FastAPIInstrumentor.instrument_app(app) # FastAPI 요청을 자동 추적
-    RedisInstrumentor().instrument() # Redis 호출을 자동 추적
-    SQLAlchemyInstrumentor().instrument(
-        engine=engine
-    ) # DB 쿼리를 자동 추적
+    # 중복 출력 방지
+    if not hasattr(app.state, "otel_instrumented"):
+        FastAPIInstrumentor.instrument_app(app)
+
+        RedisInstrumentor().instrument()
+
+        SQLAlchemyInstrumentor().instrument(
+            engine=engine
+        )
+        app.state.otel_instrumented = True
