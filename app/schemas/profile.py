@@ -6,7 +6,7 @@ from uuid import UUID
 class PersonaCreate(BaseModel):
     nickname: str # 닉네임
     # persona_type: str # 별도 테이블 fav_genre, fav_movie, fav_people, 삭제 필요
-    profile_image_url: Optional[str] = None # 이미지 url, 기본 프로필 이미지 url 필요
+    # profile_image_url: Optional[str] = None # 이미지 url, 기본 프로필 이미지 url 필요
     profile_msg: str = ""
     
     fav_movie_ids: Optional[List[int]] = None # 선호 영화 ID 목록
