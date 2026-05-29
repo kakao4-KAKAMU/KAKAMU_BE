@@ -32,11 +32,15 @@ class LikeService:
             
         db.commit()
         
-        redis_key = f"kakamu:stat:{req.target_type.lower()}:{req.target_id}:likes"
-        if is_liked:
-            await redis_client.incr(redis_key)
-        else:
-            await redis_client.decr(redis_key)
+        try:
+            redis_key = f"kakamu:stat:{req.target_type.lower()}:{req.target_id}:likes"
+            if is_liked:
+                await redis_client.incr(redis_key)
+            else:
+                await redis_client.decr(redis_key)
+        except Exception as e:
+            # Redis 통계 업데이트 실패 시에도 메인 좋아요 로직(DB 저장)은 완료되었으므로 에러를 삼킵니다.
+            print(f"[Redis Error] Like stat update failed for {req.target_id}: {e}")
             
         if target.persona_id != persona_id:
             await recommendation_service.record_ml_relationship_log(db, persona_id, req.target_type, req.target_id, "like", 1.0, is_undo=not is_liked)

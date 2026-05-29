@@ -21,6 +21,7 @@
 | `POST` | `/users/login/refresh` | 만료된 액세스 토큰 재발급 (리프레시 토큰 검증) |
 | `GET` | `/users/me` | JWT 토큰을 기반으로 현재 로그인된 사용자의 정보 조회 |
 | `GET` | `/users/{user_id}` | 특정 `user_id`를 가진 사용자 정보 조회 |
+| `POST` | `/users/local/reset-password` | Firebase 인증 기반 이메일 계정 비밀번호 재설정 |
 
 ## 3. Movies (영화 및 추천 시스템)
 | Method | Path | Description |
@@ -32,6 +33,7 @@
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/posts` | 게시물 피드 조회 (무한 스크롤, `cursor` 기반, 스포일러 마스킹) |
+| `GET` | `/posts/liked` | 내가 좋아요를 누른 게시물 목록 조회 (무한 스크롤) |
 | `POST` | `/posts` | 새 게시물 작성 (해시태그/멘션 파싱 및 영화 추천 가중치 반영) |
 | `GET` | `/posts/{post_id}` | 특정 게시물 상세 조회 (스포일러 마스킹 해제) |
 | `PUT` | `/posts/{post_id}` | 게시물 수정 (작성자 본인만 가능) |
@@ -61,6 +63,7 @@
 |---|---|---|
 | `POST` | `/test/activity` | 페르소나 활동 강제 기록 테스트 (Redis 데이터 갱신) |
 | `GET` | `/test/context/{persona_id}` | 특정 페르소나의 실시간 컨텍스트(활동 기록 및 장르 선호도) 조회 |
+| `GET` | `/test/test-500` | 에러 핸들링 및 로깅 테스트용 강제 500 에러 발생 |
 
 ## 8. Search (통합 탐색 및 메타데이터)
 | Method | Path | Description |
