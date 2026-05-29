@@ -1,3 +1,22 @@
+import os
+import sys
+import subprocess
+
+def install_requirements():
+    """서버 실행 시 requirements.txt의 패키지를 자동 설치합니다."""
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        req_path = os.path.join(base_dir, "requirements.txt")
+        
+        if os.path.exists(req_path):
+            print("Checking and installing packages from requirements.txt...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "-r", req_path])
+    except Exception as e:
+        print(f"Failed to install requirements: {e}")
+
+# 3rd-party 모듈들을 임포트하기 전에 설치를 우선 진행합니다.
+install_requirements()
+
 from contextlib import asynccontextmanager
 import asyncio
 from fastapi import FastAPI
