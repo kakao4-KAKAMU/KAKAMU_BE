@@ -26,7 +26,7 @@ class PersonaDeleteService:
         if not persona:
             raise HTTPException(
                 status_code=404,
-                detail = "페르소나를 찾을 수 없습니다."
+                detail={"code": "PERSONA_NOT_FOUND", "message": "페르소나를 찾을 수 없습니다."}
             )
 
         # 남은 활성 페르소나 개수 확인 (최소 1개는 유지)
@@ -39,7 +39,7 @@ class PersonaDeleteService:
         if active_persona_count <= 1:
             raise HTTPException(
                 status_code=400,
-                detail="최소 1개의 페르소나는 유지해야 하므로 삭제할 수 없습니다."
+                detail={"code": "MINIMUM_PERSONA_REQUIRED", "message": "최소 1개의 페르소나는 유지해야 하므로 삭제할 수 없습니다."}
             )
 
         try:
@@ -53,7 +53,7 @@ class PersonaDeleteService:
 
             raise HTTPException(
                 status_code=500,
-                detail=f"페르소나 삭제 중 오류 발생 : {str(e)}"
+                detail={"code": "PERSONA_DELETE_FAILED", "message": f"페르소나 삭제 중 오류 발생 : {str(e)}"}
             )
 
         return None

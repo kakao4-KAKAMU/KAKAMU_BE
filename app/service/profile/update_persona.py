@@ -29,12 +29,12 @@ class PersonaUpdateService:
             if not db_persona:
                 span.set_attribute("persona.update.result", "failed")
                 span.set_attribute("persona.update.fail_reason", "persona_not_found")
-                raise HTTPException(status_code=404, detail="존재하지 않는 페르소나 입니다.")
+                raise HTTPException(status_code=404, detail={"code": "PERSONA_NOT_FOUND", "message": "존재하지 않는 페르소나 입니다."})
 
             if db_persona.user_id != user_id:
                 span.set_attribute("persona.update.result", "failed")
                 span.set_attribute("persona.update.fail_reason", "forbidden")
-                raise HTTPException(status_code=403, detail="이 페르소나를 수정할 권한이 없습니다.")
+                raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_PERSONA_UPDATE", "message": "이 페르소나를 수정할 권한이 없습니다."})
 
             with tracer.start_as_current_span("persona.update.extract_update_data") as update_data_span:
                 # 사용자가 실제로 보낸 값만 딕셔너리로 추출 (exclude_unset=True)
@@ -51,7 +51,7 @@ class PersonaUpdateService:
                     span.set_attribute("persona.update.fail_reason", "same_nickname")
                     raise HTTPException(
                         status_code=400,
-                        detail="현재 닉네임과 동일합니다."
+                        detail={"code": "SAME_NICKNAME", "message": "현재 닉네임과 동일합니다."}
                     )
 
                 tag=None
@@ -112,7 +112,7 @@ class PersonaUpdateService:
                     for movie_id in add_movie_ids:
                         db.add(FavMovie(persona_id=persona_id, movie_id=movie_id)) # 새로운 목록 추가
 
-                    update_data.pop("fav_genre_ids", None) # 수동 처리 했으니 삭제
+                    update_data.pop("fav_movie_ids", None) # 수동 처리 했으니 삭제
 
             # 새로운 관심 장르 목록 '교체' 방식
             if edit_data.fav_genre_ids is not None:
@@ -208,4 +208,4 @@ class PersonaUpdateService:
                 span.set_attribute("persona.update.result", "failed")
                 span.set_attribute("persona.update.fail_reason", "database_error")
 
-                raise HTTPException(status_code=500, detail=f"데이터베이스 저장 중 오류 발생 {str(e)}")
+                raise HTTPException(status_code=500, detail={"code": "DATABASE_SAVE_FAILED", "message": f"데이터베이스 저장 중 오류 발생 {str(e)}"})

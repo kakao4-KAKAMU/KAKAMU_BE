@@ -35,7 +35,7 @@ class PersonaReadService:
         if not persona:
             raise HTTPException(
                 status_code=404,
-                detail="페르소나를 찾을 수 없습니다."
+                detail={"code": "PERSONA_NOT_FOUND", "message": "페르소나를 찾을 수 없습니다."}
             )
 
         return persona

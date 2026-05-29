@@ -34,7 +34,7 @@ def check_rate_limit(client_identifier: str):
     # 3. 최대 허용치(5회) 초과 검사
     if len(requests) >= RATE_LIMIT_MAX_REQUESTS:
         _rate_limit_store[client_identifier] = requests  # 정리된 배열 갱신
-        raise HTTPException(status_code=429, detail="단시간에 너무 많은 검색을 요청했습니다. 잠시 후 다시 시도해주세요.")
+        raise HTTPException(status_code=429, detail={"code": "RATE_LIMIT_EXCEEDED", "message": "단시간에 너무 많은 검색을 요청했습니다. 잠시 후 다시 시도해주세요."})
 
     # 4. 현재 요청 시간 기록
     requests.append(current_time)

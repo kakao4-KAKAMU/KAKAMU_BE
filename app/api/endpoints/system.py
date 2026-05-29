@@ -26,7 +26,7 @@ def test_db(db: Session = Depends(get_db)):
         # DB가 죽었다면 500 에러를 던짐.
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database connection failed"
+            detail={"code": "DB_CONNECTION_FAILED", "message": "Database connection failed"}
         )
 
 @router.get("/redis-test")

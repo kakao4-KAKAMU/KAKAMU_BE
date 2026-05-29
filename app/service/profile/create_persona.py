@@ -36,7 +36,7 @@ class PersonaCreateService:
             if not name:
                 raise HTTPException(
                     status_code=400,
-                    detail="닉네임을 입력해주세요"
+                    detail={"code": "MISSING_NICKNAME", "message": "닉네임을 입력해주세요"}
                 )
 
             tag = None
@@ -62,7 +62,7 @@ class PersonaCreateService:
                 span.set_attribute("error.reason", "tag_generation_failed")
                 raise HTTPException(
                     status_code=500,
-                    detail="태그 생성에 실패했습니다. 다시 시도해주세요."
+                    detail={"code": "TAG_GENERATION_FAILED", "message": "태그 생성에 실패했습니다. 다시 시도해주세요."}
                 )
 
             with tracer.start_as_current_span("persona.count_user_personas") as count_span:
@@ -76,7 +76,7 @@ class PersonaCreateService:
                 span.set_attribute("error.reason", "persona_limit_exceeded")
                 raise HTTPException(
                     status_code=400,
-                    detail=f"페르소나 계정은 최대 5개 생성 가능합니다."
+                    detail={"code": "PERSONA_LIMIT_EXCEEDED", "message": "페르소나 계정은 최대 5개 생성 가능합니다."}
                 )
 
             try:
@@ -85,7 +85,6 @@ class PersonaCreateService:
                     user_id=user_id,
                     nickname=name,
                     profile_msg=persona_data.profile_msg,
-                    persona_type= None, # 삭제 필요
                     tag=tag,
                     profile_image_url=profile_image_url,
                     status="ACTIVE",
@@ -131,4 +130,4 @@ class PersonaCreateService:
                 span.record_exception(e)
                 span.set_attribute("error.reason", "database_save_failed")
 
-                raise HTTPException(status_code=500, detail=f"데이터베이스 저장 중 오류 발생 {str(e)}")
+                raise HTTPException(status_code=500, detail={"code": "DATABASE_SAVE_FAILED", "message": f"데이터베이스 저장 중 오류 발생 {str(e)}"})
