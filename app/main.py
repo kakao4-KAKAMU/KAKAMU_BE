@@ -1,18 +1,4 @@
-import os
-import sys
-import subprocess
-
-def install_requirements():
-    """서버 실행 시 requirements.txt의 패키지를 자동 설치합니다."""
-    try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        req_path = os.path.join(base_dir, "requirements.txt")
-        
-        if os.path.exists(req_path):
-            print("Checking and installing packages from requirements.txt...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "-r", req_path])
-    except Exception as e:
-        print(f"Failed to install requirements: {e}")
+from app.core.install import install_requirements
 
 # 3rd-party 모듈들을 임포트하기 전에 설치를 우선 진행합니다.
 install_requirements()
@@ -21,10 +7,6 @@ from contextlib import asynccontextmanager
 import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import create_engine, text
-from urllib.parse import urlparse
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.core.tracing import setup_tracing
@@ -33,50 +15,13 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.redis import redis_client
 from app.api.api import api_router
-from app.service.sync_task import stat_sync_worker, ml_log_sync_worker
+from app.service.system.sync_task import stat_sync_worker, ml_log_sync_worker
 from app.worker.search_batch import run_daily_search_aggregation
 from app.db.session import engine
 
 from app.middleware.logging_middleware import LoggingMiddleware
-
-def create_database_if_not_exists():
-    """데이터베이스가 존재하지 않으면 생성합니다."""
-    db_url = settings.DATABASE_URL
-    parsed = urlparse(db_url)
-    db_name = parsed.path.lstrip('/')
-    
-    # postgres 데이터베이스에 연결하여 데이터베이스 생성
-    postgres_url = db_url.replace(f"/{db_name}", "/postgres")
-    
-    try:
-        # CREATE DATABASE는 트랜잭션 내에서 실행할 수 없으므로 AUTOCOMMIT 모드 적용
-        engine = create_engine(postgres_url, isolation_level="AUTOCOMMIT")
-        with engine.connect() as conn:
-            result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{db_name}'"))
-            if not result.fetchone():
-                print(f"Creating database {db_name}...")
-                conn.execute(text(f"CREATE DATABASE {db_name}"))
-                print(f"Database {db_name} created!")
-            else:
-                print(f"Database {db_name} already exists.")
-    except Exception as e:
-        print(f"Failed to create database: {e}")
-
-def run_migrations():
-    """애플리케이션 시작 시 Alembic 마이그레이션을 자동으로 실행합니다."""
-    # 1. alembic.ini 경로 설정 (프로젝트 루트 기준)
-    alembic_cfg = Config("alembic.ini")
-    
-    # 2. 실시간으로 환경 변수의 DB URL을 Alembic 설정에 주입
-    alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-    
-    # 3. 'alembic upgrade head' 명령어 실행
-    try:
-        print("Running DB migrations...")
-        command.upgrade(alembic_cfg, "head")
-        print("Migrations complete!")
-    except Exception as e:
-        print(f"Migration failed: {e}")
+from app.core.exceptions import setup_exception_handlers
+from app.core.db_startup import create_database_if_not_exists, run_migrations
 
 # --- 앱 시작 시 자동으로 마이그레이션 실행 ---
 @asynccontextmanager
@@ -142,3 +87,6 @@ app.include_router(api_router)
 # static 폴더 서빙 추가
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# --- 전역 예외 처리기 (Global Exception Handlers) ---
+setup_exception_handlers(app)
