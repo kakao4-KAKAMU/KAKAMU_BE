@@ -5,6 +5,10 @@ from pydantic import Field
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "KAKAMU_BE"
+    # 클라우드 퍼블릭 VM IP
+    IMAGE_SERVER_URL: str = "http://210.109.52.56"
+
+    DEFAULT_IMAGE:str = "http://210.109.52.56/api/api"
     
     # Optional로 변경하여 값이 없을 때 에러가 나는 것을 방지합니다.
     DATABASE_URL: Optional[str] = Field(default=None, env="DATABASE_URL")
