@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from uuid import UUID
 from app.db.session import get_db
-from app.service.recommendation import recommendation_service
+from app.service.recommendation.recommendation_service import recommendation_service
 from app.api.deps import get_current_persona
 
 router = APIRouter()

@@ -23,16 +23,16 @@ async def get_current_persona(
         payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id_str = payload.get("sub")
         if not user_id_str:
-            raise HTTPException(status_code=401, detail="토큰 내 사용자 정보가 없습니다.")
+            raise HTTPException(status_code=401, detail={"code": "MISSING_USER_INFO", "message": "토큰 내 사용자 정보가 없습니다."})
         user_id = UUID(user_id_str)
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="토큰이 만료되었습니다.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail={"code": "TOKEN_EXPIRED", "message": "토큰이 만료되었습니다."})
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="유효하지 않은 토큰입니다.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail={"code": "INVALID_TOKEN", "message": "유효하지 않은 토큰입니다."})
 
     # 페르소나 유효성 및 소유권 검증
     persona = db.get(Persona, x_persona_id)
     if not persona or persona.user_id != user_id or persona.status == "DELETED":
-        raise HTTPException(status_code=403, detail="요청한 페르소나에 대한 권한이 없거나 존재하지 않습니다.")
+        raise HTTPException(status_code=403, detail={"code": "PERSONA_NOT_FOUND_OR_FORBIDDEN", "message": "요청한 페르소나에 대한 권한이 없거나 존재하지 않습니다."})
         
     return persona.id

@@ -6,7 +6,7 @@ from app.schemas.login.social import TokenResponse
 from app.models import User, SocialAuth
 from app.core.security import create_access_token, create_refresh_token
 from app.api.deps import validate_social_registration, get_current_user
-from app.service.social_auth import get_kakao_user_info
+from app.service.user.social_auth import get_kakao_user_info
 
 router = APIRouter()
 
