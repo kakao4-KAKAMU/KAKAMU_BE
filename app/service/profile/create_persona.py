@@ -1,12 +1,15 @@
 import re,random, string
+from typing import Optional
 from uuid import UUID
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
 from sqlalchemy import select, and_, func
 from sqlalchemy.orm import Session
 from app.models import Persona
 from app.models import FavMovie, FavGenre, FavPeople
 from app.schemas.profile import PersonaCreate
 from opentelemetry import trace
+
+from app.utils.image_upload import upload_profile_image, IMAGE_PUBLIC_BASE_URL
 
 tracer = trace.get_tracer(__name__)
 
@@ -20,8 +23,12 @@ class PersonaCreateService:
         return ''.join(random.choices(characters, k=length))  # 길이는 5글자
 
     @staticmethod
-    async def create_new_persona(db: Session, persona_data: PersonaCreate, user_id: UUID) -> Persona:
-        DEFAULT_PROFILE_IMAGE_URL = "/static/default_profile_image.png"
+    async def create_new_persona(
+            db: Session,
+            persona_data: PersonaCreate,
+            user_id: UUID,
+            profile_image: Optional[UploadFile] = None
+    ) -> Persona:
 
 
 
@@ -29,6 +36,7 @@ class PersonaCreateService:
             span.set_attribute("user_id", str(user_id))
 
             DEFAULT_PROFILE_IMAGE_URL = "/static/default_profile_image.png"
+            IMAGE_PUBLIC_BASE_URL
             MAX_RETRY = 10
 
             name = persona_data.nickname
@@ -80,7 +88,20 @@ class PersonaCreateService:
                 )
 
             try:
-                profile_image_url = persona_data.profile_image_url or DEFAULT_PROFILE_IMAGE_URL
+                if profile_image:
+                    with tracer.start_as_current_span("persona.upload_image") as upload_span:
+                        upload_span.set_attribute(
+                            "file.content_type",
+                            profile_image.content_type
+                        )
+                        profile_image_url = await upload_profile_image(profile_image) # http:// 형식으로 반환
+
+                        upload_span.set_attribute(
+                            "upload.success",
+                            True
+                        )
+                else:
+                    profile_image_url = DEFAULT_PROFILE_IMAGE_URL
                 new_profile = Persona(
                     user_id=user_id,
                     nickname=name,
