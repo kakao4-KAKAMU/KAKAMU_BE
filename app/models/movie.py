@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Numeric
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Numeric, Index
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
@@ -15,6 +15,10 @@ class Movie(Base):
     posts = relationship("Post", secondary="post_movie", back_populates="movies")
     staff = relationship("People", secondary="movie_staff", back_populates="movies")
 
+    __table_args__ = (
+        Index('ix_movie_title_trgm', 'title', postgresql_using='gin', postgresql_ops={'title': 'gin_trgm_ops'}),
+    )
+
 class Genre(Base):
     __tablename__ = "genre"
     id = Column(Integer, primary_key=True)    
@@ -30,6 +34,10 @@ class People(Base):
     job = Column(String(30))    
 
     movies = relationship("Movie", secondary="movie_staff", back_populates="staff")
+
+    __table_args__ = (
+        Index('ix_people_name_trgm', 'name', postgresql_using='gin', postgresql_ops={'name': 'gin_trgm_ops'}),
+    )
 
 class MovieGenre(Base):
     __tablename__ = "movie_genre"

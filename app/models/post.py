@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, JSON, SmallInteger
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, JSON, SmallInteger, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -25,6 +25,11 @@ class Post(Base):
     movies = relationship("Movie", secondary="post_movie", back_populates="posts")    
     hashtags = relationship("Hashtag", secondary="post_hashtag", back_populates="posts")    
     mentions = relationship("Persona", secondary="post_mention", backref="mentioned_in_posts")    
+
+    __table_args__ = (
+        Index('ix_post_title_trgm', 'title', postgresql_using='gin', postgresql_ops={'title': 'gin_trgm_ops'}),
+        Index('ix_post_content_trgm', 'content', postgresql_using='gin', postgresql_ops={'content': 'gin_trgm_ops'}),
+    )
 
 class PostMovie(Base):
     __tablename__ = "post_movie"
