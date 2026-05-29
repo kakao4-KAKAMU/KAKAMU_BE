@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, SmallInteger, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, SmallInteger, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -30,6 +30,7 @@ class Persona(Base):
 
     __table_args__ = (
         UniqueConstraint('nickname', 'tag', name='uq_persona_nickname_tag'),
+        Index('ix_persona_nickname_trgm', 'nickname', postgresql_using='gin', postgresql_ops={'nickname': 'gin_trgm_ops'}),
     )
 
 class FavGenre(Base):
