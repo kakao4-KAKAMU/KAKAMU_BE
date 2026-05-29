@@ -6,7 +6,7 @@ from pydantic import Field
 class Settings(BaseSettings):
     PROJECT_NAME: str = "KAKAMU_BE"
     # 클라우드 퍼블릭 VM IP
-    IMAGE_SERVER_URL: str = "http://210.109.52.56"
+    IMAGE_SERVER_URL: str = "http://210.109.52.56/var/www/images"
 
     DEFAULT_IMAGE:str = "http://210.109.52.56/api/api"
     
