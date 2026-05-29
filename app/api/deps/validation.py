@@ -7,7 +7,7 @@ from app.models import LocalAuth, SocialAuth
 from app.schemas.register.local import UserRegister
 from app.schemas.register.social import SocialRegisterRequest
 from app.core.firebase import verify_firebase_token
-from app.service.social_auth import get_kakao_user_info
+from app.service.user.social_auth import get_kakao_user_info
 
 def validate_local_registration(user_in: UserRegister, db: Session = Depends(get_db)) -> dict:
     """일반 회원가입 시 Firebase 검증 및 이메일 중복을 체크하는 미들웨어 의존성"""

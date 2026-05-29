@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from uuid import UUID
-from app.service.recommendation import recommendation_service
+from app.service.recommendation.recommendation_service import recommendation_service
 
 router = APIRouter()
 

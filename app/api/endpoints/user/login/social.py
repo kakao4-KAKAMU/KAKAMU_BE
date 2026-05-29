@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.login.social import SocialLoginRequest, TokenResponse
-from app.service.social_auth import get_kakao_user_info
+from app.service.user.social_auth import get_kakao_user_info
 from app.models import SocialAuth, Persona
 from app.core.security import create_access_token, create_refresh_token
 
