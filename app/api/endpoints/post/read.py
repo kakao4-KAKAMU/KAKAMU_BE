@@ -32,9 +32,13 @@ def get_my_liked_posts(
     return post_read_service.get_my_liked_posts(db, current_persona_id, cursor, limit)
 
 @router.get("/{post_id}")
-def get_post_detail(post_id: int, db: Session = Depends(get_db)):
+def get_post_detail(
+    post_id: int, 
+    db: Session = Depends(get_db),
+    current_persona_id: UUID = Depends(get_current_persona)
+):
     """
     게시물 상세 내용을 조회합니다.
     사용자가 '스포일러 보기'를 클릭해서 들어온 것으로 간주하여 마스킹 없이 원본을 반환합니다.
     """
-    return post_read_service.get_post_detail(db, post_id)
+    return post_read_service.get_post_detail(db, post_id, current_persona_id)
