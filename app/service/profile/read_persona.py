@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import Session
-from app.models import Persona, EntityRelationshipLog
+from app.models import Persona, EntityRelationshipLog, Follow
 from typing import List
 from uuid import UUID
 
@@ -79,7 +79,12 @@ class PersonaReadService:
                 detail={"code": "PERSONA_NOT_FOUND", "message": "존재하지 않거나 삭제된 프로필입니다."}
             )
 
-        # TODO: viewer_persona_id(헤더에서 온 내 페르소나 ID)를 이용해 
-        # 팔로우 여부(is_following), 차단 여부 등을 추가로 DB에서 엮어서 리턴할 수 있습니다.
+        # 팔로우 여부 확인
+        follow_stmt = select(Follow).where(
+            Follow.follower_id == viewer_persona_id,
+            Follow.following_id == target_persona_id
+        )
+        is_following = db.scalar(follow_stmt) is not None
+        setattr(persona, "is_following", is_following)
         
         return persona

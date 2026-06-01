@@ -5,7 +5,7 @@ from sqlalchemy import or_, func
 from uuid import UUID
 
 from app.db.session import get_db
-from app.models import Persona
+from app.models import Persona, Block
 from .utils import handle_search_request, get_search_pattern
 
 router = APIRouter()
@@ -22,6 +22,13 @@ def search_user(
 ):
     handle_search_request(request, background_tasks, str(x_persona_id) if x_persona_id else None, q)
     search_pattern = get_search_pattern(q)
+
+    # 💡 차단 유저 필터링: 내가 차단했거나 나를 차단한 유저의 ID 목록 추출
+    excluded_persona_ids = []
+    if x_persona_id:
+        blocked_by_me = db.query(Block.blocked_id).filter(Block.blocker_id == x_persona_id).all()
+        blocking_me = db.query(Block.blocker_id).filter(Block.blocked_id == x_persona_id).all()
+        excluded_persona_ids = [b[0] for b in blocked_by_me] + [b[0] for b in blocking_me]
 
     # 닉네임 단독 검색 및 '닉네임#태그' 형태의 복합 검색 모두 지원
     query = db.query(Persona).filter(
