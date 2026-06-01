@@ -92,6 +92,8 @@ class PostReadService:
                 "id": post.id,
                 "author_id": None if author.status == "DELETED" else author.id,
                 "author": author_name,
+                "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
+                "author_tag": None if author.status == "DELETED" else author.tag,
                 "author_image": None if author.status == "DELETED" else author.profile_image_url,
                 "title": "*** 스포일러가 포함된 제목입니다 ***" if is_spoiler else post.title,
                 "content": "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else post.content,
@@ -149,7 +151,11 @@ class PostReadService:
             is_spoiler = post.is_spoiler == 1
 
             result.append({
-                "id": post.id, "author_id": None if author.status == "DELETED" else author.id, "author": author_name,
+                "id": post.id, 
+                "author_id": None if author.status == "DELETED" else author.id, 
+                "author": author_name,
+                "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
+                "author_tag": None if author.status == "DELETED" else author.tag,
                 "author_image": None if author.status == "DELETED" else author.profile_image_url,
                 "title": "*** 스포일러가 포함된 제목입니다 ***" if is_spoiler else post.title,
                 "content": "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else post.content,
@@ -209,7 +215,11 @@ class PostReadService:
             is_spoiler = post.is_spoiler == 1
 
             result.append({
-                "id": post.id, "author_id": None if author.status == "DELETED" else author.id, "author": author_name,
+                "id": post.id, 
+                "author_id": None if author.status == "DELETED" else author.id, 
+                "author": author_name,
+                "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
+                "author_tag": None if author.status == "DELETED" else author.tag,
                 "author_image": None if author.status == "DELETED" else author.profile_image_url,
                 "title": "*** 스포일러가 포함된 제목입니다 ***" if is_spoiler else post.title,
                 "content": "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else post.content,
@@ -247,7 +257,11 @@ class PostReadService:
         ).first() is not None
 
         return {
-            "id": post.id, "author_id": None if author.status == "DELETED" else author.id, "author": author_name,
+            "id": post.id, 
+            "author_id": None if author.status == "DELETED" else author.id, 
+            "author": author_name,
+            "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
+            "author_tag": None if author.status == "DELETED" else author.tag,
             "author_image": None if author.status == "DELETED" else author.profile_image_url,
             "title": post.title, "content": post.content, "image_urls": post.image_urls, "is_spoiler": post.is_spoiler == 1,
             "movies": [{"id": m.id, "title": m.title} for m in post.movies], 
