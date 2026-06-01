@@ -52,6 +52,10 @@ class LikeService:
         if target.persona_id != persona_id:
             await recommendation_service.record_ml_relationship_log(db, persona_id, req.target_type, req.target_id, "like", 1.0, is_undo=not is_liked)
             
+        # 변경된 좋아요 수를 DB 객체에 반영하고 저장
+        target.like_count = new_like_count
+        db.commit()
+
         return is_liked, new_like_count
 
 like_service = LikeService()
