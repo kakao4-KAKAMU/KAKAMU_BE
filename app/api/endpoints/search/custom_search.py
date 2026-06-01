@@ -38,7 +38,7 @@ async def search_contents(
                 pass  # 잘못된 커서 형식은 무시하고 첫 페이지부터 조회
         
         items = base_query.order_by(desc(Post.created_at), desc(Post.id)).limit(limit).all()
-        if items:
+        if len(items) == limit:
             next_cursor = str(items[-1].id)
 
     elif tab == "for-you":
@@ -77,7 +77,7 @@ async def search_contents(
         results = query_with_score.order_by(desc(score_label), desc(Post.id)).limit(limit).all()
         
         items = [row.Post for row in results] # ORM 객체만 추출
-        if results:
+        if len(results) == limit:
             last_row = results[-1]
             next_cursor = f"{last_row.sort_score}_{last_row.Post.id}"
 

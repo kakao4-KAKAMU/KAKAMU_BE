@@ -32,4 +32,6 @@ def search_live(
         
     posts = query.order_by(Post.id.desc()).limit(limit).all()
     items = [{"id": p.id, "title": p.title, "content": p.content} for p in posts]
-    return {"status": "success", "items": items, "next_cursor": posts[-1].id if posts else None}
+    
+    next_cursor = posts[-1].id if len(posts) == limit else None
+    return {"status": "success", "items": items, "next_cursor": next_cursor}
