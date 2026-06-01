@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps import get_current_persona
@@ -15,7 +15,12 @@ def create_comment(post_id: int, comment_in: CommentCreate, db: Session = Depend
     return {"status": "success", "comment_id": comment_id}
 
 @router.get("/")
-def get_comments(post_id: int, db: Session = Depends(get_db)):
-    """게시물의 댓글 목록을 조회합니다. 스포일러 댓글은 내용이 마스킹 처리됩니다."""
-    comments = comment_service.get_comments(db, post_id)
-    return {"status": "success", "comments": comments}
+def get_comments(
+    post_id: int,
+    page: int = Query(1, ge=1, description="페이지 번호 (1부터 시작)"),
+    size: int = Query(20, ge=1, le=100, description="페이지당 반환할 댓글 수"),
+    db: Session = Depends(get_db)
+):
+    """게시물의 댓글 목록을 페이징 처리하여 조회합니다. 스포일러 댓글은 내용이 마스킹 처리됩니다."""
+    comments_data = comment_service.get_comments(db, post_id, page=page, size=size)
+    return {"status": "success", **comments_data}

@@ -38,7 +38,7 @@
 | `GET` | `/posts/{post_id}` | 특정 게시물 상세 조회 (스포일러 마스킹 해제) |
 | `PUT` | `/posts/{post_id}` | 게시물 수정 (작성자 본인만 가능) |
 | `DELETE` | `/posts/{post_id}` | 게시물 삭제 (Soft Delete, **하위 댓글도 모두 비활성화 처리**) |
-| `GET` | `/posts/{post_id}/comments` | 특정 게시물의 댓글 목록 조회 |
+| `GET` | `/posts/{post_id}/comments` | 특정 게시물의 댓글 목록 조회 (Offset 기반 페이징 - `page`, `size` 쿼리 파라미터 지원) |
 | `POST` | `/posts/{post_id}/comments` | 특정 게시물에 댓글 및 대댓글 작성 |
 
 ## 5. Comments & Likes (단일 댓글 관리 및 좋아요)
