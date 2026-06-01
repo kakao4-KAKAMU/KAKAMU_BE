@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from fastapi import HTTPException
 
-from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block, Persona, PostMention
+from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block, Persona, PostMention, Follow
 
 class PostReadService:
     def _get_mentions_for_posts(self, db: Session, post_ids: List[int]) -> Dict[int, List[Dict[str, Any]]]:
@@ -47,6 +47,15 @@ class PostReadService:
             
         return {pid: count for pid, count in counts}
 
+    def _get_followed_author_ids(self, db: Session, current_persona_id: UUID, author_ids: List[UUID]) -> set:
+        if not author_ids:
+            return set()
+        follows = db.query(Follow.following_id).filter(
+            Follow.follower_id == current_persona_id,
+            Follow.following_id.in_(author_ids)
+        ).all()
+        return {f[0] for f in follows}
+
     def get_posts(self, db: Session, current_persona_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
         """게시물 피드 조회 로직"""
         blocked_by_me = db.query(Block.blocked_id).filter(Block.blocker_id == current_persona_id).all()
@@ -65,6 +74,7 @@ class PostReadService:
         
         post_ids = [post.id for post in posts]
         liked_post_ids = set()
+        followed_author_ids = set()
         mentions_map = {}
         hashtags_map = {}
         comment_counts_map = {}
@@ -77,6 +87,9 @@ class PostReadService:
                 LikeLog.is_active == 1
             ).all()
             liked_post_ids = {log[0] for log in liked_logs}
+            
+            author_ids = list({post.persona_id for post in posts})
+            followed_author_ids = self._get_followed_author_ids(db, current_persona_id, author_ids)
             
             mentions_map = self._get_mentions_for_posts(db, post_ids)
             hashtags_map = self._get_hashtags_for_posts(db, post_ids)
@@ -92,6 +105,8 @@ class PostReadService:
                 "id": post.id,
                 "author_id": None if author.status == "DELETED" else author.id,
                 "author": author_name,
+                "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
+                "author_tag": None if author.status == "DELETED" else author.tag,
                 "author_image": None if author.status == "DELETED" else author.profile_image_url,
                 "title": "*** 스포일러가 포함된 제목입니다 ***" if is_spoiler else post.title,
                 "content": "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else post.content,
@@ -104,7 +119,8 @@ class PostReadService:
                 "mentions": mentions_map.get(post.id, []),
                 "like_count": post.like_count, # Use the model field instead of querying LikeLog
                 "comment_count": comment_counts_map.get(post.id, 0),
-                "is_liked": post.id in liked_post_ids
+                "is_liked": post.id in liked_post_ids,
+                "is_following": author.id in followed_author_ids if author.status != "DELETED" else False
             })
         
         next_cursor = result[-1]["id"] if result else None
@@ -133,11 +149,15 @@ class PostReadService:
         posts = query.order_by(Post.id.desc()).limit(limit).all()
         
         post_ids = [post.id for post in posts]
+        followed_author_ids = set()
         mentions_map = {}
         hashtags_map = {}
         comment_counts_map = {}
         
         if post_ids:
+            author_ids = list({post.persona_id for post in posts})
+            followed_author_ids = self._get_followed_author_ids(db, current_persona_id, author_ids)
+
             mentions_map = self._get_mentions_for_posts(db, post_ids)
             hashtags_map = self._get_hashtags_for_posts(db, post_ids)
             comment_counts_map = self._get_comment_counts_for_posts(db, post_ids)
@@ -149,7 +169,11 @@ class PostReadService:
             is_spoiler = post.is_spoiler == 1
 
             result.append({
-                "id": post.id, "author_id": None if author.status == "DELETED" else author.id, "author": author_name,
+                "id": post.id, 
+                "author_id": None if author.status == "DELETED" else author.id, 
+                "author": author_name,
+                "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
+                "author_tag": None if author.status == "DELETED" else author.tag,
                 "author_image": None if author.status == "DELETED" else author.profile_image_url,
                 "title": "*** 스포일러가 포함된 제목입니다 ***" if is_spoiler else post.title,
                 "content": "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else post.content,
@@ -160,7 +184,8 @@ class PostReadService:
                 "mentions": mentions_map.get(post.id, []),
                 "like_count": post.like_count, # Use the model field
                 "comment_count": comment_counts_map.get(post.id, 0),
-                "is_liked": True
+                "is_liked": True,
+                "is_following": author.id in followed_author_ids if author.status != "DELETED" else False
             })
         
         next_cursor = result[-1]["id"] if result else None
@@ -185,6 +210,7 @@ class PostReadService:
         
         post_ids = [post.id for post in posts]
         liked_post_ids = set()
+        followed_author_ids = set()
         mentions_map = {}
         hashtags_map = {}
         comment_counts_map = {}
@@ -198,6 +224,9 @@ class PostReadService:
             ).all()
             liked_post_ids = {log[0] for log in liked_logs}
             
+            author_ids = list({post.persona_id for post in posts})
+            followed_author_ids = self._get_followed_author_ids(db, current_persona_id, author_ids)
+            
             mentions_map = self._get_mentions_for_posts(db, post_ids)
             hashtags_map = self._get_hashtags_for_posts(db, post_ids)
             comment_counts_map = self._get_comment_counts_for_posts(db, post_ids)
@@ -209,7 +238,11 @@ class PostReadService:
             is_spoiler = post.is_spoiler == 1
 
             result.append({
-                "id": post.id, "author_id": None if author.status == "DELETED" else author.id, "author": author_name,
+                "id": post.id, 
+                "author_id": None if author.status == "DELETED" else author.id, 
+                "author": author_name,
+                "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
+                "author_tag": None if author.status == "DELETED" else author.tag,
                 "author_image": None if author.status == "DELETED" else author.profile_image_url,
                 "title": "*** 스포일러가 포함된 제목입니다 ***" if is_spoiler else post.title,
                 "content": "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else post.content,
@@ -220,7 +253,8 @@ class PostReadService:
                 "mentions": mentions_map.get(post.id, []),
                 "like_count": post.like_count, 
                 "comment_count": comment_counts_map.get(post.id, 0),
-                "is_liked": post.id in liked_post_ids
+                "is_liked": post.id in liked_post_ids,
+                "is_following": author.id in followed_author_ids if author.status != "DELETED" else False
             })
         
         next_cursor = result[-1]["id"] if result else None
@@ -246,8 +280,19 @@ class PostReadService:
             LikeLog.is_active == 1
         ).first() is not None
 
+        is_following = False
+        if author.status != "DELETED":
+            is_following = db.query(Follow).filter(
+                Follow.follower_id == current_persona_id,
+                Follow.following_id == author.id
+            ).first() is not None
+
         return {
-            "id": post.id, "author_id": None if author.status == "DELETED" else author.id, "author": author_name,
+            "id": post.id, 
+            "author_id": None if author.status == "DELETED" else author.id, 
+            "author": author_name,
+            "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
+            "author_tag": None if author.status == "DELETED" else author.tag,
             "author_image": None if author.status == "DELETED" else author.profile_image_url,
             "title": post.title, "content": post.content, "image_urls": post.image_urls, "is_spoiler": post.is_spoiler == 1,
             "movies": [{"id": m.id, "title": m.title} for m in post.movies], 
@@ -256,7 +301,8 @@ class PostReadService:
             "like_count": post.like_count, # Use the model field
             "comment_count": comment_counts_map.get(post.id, 0),
             "created_at": post.created_at, "updated_at": post.updated_at,
-            "is_liked": is_liked
+            "is_liked": is_liked,
+            "is_following": is_following
         }
 
 post_read_service = PostReadService()

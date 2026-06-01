@@ -1,12 +1,11 @@
-from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request, Header
 from sqlalchemy.orm import Session
 from typing import Optional
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from uuid import UUID
 
 from app.db.session import get_db
-from app.models import Persona
-from app.api.deps import optional_verify_persona_ownership
+from app.models import Persona, Block
 from .utils import handle_search_request, get_search_pattern
 
 router = APIRouter()
@@ -18,14 +17,26 @@ def search_user(
     q: str = Query(..., min_length=1, description="검색어"),
     cursor: Optional[str] = Query(None, description="페이징 커서 (nickname,id)"),
     limit: int = Query(20, le=50),
-    active_persona_id: Optional[UUID] = Depends(optional_verify_persona_ownership),
+    x_persona_id: Optional[UUID] = Header(None, alias="X-Persona-Id", description="현재 활성화된 페르소나 ID"),
     db: Session = Depends(get_db)
 ):
-    handle_search_request(request, background_tasks, str(active_persona_id) if active_persona_id else None, q)
+    handle_search_request(request, background_tasks, str(x_persona_id) if x_persona_id else None, q)
     search_pattern = get_search_pattern(q)
 
+    # 💡 차단 유저 필터링: 내가 차단했거나 나를 차단한 유저의 ID 목록 추출
+    excluded_persona_ids = []
+    if x_persona_id:
+        blocked_by_me = db.query(Block.blocked_id).filter(Block.blocker_id == x_persona_id).all()
+        blocking_me = db.query(Block.blocker_id).filter(Block.blocked_id == x_persona_id).all()
+        excluded_persona_ids = [b[0] for b in blocked_by_me] + [b[0] for b in blocking_me]
+
+    # 닉네임 단독 검색 및 '닉네임#태그' 형태의 복합 검색 모두 지원
     query = db.query(Persona).filter(
-        Persona.status == "ACTIVE", Persona.nickname.ilike(search_pattern)
+        Persona.status == "ACTIVE",
+        or_(
+            Persona.nickname.ilike(search_pattern),
+            func.concat(Persona.nickname, "#", Persona.tag).ilike(search_pattern)
+        )
     )
     
     # 커서 기반 페이징 적용

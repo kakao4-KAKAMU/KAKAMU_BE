@@ -53,7 +53,7 @@ def search_content(
     ]
     
     # 커서 페이징은 ID 기반 정렬(accuracy)일 때만 유효함
-    next_cursor = movies[-1].id if movies and sort == "accuracy" else None
+    next_cursor = movies[-1].id if len(movies) == limit and sort == "accuracy" else None
     return {"status": "success", "items": items, "next_cursor": next_cursor}
 
 # 2. 장르 목록 조회 API
@@ -91,6 +91,7 @@ def search_movies(
     else: 
         query = query.order_by(Movie.release_date.desc().nullslast(), Movie.id.desc())
             
+    total_count = query.count()
     movies = query.offset(skip).limit(limit).all()
     
     items = [
@@ -103,7 +104,7 @@ def search_movies(
         } 
         for m in movies
     ]
-    return {"status": "success", "items": items, "skip": skip, "limit": limit}
+    return {"status": "success", "items": items, "skip": skip, "limit": limit, "total_count": total_count}
 
 # 4. 기존 인물 검색 API
 @router.get("/v1/search/person", tags=["Search - Metadata"])
@@ -126,9 +127,10 @@ def search_people(
     else: 
         query = query.order_by(People.name.asc(), People.id.desc())
         
+    total_count = query.count()
     people = query.offset(skip).limit(limit).all()
     items = [{"id": p.id, "name": p.name, "profile_image": p.profile_image, "job": p.job} for p in people]
-    return {"status": "success", "items": items, "skip": skip, "limit": limit}
+    return {"status": "success", "items": items, "skip": skip, "limit": limit, "total_count": total_count}
 
 # 5. 일간 인기 검색어(트렌드) Top 10 조회 API
 @router.get("/v1/search/trend", tags=["Search - Metadata"])

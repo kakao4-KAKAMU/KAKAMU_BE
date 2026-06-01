@@ -27,6 +27,7 @@ class PersonaResponse(BaseModel):
     # persona_type: str
 #     persona_type: Optional[str] = None
     profile_image_url: str # 이미지 경로
+    is_following: Optional[bool] = False # 팔로우 상태 필드 추가
 
     @field_serializer("profile_image_url")
     def serialize_profile_image_url(self, value: str):
