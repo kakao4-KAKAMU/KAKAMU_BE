@@ -1,7 +1,7 @@
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import Session
-from app.models import Persona
+from app.models import Persona, EntityRelationshipLog
 from typing import List
 from uuid import UUID
 
@@ -38,4 +38,48 @@ class PersonaReadService:
                 detail={"code": "PERSONA_NOT_FOUND", "message": "페르소나를 찾을 수 없습니다."}
             )
 
+        return persona
+
+    # 타인의 공개 프로필(페르소나) 조회
+    @staticmethod
+    async def get_public_persona_profile(
+        db: Session,
+        target_persona_id: UUID,
+        viewer_persona_id: UUID
+    ) -> Persona:
+        
+        # 차단 여부 검증: 내가 상대방을 차단했거나, 상대방이 나를 차단했는지 확인 (양방향)
+        block_stmt = select(EntityRelationshipLog).where(
+            EntityRelationshipLog.relation_type == "BLOCK",
+            or_(
+                and_(EntityRelationshipLog.persona_id == viewer_persona_id,
+                     EntityRelationshipLog.target_id == target_persona_id),
+                and_(EntityRelationshipLog.persona_id == target_persona_id,
+                     EntityRelationshipLog.target_id == viewer_persona_id)
+            )
+        )
+        is_blocked = db.scalar(block_stmt)
+
+        if is_blocked:
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "FORBIDDEN_BLOCKED_USER", "message": "차단한 사용자의 프로필은 볼 수 없습니다."}
+            )
+
+        stmt = select(Persona).where(
+            Persona.id == target_persona_id,
+            Persona.status == "ACTIVE"  # 다른 사람의 프로필은 활성 상태일 때만 조회
+        )
+
+        persona = db.scalar(stmt)
+
+        if not persona:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "PERSONA_NOT_FOUND", "message": "존재하지 않거나 삭제된 프로필입니다."}
+            )
+
+        # TODO: viewer_persona_id(헤더에서 온 내 페르소나 ID)를 이용해 
+        # 팔로우 여부(is_following), 차단 여부 등을 추가로 DB에서 엮어서 리턴할 수 있습니다.
+        
         return persona

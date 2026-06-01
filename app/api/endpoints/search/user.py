@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request, Header
 from sqlalchemy.orm import Session
 from typing import Optional
 from sqlalchemy import or_, func
@@ -6,7 +6,6 @@ from uuid import UUID
 
 from app.db.session import get_db
 from app.models import Persona
-from app.api.deps import optional_verify_persona_ownership
 from .utils import handle_search_request, get_search_pattern
 
 router = APIRouter()
@@ -18,10 +17,10 @@ def search_user(
     q: str = Query(..., min_length=1, description="검색어"),
     cursor: Optional[str] = Query(None, description="페이징 커서 (nickname,id)"),
     limit: int = Query(20, le=50),
-    active_persona_id: Optional[UUID] = Depends(optional_verify_persona_ownership),
+    x_persona_id: Optional[UUID] = Header(None, alias="X-Persona-Id", description="현재 활성화된 페르소나 ID"),
     db: Session = Depends(get_db)
 ):
-    handle_search_request(request, background_tasks, str(active_persona_id) if active_persona_id else None, q)
+    handle_search_request(request, background_tasks, str(x_persona_id) if x_persona_id else None, q)
     search_pattern = get_search_pattern(q)
 
     # 닉네임 단독 검색 및 '닉네임#태그' 형태의 복합 검색 모두 지원
