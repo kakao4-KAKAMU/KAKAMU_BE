@@ -31,6 +31,19 @@ def get_my_liked_posts(
     """
     return post_read_service.get_my_liked_posts(db, current_persona_id, cursor, limit)
 
+@router.get("/persona/{target_persona_id}")
+def get_persona_posts(
+    target_persona_id: UUID,
+    cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"), 
+    limit: int = Query(20, le=100), 
+    db: Session = Depends(get_db),
+    current_persona_id: UUID = Depends(get_current_persona)
+):
+    """
+    특정 페르소나(본인 또는 타인)가 작성한 게시물 목록을 조회합니다.
+    """
+    return post_read_service.get_persona_posts(db, target_persona_id, current_persona_id, cursor, limit)
+
 @router.get("/{post_id}")
 def get_post_detail(
     post_id: int, 
