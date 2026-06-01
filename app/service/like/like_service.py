@@ -8,7 +8,7 @@ from app.service.recommendation.recommendation_service import recommendation_ser
 from app.core.redis import redis_client
 
 class LikeService:
-    async def toggle_like(self, db: Session, req: LikeToggleRequest, persona_id: UUID) -> bool:
+    async def toggle_like(self, db: Session, req: LikeToggleRequest, persona_id: UUID) -> tuple[bool, int]:
         """게시물 또는 댓글의 좋아요를 토글(Like/Unlike)하고 취향 가중치에 반영합니다."""
         if req.target_type == "POST":
             target = db.query(Post).filter(Post.id == req.target_id).first()
@@ -32,19 +32,26 @@ class LikeService:
             
         db.commit()
         
+        new_like_count = target.like_count
         try:
             redis_key = f"kakamu:stat:{req.target_type.lower()}:{req.target_id}:likes"
+            
+            # [Fix] Redis에 키가 없을 경우 DB의 현재 좋아요 수로 초기화 (Cache Miss로 인한 카운트 1 초기화 현상 방지)
+            await redis_client.setnx(redis_key, target.like_count)
+
             if is_liked:
-                await redis_client.incr(redis_key)
+                new_like_count = await redis_client.incr(redis_key)
             else:
-                await redis_client.decr(redis_key)
+                new_like_count = await redis_client.decr(redis_key)
         except Exception as e:
             # Redis 통계 업데이트 실패 시에도 메인 좋아요 로직(DB 저장)은 완료되었으므로 에러를 삼킵니다.
             print(f"[Redis Error] Like stat update failed for {req.target_id}: {e}")
+            # Redis 실패 시 Fallback 카운트
+            new_like_count = target.like_count + (1 if is_liked else -1)
             
         if target.persona_id != persona_id:
             await recommendation_service.record_ml_relationship_log(db, persona_id, req.target_type, req.target_id, "like", 1.0, is_undo=not is_liked)
             
-        return is_liked
+        return is_liked, new_like_count
 
 like_service = LikeService()

@@ -166,6 +166,66 @@ class PostReadService:
         next_cursor = result[-1]["id"] if result else None
         return {"items": result, "next_cursor": next_cursor, "has_next": len(result) == limit}
 
+    def get_persona_posts(self, db: Session, target_persona_id: UUID, current_persona_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
+        """특정 페르소나가 작성한 게시물 조회 로직"""
+        blocked_by_me = db.query(Block.blocked_id).filter(Block.blocker_id == current_persona_id).all()
+        blocking_me = db.query(Block.blocker_id).filter(Block.blocked_id == current_persona_id).all()
+        excluded_persona_ids = [b[0] for b in blocked_by_me] + [b[0] for b in blocking_me]
+
+        # 차단 관계일 경우 빈 목록 반환 (프로필 주인이 나와 차단 관계라면 글을 볼 수 없음)
+        if target_persona_id in excluded_persona_ids:
+            return {"items": [], "next_cursor": None, "has_next": False}
+
+        query = db.query(Post).filter(Post.persona_id == target_persona_id, Post.status == "ACTIVE")
+        
+        if cursor:
+            query = query.filter(Post.id < cursor)
+        
+        posts = query.order_by(Post.id.desc()).limit(limit).all()
+        
+        post_ids = [post.id for post in posts]
+        liked_post_ids = set()
+        mentions_map = {}
+        hashtags_map = {}
+        comment_counts_map = {}
+        
+        if post_ids:
+            liked_logs = db.query(LikeLog.target_id).filter(
+                LikeLog.persona_id == current_persona_id,
+                LikeLog.target_type == "POST",
+                LikeLog.target_id.in_(post_ids),
+                LikeLog.is_active == 1
+            ).all()
+            liked_post_ids = {log[0] for log in liked_logs}
+            
+            mentions_map = self._get_mentions_for_posts(db, post_ids)
+            hashtags_map = self._get_hashtags_for_posts(db, post_ids)
+            comment_counts_map = self._get_comment_counts_for_posts(db, post_ids)
+
+        result = []
+        for post in posts:
+            author = post.persona
+            author_name = "알 수 없음" if author.status == "DELETED" else f"{author.nickname}#{author.tag}"
+            is_spoiler = post.is_spoiler == 1
+
+            result.append({
+                "id": post.id, "author_id": None if author.status == "DELETED" else author.id, "author": author_name,
+                "author_image": None if author.status == "DELETED" else author.profile_image_url,
+                "title": "*** 스포일러가 포함된 제목입니다 ***" if is_spoiler else post.title,
+                "content": "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else post.content,
+                "image_urls": [] if is_spoiler else post.image_urls, "is_spoiler": is_spoiler, 
+                "created_at": post.created_at, "updated_at": post.updated_at,
+                "movies": [{"id": m.id, "title": m.title} for m in post.movies], 
+                "hashtags": hashtags_map.get(post.id, []),
+                "mentions": mentions_map.get(post.id, []),
+                "like_count": post.like_count, 
+                "comment_count": comment_counts_map.get(post.id, 0),
+                "is_liked": post.id in liked_post_ids
+            })
+        
+        next_cursor = result[-1]["id"] if result else None
+        return {"items": result, "next_cursor": next_cursor, "has_next": len(result) == limit}
+
     def get_post_detail(self, db: Session, post_id: int, current_persona_id: UUID) -> Dict[str, Any]:
         """게시물 상세 조회 로직"""
         post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()

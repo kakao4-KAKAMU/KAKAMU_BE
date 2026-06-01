@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from sqlalchemy import func
 from uuid import UUID
 from typing import List, Dict, Any
 
@@ -35,8 +36,14 @@ class CommentService:
         db.commit()
         return new_comment.id
 
-    def get_comments(self, db: Session, post_id: int) -> List[Dict[str, Any]]:
-        comments = db.query(Comment).filter(Comment.post_id == post_id, Comment.status == "ACTIVE").order_by(Comment.created_at.asc()).all()
+    def get_comments(self, db: Session, post_id: int, page: int = 1, size: int = 20) -> Dict[str, Any]:
+        offset = (page - 1) * size
+        
+        total_count = db.query(func.count(Comment.id)).filter(Comment.post_id == post_id, Comment.status == "ACTIVE").scalar()
+        
+        comments = db.query(Comment).filter(Comment.post_id == post_id, Comment.status == "ACTIVE")\
+            .order_by(Comment.created_at.asc()).offset(offset).limit(size).all()
+            
         result = []
         for c in comments:
             author = c.persona
@@ -47,7 +54,16 @@ class CommentService:
                 "author": author_name, "content": "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else c.content,
                 "is_spoiler": is_spoiler, "created_at": c.created_at
             })
-        return result
+            
+        return {
+            "items": result,
+            "meta": {
+                "total_count": total_count,
+                "current_page": page,
+                "page_size": size,
+                "total_pages": (total_count + size - 1) // size if total_count > 0 else 1
+            }
+        }
 
     def delete_comment(self, db: Session, comment_id: int, persona_id: UUID) -> None:
         comment = db.query(Comment).filter(Comment.id == comment_id, Comment.persona_id == persona_id).first()
