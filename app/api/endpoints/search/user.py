@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from typing import Optional
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from uuid import UUID
 
 from app.db.session import get_db
@@ -24,8 +24,13 @@ def search_user(
     handle_search_request(request, background_tasks, str(active_persona_id) if active_persona_id else None, q)
     search_pattern = get_search_pattern(q)
 
+    # 닉네임 단독 검색 및 '닉네임#태그' 형태의 복합 검색 모두 지원
     query = db.query(Persona).filter(
-        Persona.status == "ACTIVE", Persona.nickname.ilike(search_pattern)
+        Persona.status == "ACTIVE",
+        or_(
+            Persona.nickname.ilike(search_pattern),
+            func.concat(Persona.nickname, "#", Persona.tag).ilike(search_pattern)
+        )
     )
     
     # 커서 기반 페이징 적용
