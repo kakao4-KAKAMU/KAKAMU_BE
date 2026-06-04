@@ -1,7 +1,7 @@
 from uuid import UUID
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, select, or_
 from fastapi import HTTPException
 
 from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block, Persona, PostMention, Follow
@@ -58,14 +58,17 @@ class PostReadService:
 
     def get_posts(self, db: Session, current_persona_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
         """게시물 피드 조회 로직"""
-        blocked_by_me = db.query(Block.blocked_id).filter(Block.blocker_id == current_persona_id).all()
-        blocking_me = db.query(Block.blocker_id).filter(Block.blocked_id == current_persona_id).all()
-        excluded_persona_ids = [b[0] for b in blocked_by_me] + [b[0] for b in blocking_me]
+        # 1. 차단 관계 서브쿼리 (메모리에 올리지 않고 DB 엔진 레벨의 NOT IN 활용)
+        blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_persona_id)
+        blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_persona_id)
 
-        query = db.query(Post).filter(Post.status == "ACTIVE")
-        
-        if excluded_persona_ids:
-            query = query.filter(Post.persona_id.notin_(excluded_persona_ids))
+        # 2. 게시물과 작성자(Persona) 조인 및 필터링 적용
+        query = db.query(Post).join(Persona, Post.persona_id == Persona.id).filter(
+            Post.status == "ACTIVE",
+            Persona.status == "ACTIVE",            # 탈퇴/삭제 유예 기간인 작성자 숨김
+            Post.persona_id.notin_(blocked_by_me), # 내가 차단한 사람 숨김
+            Post.persona_id.notin_(blocking_me)    # 나를 차단한 사람 숨김
+        )
 
         if cursor:
             query = query.filter(Post.id < cursor)
@@ -128,20 +131,25 @@ class PostReadService:
 
     def get_my_liked_posts(self, db: Session, current_persona_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
         """내가 좋아요 누른 게시물 조회 로직"""
-        blocked_by_me = db.query(Block.blocked_id).filter(Block.blocker_id == current_persona_id).all()
-        blocking_me = db.query(Block.blocker_id).filter(Block.blocked_id == current_persona_id).all()
-        excluded_persona_ids = [b[0] for b in blocked_by_me] + [b[0] for b in blocking_me]
+        # 1. 차단 관계 서브쿼리
+        blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_persona_id)
+        blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_persona_id)
 
-        liked_post_ids_subquery = db.query(LikeLog.target_id).filter(
+        # 2. 내가 좋아요한 게시물 ID 서브쿼리
+        liked_post_ids_subquery = select(LikeLog.target_id).where(
             LikeLog.persona_id == current_persona_id,
             LikeLog.target_type == "POST",
             LikeLog.is_active == 1
-        ).subquery()
+        )
 
-        query = db.query(Post).filter(Post.id.in_(liked_post_ids_subquery), Post.status == "ACTIVE")
-        
-        if excluded_persona_ids:
-            query = query.filter(Post.persona_id.notin_(excluded_persona_ids))
+        # 3. 조인 및 필터 적용
+        query = db.query(Post).join(Persona, Post.persona_id == Persona.id).filter(
+            Post.id.in_(liked_post_ids_subquery), 
+            Post.status == "ACTIVE",
+            Persona.status == "ACTIVE",
+            Post.persona_id.notin_(blocked_by_me),
+            Post.persona_id.notin_(blocking_me)
+        )
 
         if cursor:
             query = query.filter(Post.id < cursor)
@@ -193,15 +201,22 @@ class PostReadService:
 
     def get_persona_posts(self, db: Session, target_persona_id: UUID, current_persona_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
         """특정 페르소나가 작성한 게시물 조회 로직"""
-        blocked_by_me = db.query(Block.blocked_id).filter(Block.blocker_id == current_persona_id).all()
-        blocking_me = db.query(Block.blocker_id).filter(Block.blocked_id == current_persona_id).all()
-        excluded_persona_ids = [b[0] for b in blocked_by_me] + [b[0] for b in blocking_me]
+        # 프로필 주인이 나와 차단 관계인지 데이터베이스에서 직접 확인 (1건 조회로 최적화)
+        is_blocked = db.query(Block).filter(
+            or_(
+                (Block.blocker_id == current_persona_id) & (Block.blocked_id == target_persona_id),
+                (Block.blocker_id == target_persona_id) & (Block.blocked_id == current_persona_id)
+            )
+        ).first()
 
-        # 차단 관계일 경우 빈 목록 반환 (프로필 주인이 나와 차단 관계라면 글을 볼 수 없음)
-        if target_persona_id in excluded_persona_ids:
+        if is_blocked:
             return {"items": [], "next_cursor": None, "has_next": False}
 
-        query = db.query(Post).filter(Post.persona_id == target_persona_id, Post.status == "ACTIVE")
+        query = db.query(Post).join(Persona, Post.persona_id == Persona.id).filter(
+            Post.persona_id == target_persona_id, 
+            Post.status == "ACTIVE",
+            Persona.status == "ACTIVE"
+        )
         
         if cursor:
             query = query.filter(Post.id < cursor)
@@ -266,6 +281,17 @@ class PostReadService:
         if not post:
             raise HTTPException(status_code=404, detail={"code": "POST_NOT_FOUND", "message": "게시물을 찾을 수 없습니다."})
             
+        # 직접 링크를 통해 접속하더라도 본인과의 차단(Block) 관계가 있으면 차단
+        is_blocked = db.query(Block).filter(
+            or_(
+                (Block.blocker_id == current_persona_id) & (Block.blocked_id == post.persona_id),
+                (Block.blocker_id == post.persona_id) & (Block.blocked_id == current_persona_id)
+            )
+        ).first()
+        
+        if is_blocked:
+            raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_BLOCKED_POST", "message": "차단된 사용자의 게시물입니다."})
+
         author = post.persona
         author_name = "알 수 없음" if author.status == "DELETED" else f"{author.nickname}#{author.tag}"
         

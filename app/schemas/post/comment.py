@@ -13,3 +13,16 @@ class CommentCreate(BaseModel):
         if not v:
             raise ValueError("공백으로만 이루어질 수 없습니다.")
         return v
+
+class CommentUpdate(BaseModel):
+    content: Optional[str] = Field(default=None, max_length=1000, description="수정할 댓글 본문")
+    is_spoiler: Optional[int] = Field(default=None, ge=0, le=1, description="스포일러 여부 (0: 일반, 1: 스포일러)")
+
+    @field_validator('content')
+    @classmethod
+    def check_not_empty(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if not v:
+                raise ValueError("공백으로만 이루어질 수 없습니다.")
+        return v

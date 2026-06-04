@@ -1,7 +1,7 @@
 from fastapi import HTTPException
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, func
 from sqlalchemy.orm import Session
-from app.models import Persona, EntityRelationshipLog, Follow
+from app.models import Persona, EntityRelationshipLog, Follow, Post
 from typing import List
 from uuid import UUID
 
@@ -15,7 +15,16 @@ class PersonaReadService:
             Persona.status != "DELETED"
         )
 
-        return list(db.scalars(stmt).all())
+        personas = list(db.scalars(stmt).all())
+        for persona in personas:
+            follower_count = db.scalar(select(func.count(Follow.id)).where(Follow.following_id == persona.id))
+            following_count = db.scalar(select(func.count(Follow.id)).where(Follow.follower_id == persona.id))
+            post_count = db.scalar(select(func.count(Post.id)).where(Post.persona_id == persona.id, Post.status == "ACTIVE"))
+            setattr(persona, "follower_count", follower_count)
+            setattr(persona, "following_count", following_count)
+            setattr(persona, "post_count", post_count)
+            
+        return personas
 
     # 특정 페르소나 조회
     @staticmethod
@@ -37,6 +46,14 @@ class PersonaReadService:
                 status_code=404,
                 detail={"code": "PERSONA_NOT_FOUND", "message": "페르소나를 찾을 수 없습니다."}
             )
+
+        follower_count = db.scalar(select(func.count(Follow.id)).where(Follow.following_id == persona_id))
+        following_count = db.scalar(select(func.count(Follow.id)).where(Follow.follower_id == persona_id))
+        post_count = db.scalar(select(func.count(Post.id)).where(Post.persona_id == persona_id, Post.status == "ACTIVE"))
+        
+        setattr(persona, "follower_count", follower_count)
+        setattr(persona, "following_count", following_count)
+        setattr(persona, "post_count", post_count)
 
         return persona
 
@@ -86,5 +103,13 @@ class PersonaReadService:
         )
         is_following = db.scalar(follow_stmt) is not None
         setattr(persona, "is_following", is_following)
+
+        follower_count = db.scalar(select(func.count(Follow.id)).where(Follow.following_id == target_persona_id))
+        following_count = db.scalar(select(func.count(Follow.id)).where(Follow.follower_id == target_persona_id))
+        post_count = db.scalar(select(func.count(Post.id)).where(Post.persona_id == target_persona_id, Post.status == "ACTIVE"))
+        
+        setattr(persona, "follower_count", follower_count)
+        setattr(persona, "following_count", following_count)
+        setattr(persona, "post_count", post_count)
         
         return persona

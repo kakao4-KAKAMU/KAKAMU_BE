@@ -15,6 +15,7 @@
 | `400` | `KAKAO_TOKEN_ISSUE_FAILED` | 카카오 서버로부터 액세스 토큰 발급 실패 |
 | `401` | `LOGIN_FAILED` | 일반 로그인 시 이메일 또는 비밀번호 불일치 |
 | `401` | `INVALID_KAKAO_TOKEN` | 유효하지 않은 카카오 액세스 토큰 |
+| `403` | `ACCOUNT_IN_GRACE_PERIOD` | 탈퇴 유예 기간(30일) 내의 계정으로 로그인 시도. 복구 절차 필요 |
 | `404` | `USER_NOT_FOUND` | 요청한 사용자를 찾을 수 없음 |
 | `500` | `KAKAO_API_KEY_NOT_SET` | 서버에 카카오 REST API 키가 설정되지 않음 |
 | `500` | `KAKAO_API_CONNECTION_ERROR` | 카카오 API 서버 통신 에러 |
@@ -38,22 +39,33 @@
 | HTTP Status | Error Code | 발생 원인 / 설명 |
 |:---:|:---|:---|
 | `404` | `POST_NOT_FOUND` | 삭제된 게시물에 댓글을 작성하려고 시도 |
-| `404` | `COMMENT_NOT_FOUND_OR_FORBIDDEN` | 댓글이 없거나, 타인이 작성한 댓글을 삭제하려고 시도 |
-| `404` | `COMMENT_NOT_FOUND` | 존재하지 않는 댓글 내용(스포일러 보기 등) 조회 시도 |
+| `404` | `COMMENT_NOT_FOUND` | 존재하지 않거나 이미 삭제된 댓글 조회/수정/삭제 시도 |
+| `403` | `FORBIDDEN_COMMENT_UPDATE` | 본인이 작성하지 않은 댓글을 수정하려고 시도 |
+| `403` | `FORBIDDEN_COMMENT_DELETE` | 본인이 작성하지 않은 댓글을 삭제하려고 시도 |
+| `403` | `FORBIDDEN_BLOCKED_COMMENT` | 차단 관계에 있는 사용자의 단일 댓글 상세 조회 시도 |
 
-## 4. Like (좋아요 관련)
+## 4. Post (게시물 관련)
+| HTTP Status | Error Code | 발생 원인 / 설명 |
+|:---:|:---|:---|
+| `404` | `POST_NOT_FOUND` | 존재하지 않거나 이미 삭제된 게시물 조회 시도 |
+| `403` | `FORBIDDEN_POST_UPDATE` | 본인이 작성하지 않은 게시물 수정 시도 |
+| `403` | `FORBIDDEN_POST_DELETE` | 본인이 작성하지 않은 게시물 삭제 시도 |
+| `403` | `FORBIDDEN_BLOCKED_POST` | 차단 관계에 있는 사용자의 게시물을 링크로 직접 상세 조회 시도 |
+| `400` | `HASHTAG_LIMIT_EXCEEDED` | 본문에 삽입된 해시태그 최대 등록 개수(10개) 초과 |
+
+## 5. Like (좋아요 관련)
 | HTTP Status | Error Code | 발생 원인 / 설명 |
 |:---:|:---|:---|
 | `400` | `UNSUPPORTED_TARGET_TYPE` | 좋아요가 불가능한 타겟 타입(게시물, 댓글 외) 요청 |
 | `404` | `TARGET_NOT_FOUND` | 좋아요를 누르려는 대상 원본 데이터가 존재하지 않음 |
 
-## 5. Relation (팔로우 및 차단 관련)
+## 6. Relation (팔로우 및 차단 관련)
 | HTTP Status | Error Code | 발생 원인 / 설명 |
 |:---:|:---|:---|
 | `400` | `CANNOT_FOLLOW_SELF` | 본인의 페르소나를 팔로우 대상으로 지정 |
 | `400` | `CANNOT_BLOCK_SELF` | 본인의 페르소나를 차단 대상으로 지정 |
 
-## 6. System (시스템 공통)
+## 7. System (시스템 공통)
 | HTTP Status | Error Code | 발생 원인 / 설명 |
 |:---:|:---|:---|
 | `500` | `DB_CONNECTION_FAILED` | `/db-test` Health check 중 데이터베이스 연결 실패 |

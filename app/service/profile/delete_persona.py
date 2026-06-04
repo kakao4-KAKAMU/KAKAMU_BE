@@ -58,9 +58,4 @@ class PersonaDeleteService:
 
         return None
 
-
-
-# 1번 페르소나를 활성화 하고 있는데 2번 페르소나 삭제를 할 수 있는가?
-# 삭제된 페르소나는 페르소나 생성 규칙인 최대 5개에 포함되는 가?
-# 즉시 페르소나 삭제 기능은 필요한가?
-# 30일 뒤에 자동으로 삭제되도록 하려면 어떻게 해야하는가?
+# * 7일 뒤 자동 삭제 로직은 app.worker.persona_batch 내 배치 작업(APScheduler)으로 구현됨.

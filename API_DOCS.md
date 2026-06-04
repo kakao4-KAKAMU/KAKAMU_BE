@@ -22,6 +22,7 @@
 | `GET` | `/users/me` | JWT 토큰을 기반으로 현재 로그인된 사용자의 정보 조회 |
 | `GET` | `/users/{user_id}` | 특정 `user_id`를 가진 사용자 정보 조회 |
 | `POST` | `/users/local/reset-password` | Firebase 인증 기반 이메일 계정 비밀번호 재설정 |
+| `POST` | `/users/me/restore` | 삭제된 회원(유예 기간) 복구 (계정 활성화) |
 
 ## 3. Movies (영화 및 추천 시스템)
 | Method | Path | Description |
@@ -45,6 +46,7 @@
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/comments/{comment_id}` | 단일 댓글 상세 조회 (스포일러 원본 확인용) |
+| `PUT` | `/comments/{comment_id}` | 단일 댓글 내용 및 스포일러 여부 수정 (작성자 본인만 가능) |
 | `DELETE` | `/comments/{comment_id}` | 단일 댓글 삭제 (Soft Delete, 하위 대댓글 함께 비활성화) |
 | `POST` | `/likes` | 대상(게시물/댓글 등)에 대한 좋아요 토글 및 활동 기록 |
 
@@ -76,6 +78,17 @@
 | `GET` | `/v1/search/person` | 인물(배우/감독) 검색 (직업 필터, 이름 정렬, Offset 페이징) |
 | `GET` | `/v1/genre/list` | 전체 영화 장르 목록 가나다순 조회 |
 | `GET` | `/v1/search/trend` | 일간 인기 검색어(트렌드) Top 10 순위 조회 |
+
+## 9. Profiles (페르소나 관리)
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/personas` | 현재 로그인된 유저의 모든 페르소나 목록 조회 |
+| `POST` | `/personas` | 신규 페르소나 생성 (최대 5개 제한, 고유 태그 발급) |
+| `GET` | `/personas/{persona_id}` | 특정 페르소나 상세 정보 조회 |
+| `PUT` | `/personas/{persona_id}` | 특정 페르소나 정보(닉네임, 프로필 이미지 등) 수정 |
+| `DELETE` | `/personas/{persona_id}` | 특정 페르소나 삭제 (Soft Delete, 최소 1개 유지) |
+| `POST` | `/personas/{persona_id}/restore` | 유예 기간 내의 페르소나 복구 (활성화) |
+| `GET` | `/public/{target_persona_id}` | 타인의 공개 페르소나 프로필 조회 |
 
 ---
 

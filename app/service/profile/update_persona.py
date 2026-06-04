@@ -1,211 +1,109 @@
-import re,string,random
+from typing import Optional
 from uuid import UUID
 from fastapi import HTTPException
-from sqlalchemy import select, and_,delete
+from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
+
 from app.models import Persona, FavMovie, FavGenre, FavPeople
 from app.schemas.profile import PersonaEdit
+from app.service.profile.create_persona import PersonaCreateService
 from opentelemetry import trace
+
 tracer = trace.get_tracer(__name__)
 
 class PersonaUpdateService:
 
-    # 태그 랜덤 생성 함수
     @staticmethod
-    def generate_random_tag(length: int = 5) -> str:
-        characters = string.ascii_lowercase + string.digits  # 소문자와 숫자 조합
-        return ''.join(random.choices(characters, k=length))  # 길이는 5글자
-
-    # 특정 페르소나 수정
-    @staticmethod
-    async def update_persona(db: Session, persona_id: UUID, edit_data: PersonaEdit, user_id: UUID) -> Persona:
+    async def update_persona(
+        db: Session,
+        user_id: UUID,
+        persona_id: UUID,
+        persona_data: PersonaEdit
+    ) -> Persona:
         with tracer.start_as_current_span("persona.update") as span:
-            span.set_attribute("persona.id", str(persona_id))
-            span.set_attribute("user.id", str(user_id))
+            span.set_attribute("user_id", str(user_id))
+            span.set_attribute("persona_id", str(persona_id))
 
-            MAX_RETRY = 10
-            db_persona = db.get(Persona, persona_id) # persona_id로 Persona 테이블 찾음
+            # 1. 페르소나 존재 여부 및 본인 소유 확인
+            stmt = select(Persona).where(
+                and_(
+                    Persona.id == persona_id,
+                    Persona.user_id == user_id,
+                    Persona.status == "ACTIVE"
+                )
+            )
+            persona = db.scalar(stmt)
 
-            if not db_persona:
-                span.set_attribute("persona.update.result", "failed")
-                span.set_attribute("persona.update.fail_reason", "persona_not_found")
-                raise HTTPException(status_code=404, detail={"code": "PERSONA_NOT_FOUND", "message": "존재하지 않는 페르소나 입니다."})
+            if not persona:
+                raise HTTPException(
+                    status_code=404,
+                    detail={"code": "PERSONA_NOT_FOUND", "message": "페르소나를 찾을 수 없거나 권한이 없습니다."}
+                )
 
-            if db_persona.user_id != user_id:
-                span.set_attribute("persona.update.result", "failed")
-                span.set_attribute("persona.update.fail_reason", "forbidden")
-                raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_PERSONA_UPDATE", "message": "이 페르소나를 수정할 권한이 없습니다."})
-
-            with tracer.start_as_current_span("persona.update.extract_update_data") as update_data_span:
-                # 사용자가 실제로 보낸 값만 딕셔너리로 추출 (exclude_unset=True)
-                update_data = edit_data.model_dump(exclude_unset=True)
-                update_data_span.set_attribute("update.field_count", len(update_data))
-                update_data_span.set_attribute("update.has_nickname", "nickname" in update_data)
-
-            # 닉네임이 포함될 시 검사 로직
-            if "nickname" in update_data and update_data["nickname"] is not None:
-                new_nickname = update_data["nickname"]
-
-                if db_persona.nickname == new_nickname:
-                    span.set_attribute("persona.update.result", "failed")
-                    span.set_attribute("persona.update.fail_reason", "same_nickname")
+            # 2. 닉네임 변경 요청 시 처리 (태그 재발급 포함)
+            if persona_data.nickname is not None:
+                if persona_data.nickname == persona.nickname:
                     raise HTTPException(
                         status_code=400,
-                        detail={"code": "SAME_NICKNAME", "message": "현재 닉네임과 동일합니다."}
+                        detail={"code": "SAME_NICKNAME", "message": "기존과 동일한 닉네임입니다."}
                     )
-
-                tag=None
-
-                with tracer.start_as_current_span("persona.update.generate_unique_tag") as tag_span:
-                    for retry_count in range(MAX_RETRY):  # 10번 태그 생성 시도
-                        candidate_tag = PersonaUpdateService.generate_random_tag()  # 랜덤 태그 생성
-
+                
+                # 새 닉네임에 부여할 유니크 태그 발급 (최대 10회 재시도)
+                tag = None
+                MAX_RETRY = 10
+                with tracer.start_as_current_span("persona.generate_new_tag"):
+                    for _ in range(MAX_RETRY):
+                        candidate_tag = PersonaCreateService.generate_random_tag()
                         exist_stmt = select(Persona).where(
-                            and_(
-                                Persona.nickname == new_nickname,  # and 연산으로 name, tag 비교
-                                Persona.tag == candidate_tag
-                            )
+                            and_(Persona.nickname == persona_data.nickname, Persona.tag == candidate_tag)
                         )
-
-                        existing_persona = db.scalar(exist_stmt)  # 닉네임 + 태그로 중복 검사
-
-                        if not existing_persona:  # 만약 없으면
-                            tag = candidate_tag  # 태그를 생성된 태그로 지정하고
-                            tag_span.set_attribute("tag.retry_count", retry_count + 1)
-                            break  # 반복문 종료
-
-                db_persona.nickname = new_nickname
-                db_persona.tag = tag
-
-                # 처리했으니깐 삭제
-                del update_data["nickname"]
-
-            # 새로운 관심 영화 목록 '교체' 방식
-            if edit_data.fav_movie_ids is not None: # 새로운 관심 영화 목록이 들어오면
-                with tracer.start_as_current_span("persona.update.fav_movies") as movie_span:
-                    input_movie_ids = set(edit_data.fav_movie_ids) # 그 영화 아이디들을 집합으로 전환하고 저장
-
-                    existing_movie_ids = set(
-                        db.scalars(
-                            select(FavMovie.movie_id).where(
-                                FavMovie.persona_id == persona_id
-                            ) # favmovie 테이블에서 페르소나 id와 일치하는 모든 목록 가져옴.
-                        ).all()
-                    )
-
-                    delete_movie_ids = existing_movie_ids - input_movie_ids # 지워야 하는 목록 필터링
-                    add_movie_ids = input_movie_ids - existing_movie_ids # 추가해야 하는 목록 필터링
-
-                    movie_span.set_attribute("fav_movie.input_count", len(input_movie_ids))
-                    movie_span.set_attribute("fav_movie.existing_count", len(existing_movie_ids))
-                    movie_span.set_attribute("fav_movie.delete_count", len(delete_movie_ids))
-                    movie_span.set_attribute("fav_movie.add_count", len(add_movie_ids))
-
-                    if delete_movie_ids:
-                        db.execute(
-                            delete(FavMovie).where(
-                                FavMovie.persona_id == persona_id,
-                                FavMovie.movie_id.in_(delete_movie_ids)
-                            )
-                        ) # 영화 목록 삭제
-
-                    for movie_id in add_movie_ids:
-                        db.add(FavMovie(persona_id=persona_id, movie_id=movie_id)) # 새로운 목록 추가
-
-                    update_data.pop("fav_movie_ids", None) # 수동 처리 했으니 삭제
-
-            # 새로운 관심 장르 목록 '교체' 방식
-            if edit_data.fav_genre_ids is not None:
-                with tracer.start_as_current_span("persona.update.fav_genres") as genre_span:
-                    input_genre_ids = set(edit_data.fav_genre_ids)
-
-                    existing_genre_ids = set(
-                        db.scalars(
-                            select(FavGenre.genre_id).where(
-                                FavGenre.persona_id == persona_id
-                            )
-                        ).all()
-                    )
-
-                    delete_genre_ids = existing_genre_ids - input_genre_ids
-                    add_genre_ids = input_genre_ids - existing_genre_ids
-
-                    genre_span.set_attribute("fav_genre.input_count", len(input_genre_ids))
-                    genre_span.set_attribute("fav_genre.existing_count", len(existing_genre_ids))
-                    genre_span.set_attribute("fav_genre.delete_count", len(delete_genre_ids))
-                    genre_span.set_attribute("fav_genre.add_count", len(add_genre_ids))
-
-                    if delete_genre_ids:
-                        db.execute(
-                            delete(FavGenre).where(
-                                FavGenre.persona_id == persona_id,
-                                FavGenre.genre_id.in_(delete_genre_ids)
-                            )
+                        if not db.scalar(exist_stmt):
+                            tag = candidate_tag
+                            break
+                    
+                    if tag is None:
+                        raise HTTPException(
+                            status_code=500,
+                            detail={"code": "TAG_GENERATION_FAILED", "message": "새로운 태그 발급에 실패했습니다."}
                         )
+                
+                persona.nickname = persona_data.nickname
+                persona.tag = tag
 
-                    for genre_id in add_genre_ids:
-                        db.add(FavGenre(persona_id=persona_id, genre_id=genre_id))
+            # 3. 기본 프로필 정보 업데이트
+            if persona_data.profile_msg is not None:
+                persona.profile_msg = persona_data.profile_msg
+            if persona_data.profile_image_url is not None:
+                persona.profile_image_url = persona_data.profile_image_url
 
-                    update_data.pop("fav_genre_ids", None)
-
-            # 새로운 관심 인물 목록 '교체' 방식
-            if edit_data.fav_people_ids is not None:
-                with tracer.start_as_current_span("persona.update.fav_people") as people_span:
-                    input_people_ids = set(edit_data.fav_people_ids)
-
-                    existing_people_ids = set(
-                        db.scalars(
-                            select(FavPeople.people_id).where(
-                                FavPeople.persona_id == persona_id
-                            )
-                        ).all()
-                    )
-
-                    delete_people_ids = existing_people_ids - input_people_ids
-                    add_people_ids = input_people_ids - existing_people_ids
-
-                    people_span.set_attribute("fav_people.input_count", len(input_people_ids))
-                    people_span.set_attribute("fav_people.existing_count", len(existing_people_ids))
-                    people_span.set_attribute("fav_people.delete_count", len(delete_people_ids))
-                    people_span.set_attribute("fav_people.add_count", len(add_people_ids))
-
-                    if delete_people_ids:
-                        db.execute(
-                            delete(FavPeople).where(
-                                FavPeople.persona_id == persona_id,
-                                FavPeople.people_id.in_(delete_people_ids)
-                            )
-                        )
-
-                    for people_id in add_people_ids:
-                        db.add(
-                            FavPeople(
-                                persona_id=persona_id,
-                                people_id=people_id,
-                                type="FAVORITE"
-                            )
-                        )
-                    update_data.pop("fav_people_ids", None)
-
-            # 나머지 일괄 처리
+            # 4. 취향 정보(영화, 장르, 인물) 업데이트 - 기존 연결 삭제 후 재삽입
             try:
-                with tracer.start_as_current_span("persona.update.apply_fields"):
-                    for key, value in update_data.items():
-                        setattr(db_persona, key, value)
-
-                with tracer.start_as_current_span("persona.update.db_commit"):
+                with tracer.start_as_current_span("persona.update_preferences"):
+                    if persona_data.fav_movie_ids is not None:
+                        db.query(FavMovie).filter(FavMovie.persona_id == persona.id).delete()
+                        for movie_id in persona_data.fav_movie_ids:
+                            db.add(FavMovie(persona_id=persona.id, movie_id=movie_id))
+                            
+                    if persona_data.fav_genre_ids is not None:
+                        db.query(FavGenre).filter(FavGenre.persona_id == persona.id).delete()
+                        for genre_id in persona_data.fav_genre_ids:
+                            db.add(FavGenre(persona_id=persona.id, genre_id=genre_id))
+                            
+                    if persona_data.fav_people_ids is not None:
+                        db.query(FavPeople).filter(FavPeople.persona_id == persona.id).delete()
+                        for people_id in persona_data.fav_people_ids:
+                            db.add(FavPeople(persona_id=persona.id, people_id=people_id, type="FAVORITE"))
+                            
+                    db.flush()
                     db.commit()
-                with tracer.start_as_current_span("persona.update.db_refresh"):
-                    db.refresh(db_persona)
-
-                span.set_attribute("persona.update.result", "success")
-
-                return db_persona
+                    db.refresh(persona)
+                    
+                    return persona
+                    
             except Exception as e:
                 db.rollback()
-
                 span.record_exception(e)
-                span.set_attribute("persona.update.result", "failed")
-                span.set_attribute("persona.update.fail_reason", "database_error")
-
-                raise HTTPException(status_code=500, detail={"code": "DATABASE_SAVE_FAILED", "message": f"데이터베이스 저장 중 오류 발생 {str(e)}"})
+                raise HTTPException(
+                    status_code=500,
+                    detail={"code": "DATABASE_SAVE_FAILED", "message": f"페르소나 정보 수정 중 오류 발생: {str(e)}"}
+                )

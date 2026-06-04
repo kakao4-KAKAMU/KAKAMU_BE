@@ -75,6 +75,7 @@ API 요청 시 발생할 수 있는 주요 예외 상황과 에러 코드(`code`
 | **가입/인증** | `LOCAL_AUTH_ALREADY_LINKED` | 400 | 해당 본인인증(CI)으로 이미 일반 계정이 연결되어 있음 |
 | **가입/인증** | `SOCIAL_AUTH_ALREADY_LINKED` | 400 | 해당 본인인증(CI)으로 이미 동일한 소셜 계정(Provider)이 연결되어 있음 |
 | **로그인** | `LOGIN_FAILED` | 401 | 일반 로그인 시 이메일 또는 비밀번호 불일치 |
+| **로그인** | `ACCOUNT_IN_GRACE_PERIOD` | 403 | 탈퇴 유예 기간(30일) 내의 계정으로 로그인 시도. 복구 절차 필요 |
 | **소셜 연동** | `KAKAO_API_KEY_NOT_SET` | 500 | 서버에 카카오 REST API 키가 설정되지 않음 |
 | **소셜 연동** | `TOKEN_OR_CODE_REQUIRED` | 400 | 소셜 로그인 요청 시 인가 코드나 액세스 토큰이 누락됨 |
 | **소셜 연동** | `UNSUPPORTED_SOCIAL_PROVIDER` | 400 | 지원하지 않는 소셜 로그인 제공자 요청 (예: 카카오 외) |

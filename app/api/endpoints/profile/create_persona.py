@@ -1,26 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, status,File, Form, UploadFile
-from typing import Optional, List
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-
-from app.api.deps import get_current_user
+from app.api.deps import get_active_user
 from app.db.session import get_db
-from app.schemas.profile import PersonaCreate, PersonaResponse
 from app.models import User
-
-from app.service.profile import PersonaService
+from app.schemas.profile import PersonaCreate, PersonaResponse
+from app.service.profile.create_persona import PersonaCreateService
 
 router = APIRouter()
 
-
-@router.post("/persona", response_model=PersonaResponse, status_code=201)
-async def new_persona_profile(
-        persona_data: PersonaCreate,
-
-
-        user: User = Depends(get_current_user), # 현재 액세스 토큰으로 인증된 user 정보
-        db: Session = Depends(get_db) # db 연결 후 세션 객체
+@router.post("/personas", response_model=PersonaResponse, status_code=status.HTTP_201_CREATED)
+async def create_persona(
+    request: PersonaCreate,
+    user: User = Depends(get_active_user),
+    db: Session = Depends(get_db)
 ):
-
-    return await PersonaService.create_new_persona(db=db,
-                                                   persona_data=persona_data,
-                                                   user_id=user.id)
+    """
+    새로운 페르소나를 생성합니다.
+    (최대 5개까지 생성 가능하며, 서비스 계층에서 PERSONA_LIMIT_EXCEEDED 에러 처리 필요)
+    """
+    return await PersonaCreateService.create_new_persona(
+        db=db,
+        user_id=user.id,
+        persona_data=request
+    )
