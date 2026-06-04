@@ -1,20 +1,27 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from uuid import UUID
-
-from app.api.deps import get_current_user
+from app.api.deps import get_active_user
 from app.db.session import get_db
-from app.schemas.profile import PersonaEdit
 from app.models import User
-from app.service.profile import PersonaService
+from app.schemas.profile import PersonaEdit, PersonaResponse
+from app.service.profile.update_persona import PersonaUpdateService
 
 router = APIRouter()
 
-@router.patch("/persona/{persona_id}")
-async def edit_persona_profile(
-        persona_id: UUID,
-        persona_edit_data: PersonaEdit,
-        user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+@router.put("/personas/{persona_id}", response_model=PersonaResponse)
+async def update_persona(
+    persona_id: UUID,
+    request: PersonaEdit,
+    user: User = Depends(get_active_user),
+    db: Session = Depends(get_db)
 ):
-    return await PersonaService.update_persona(db=db, persona_id=persona_id, edit_data=persona_edit_data, user_id=user.id)
+    """
+    기존 페르소나의 정보(닉네임, 프로필 메시지, 취향 등)를 수정합니다.
+    """
+    return await PersonaUpdateService.update_persona(
+        db=db,
+        user_id=user.id,
+        persona_id=persona_id,
+        persona_data=request
+    )

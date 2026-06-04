@@ -17,6 +17,8 @@ from app.core.redis import redis_client
 from app.api.api import api_router
 from app.service.system.sync_task import stat_sync_worker, ml_log_sync_worker
 from app.worker.search_batch import run_daily_search_aggregation
+from app.worker.persona_batch import hard_delete_old_personas
+from app.worker.user_batch import hard_delete_old_users
 from app.db.session import engine
 
 from app.middleware.logging_middleware import LoggingMiddleware
@@ -43,6 +45,10 @@ async def lifespan(app: FastAPI):
     # 매일 새벽 3시에 검색어 일일 통계 배치 실행
     scheduler = BackgroundScheduler()
     scheduler.add_job(run_daily_search_aggregation, 'cron', hour=3, minute=0)
+    # 매일 새벽 4시에 7일 경과된 삭제(Soft Delete) 페르소나 영구 삭제 배치 실행
+    scheduler.add_job(hard_delete_old_personas, 'cron', hour=4, minute=0)
+    # 매일 새벽 4시 30분에 30일 경과된 탈퇴 유저(User) 영구 삭제 배치 실행
+    scheduler.add_job(hard_delete_old_users, 'cron', hour=4, minute=30)
     scheduler.start()
 
     yield

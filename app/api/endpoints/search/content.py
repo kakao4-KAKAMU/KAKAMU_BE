@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from app.db.session import get_db
 from app.models.movie import Movie, Genre, People
 from app.models.search_log import SearchDailyStat
-from app.api.deps import optional_verify_persona_ownership
+from app.api.deps import get_active_user
 from .utils import handle_search_request, get_search_pattern
 
 router = APIRouter()
@@ -22,10 +22,10 @@ def search_content(
     cursor: Optional[int] = Query(None, description="페이징 커서(ID)"),
     limit: int = Query(20, le=50),
     sort: str = Query("accuracy", description="정렬 기준 (accuracy: 정확도순, popularity: 인기순, latest: 최신순, name_asc: 이름 오름차순, name_desc: 이름 내림차순)"),
-    active_persona_id: Optional[UUID] = Depends(optional_verify_persona_ownership),
+    user = Depends(get_active_user),
     db: Session = Depends(get_db)
 ):
-    handle_search_request(request, background_tasks, str(active_persona_id) if active_persona_id else None, q)
+    handle_search_request(request, background_tasks, None, q)
     search_pattern = get_search_pattern(q)
 
     query = db.query(Movie).filter(Movie.title.ilike(search_pattern))

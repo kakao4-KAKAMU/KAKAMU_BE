@@ -15,7 +15,7 @@ def get_posts(
     db: Session = Depends(get_db),
     current_persona_id: UUID = Depends(get_current_persona)
 ):
-    """게시물 피드를 무한 스크롤(Cursor-based) 방식으로 조회합니다. 스포일러 게시물은 본문과 제목이 마스킹됩니다."""
+    """게시물 피드를 무한 스크롤(Cursor-based) 방식으로 조회합니다."""
     return post_read_service.get_posts(db, current_persona_id, cursor, limit)
 
 @router.get("/liked")
