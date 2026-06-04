@@ -12,15 +12,14 @@ class RelationResponse(BaseModel):
     message: str
 
 class BlockRequest(BaseModel):
-    level: BlockLevel = BlockLevel.PERSONA
+    level: BlockLevel = BlockLevel.USER
 
-class PersonaSimpleInfo(BaseModel):
+class UserSimpleInfo(BaseModel):
     id: UUID
     nickname: str
-    tag: str
-    profile_image_url: Optional[str] = None
+    username: str
 
 class FollowListResponse(BaseModel):
-    items: List[PersonaSimpleInfo]
+    items: List[UserSimpleInfo]
     next_cursor: Optional[UUID] = None
     has_next: bool

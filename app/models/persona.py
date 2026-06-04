@@ -17,11 +17,6 @@ class Persona(Base):
     deleted_at = Column(DateTime, nullable=True) 
 
     user = relationship("User", back_populates="personas")    
-    posts = relationship("Post", back_populates="persona", cascade="all, delete-orphan")    
-    comments = relationship("Comment", back_populates="persona", cascade="all, delete-orphan")    
-    
-    following = relationship("Follow", foreign_keys="Follow.follower_id", back_populates="follower", cascade="all, delete-orphan")    
-    followers = relationship("Follow", foreign_keys="Follow.following_id", back_populates="following_persona", cascade="all, delete-orphan")    
 
     # 선호 취향 매핑 테이블들과의 관계 설정
     fav_genres = relationship("FavGenre", cascade="all, delete-orphan")

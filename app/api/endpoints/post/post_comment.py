@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.api.deps import get_current_persona
+from app.api.deps.auth import get_active_user
+from app.models.user import User
 from app.schemas.post.comment import CommentCreate
 from app.service.comment.comment_service import comment_service
-from uuid import UUID
 
 router = APIRouter()
 
 @router.post("/", status_code=201)
-def create_comment(post_id: int, comment_in: CommentCreate, db: Session = Depends(get_db), persona_id: UUID = Depends(get_current_persona)):
+def create_comment(post_id: int, comment_in: CommentCreate, db: Session = Depends(get_db), current_user: User = Depends(get_active_user)):
     """게시물에 댓글(또는 대댓글)을 작성합니다."""
-    comment_id = comment_service.create_comment(db, post_id, comment_in, persona_id)
+    comment_id = comment_service.create_comment(db, post_id, comment_in, current_user.id)
     return {"status": "success", "comment_id": comment_id}
 
 @router.get("/")

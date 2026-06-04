@@ -15,10 +15,10 @@ async def delete_persona(
     db: Session = Depends(get_db)
 ):
     """
-    특정 페르소나를 삭제(Soft Delete)합니다.
+    특정 페르소나를 즉시 삭제합니다.
     최소 1개의 활성 페르소나가 유지되어야 합니다.
     """
-    await PersonaDeleteService.delete_persona_soft(
+    await PersonaDeleteService.delete_persona(
         db=db,
         user_id=user.id,
         persona_id=persona_id

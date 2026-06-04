@@ -9,7 +9,7 @@ class PersonaDeleteService:
 
 
     @staticmethod
-    async def delete_persona_soft(
+    async def delete_persona(
             db: Session,
             user_id: UUID,
             persona_id: UUID
@@ -44,8 +44,7 @@ class PersonaDeleteService:
 
         try:
 
-            persona.status = "DELETED" # 페르소나 상태를 ACTIVE -> DELETED 로 변경
-            persona.deleted_at = datetime.now(timezone.utc) # 현재 삭제 시도 시간 저장
+            db.delete(persona)
             db.commit()
 
         except Exception as e:
@@ -57,5 +56,3 @@ class PersonaDeleteService:
             )
 
         return None
-
-# * 7일 뒤 자동 삭제 로직은 app.worker.persona_batch 내 배치 작업(APScheduler)으로 구현됨.

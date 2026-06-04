@@ -7,7 +7,7 @@ from app.db.base import Base
 class Post(Base):
     __tablename__ = "post"
     id = Column(Integer, primary_key=True)    
-    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
     title = Column(String(255), nullable=False)    
     content = Column(Text)    
     image_urls = Column(JSON) 
@@ -20,11 +20,11 @@ class Post(Base):
     # [성능 최적화] 서브쿼리 대신 물리적 컬럼으로 관리 (Redis Sync Task가 5분 주기로 업데이트)
     like_count = Column(Integer, default=0, nullable=False, index=True)
 
-    persona = relationship("Persona", back_populates="posts")    
+    user = relationship("User", back_populates="posts")    
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")    
     movies = relationship("Movie", secondary="post_movie", back_populates="posts")    
     hashtags = relationship("Hashtag", secondary="post_hashtag", back_populates="posts")    
-    mentions = relationship("Persona", secondary="post_mention", backref="mentioned_in_posts")    
+    mentions = relationship("User", secondary="post_mention", backref="mentioned_in_posts")    
 
     __table_args__ = (
         Index('ix_post_title_trgm', 'title', postgresql_using='gin', postgresql_ops={'title': 'gin_trgm_ops'}),
@@ -51,4 +51,4 @@ class PostHashtag(Base):
 class PostMention(Base):
     __tablename__ = "post_mention"
     post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), primary_key=True)    
-    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)

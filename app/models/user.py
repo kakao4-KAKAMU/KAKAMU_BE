@@ -12,10 +12,16 @@ class User(Base):
     phone = Column(String(20), nullable=False)    
     username = Column(String(150), nullable=False)    
     nickname = Column(String(150), nullable=False)    
+    status = Column(String(20), default="ACTIVE")
+    deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())    
     updated_at = Column(DateTime, onupdate=func.now())    
 
     personas = relationship("Persona", back_populates="user", cascade="all, delete-orphan")    
+    posts = relationship("Post", back_populates="user", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
+    following = relationship("Follow", foreign_keys="Follow.follower_id", back_populates="follower", cascade="all, delete-orphan")
+    followers = relationship("Follow", foreign_keys="Follow.following_id", back_populates="following_user", cascade="all, delete-orphan")
     local_auths = relationship("LocalAuth", back_populates="user", cascade="all, delete-orphan")    
     social_auths = relationship("SocialAuth", back_populates="user", cascade="all, delete-orphan")    
 

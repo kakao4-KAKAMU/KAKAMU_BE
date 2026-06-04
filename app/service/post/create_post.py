@@ -10,11 +10,11 @@ from app.service.recommendation.recommendation_service import recommendation_ser
 from app.schemas.post.create import PostCreate
 
 class PostCreateService:
-    async def create_post(self, db: Session, post_in: PostCreate, persona_id: UUID) -> int:
+    async def create_post(self, db: Session, post_in: PostCreate, user_id: UUID, persona_id: UUID) -> int:
         """게시물 생성 및 해시태그/멘션/추천 가중치 연동 로직"""
         try:
             new_post = Post(
-                persona_id=persona_id,
+                user_id=user_id,
                 title=post_in.title,
                 content=post_in.content,
                 image_urls=post_in.image_urls,
@@ -53,7 +53,7 @@ class PostCreateService:
                     Persona.nickname == nickname, Persona.tag == tag, Persona.status == "ACTIVE"
                 ).first()
                 if target_persona:
-                    db.add(PostMention(post_id=new_post.id, persona_id=target_persona.id))
+                    db.add(PostMention(post_id=new_post.id, user_id=target_persona.user_id))
 
             db.commit()
             

@@ -22,21 +22,7 @@ class AccountTerminationService:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "유저를 찾을 수 없습니다."})
             
         try:
-            now = datetime.now(timezone.utc)
-            
-            # 1. 유저 계정 Soft Delete 처리
-            user.status = "DELETED"
-            user.deleted_at = now
-
-            # 2. 보유한 모든 활성 페르소나도 함께 Soft Delete 처리
-            db.query(Persona).filter(
-                Persona.user_id == user_id,
-                Persona.status == "ACTIVE"
-            ).update({
-                "status": "DELETED",
-                "deleted_at": now
-            }, synchronize_session=False)
-
+            db.delete(user)
             db.commit()
             return True
 

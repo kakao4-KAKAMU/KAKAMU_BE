@@ -8,7 +8,7 @@ from app.service.recommendation.recommendation_service import recommendation_ser
 from app.core.redis import redis_client
 
 class LikeService:
-    async def toggle_like(self, db: Session, req: LikeToggleRequest, persona_id: UUID) -> tuple[bool, int]:
+    async def toggle_like(self, db: Session, req: LikeToggleRequest, user_id: UUID, persona_id: UUID) -> tuple[bool, int]:
         """게시물 또는 댓글의 좋아요를 토글(Like/Unlike)하고 취향 가중치에 반영합니다."""
         if req.target_type == "POST":
             target = db.query(Post).filter(Post.id == req.target_id).first()
@@ -20,13 +20,13 @@ class LikeService:
         if not target:
             raise HTTPException(status_code=404, detail={"code": "TARGET_NOT_FOUND", "message": "대상을 찾을 수 없습니다."})
             
-        like_log = db.query(LikeLog).filter(LikeLog.persona_id == persona_id, LikeLog.target_type == req.target_type, LikeLog.target_id == req.target_id).first()
+        like_log = db.query(LikeLog).filter(LikeLog.user_id == user_id, LikeLog.target_type == req.target_type, LikeLog.target_id == req.target_id).first()
         
         if like_log:
             like_log.is_active = 0 if like_log.is_active == 1 else 1
             is_liked = like_log.is_active == 1
         else:
-            like_log = LikeLog(persona_id=persona_id, target_type=req.target_type, target_id=req.target_id, is_active=1)
+            like_log = LikeLog(user_id=user_id, target_type=req.target_type, target_id=req.target_id, is_active=1)
             db.add(like_log)
             is_liked = True
             
@@ -49,7 +49,7 @@ class LikeService:
             # Redis 실패 시 Fallback 카운트
             new_like_count = target.like_count + (1 if is_liked else -1)
             
-        if target.persona_id != persona_id:
+        if target.user_id != user_id:
             await recommendation_service.record_ml_relationship_log(db, persona_id, req.target_type, req.target_id, "like", 1.0, is_undo=not is_liked)
             
         # 변경된 좋아요 수를 DB 객체에 반영하고 저장
