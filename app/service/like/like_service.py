@@ -31,30 +31,27 @@ class LikeService:
             is_liked = True
             
         db.commit()
-        
-        new_like_count = target.like_count
+
+        new_like_count = target.like_count or 0
         try:
             redis_key = f"kakamu:stat:{req.target_type.lower()}:{req.target_id}:likes"
             
-            # [Fix] Redis에 키가 없을 경우 DB의 현재 좋아요 수로 초기화 (Cache Miss로 인한 카운트 1 초기화 현상 방지)
-            await redis_client.setnx(redis_key, target.like_count)
+            # Redis에 키가 없을 경우 DB의 현재 좋아요 수로 초기화 (Cache Miss 현상 방지)
+            await redis_client.setnx(redis_key, new_like_count)
 
             if is_liked:
                 new_like_count = await redis_client.incr(redis_key)
             else:
                 new_like_count = await redis_client.decr(redis_key)
         except Exception as e:
-            # Redis 통계 업데이트 실패 시에도 메인 좋아요 로직(DB 저장)은 완료되었으므로 에러를 삼킵니다.
+            # Redis 실패 시 Fallback
             print(f"[Redis Error] Like stat update failed for {req.target_id}: {e}")
-            # Redis 실패 시 Fallback 카운트
-            new_like_count = target.like_count + (1 if is_liked else -1)
+            new_like_count += 1 if is_liked else -1
             
         if target.user_id != user_id:
             await recommendation_service.record_ml_relationship_log(db, persona_id, req.target_type, req.target_id, "like", 1.0, is_undo=not is_liked)
             
-        # 변경된 좋아요 수를 DB 객체에 반영하고 저장
-        target.like_count = new_like_count
-        db.commit()
+        # DB(target.like_count)에 즉시 업데이트하지 않고 Redis(sync_task)의 Bulk Update에 맡김
 
         return is_liked, new_like_count
 

@@ -3,7 +3,6 @@ import json
 from typing import List, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
-from app.core.redis import redis_client
 from app.models import EntityRelationshipLog
 from enum import Enum
 
@@ -14,10 +13,6 @@ class ActionType(str, Enum):
     SHARE = "share"
 
 class RecommendationService:
-    def __init__(self):
-        # app.core.redis에서 생성한 비동기 클라이언트를 사용합니다.
-        self.redis = redis_client
-
     async def record_ml_relationship_log(
         self, 
         db: Session, 
@@ -55,52 +50,6 @@ class RecommendationService:
 
         # 참고: 이 로그는 타인에 의해 target_id 원본이 삭제되더라도 
         # FK 제약조건이 없으므로 이 로그 테이블에 안전하게 남아 추천 알고리즘 훈련에 사용됩니다.
-
-    async def record_activity(self, persona_id: UUID, movie_id: int, action: ActionType | str):
-        """페르소나의 실시간 활동(클릭/시청)을 Redis Sorted Set에 기록"""
-        # action 파라미터를 활용해 활동별로 Redis 키를 매핑합니다.
-        activity_key = f"kakamu:persona:{persona_id}:activities:{action}"
-        timestamp = int(time.time())
-        
-        try:
-            # movie_id를 스코어(시간)와 함께 저장
-            await self.redis.zadd(activity_key, {str(movie_id): timestamp})
-            # 최신 50개만 남기고 삭제 (메모리 최적화)
-            await self.redis.zremrangebyrank(activity_key, 0, -51)
-        except Exception as e:
-            print(f"[Redis Error] Failed to record activity for {persona_id}: {e}")
-
-    async def update_persona_preference(self, persona_id: UUID, genres: List[str]):
-        """활동 기반으로 페르소나의 장르 선호도 점수를 증가시킴 (Hash)"""
-        pref_key = f"kakamu:persona:{persona_id}:preferences"
-        try:
-            for genre in genres:
-                await self.redis.hincrby(pref_key, genre, 1)
-        except Exception as e:
-            print(f"[Redis Error] Failed to update preference for {persona_id}: {e}")
-
-    async def get_persona_context(self, persona_id: UUID) -> Dict[str, Any]:
-        """추천 엔진에 전달할 유저의 최신 상태(Context)를 한 번에 가져옴"""
-        # 추천을 위해 가장 중요한 '시청(view)' 기록을 가져오도록 매핑 수정
-        view_activity_key = f"kakamu:persona:{persona_id}:activities:view"
-        pref_key = f"kakamu:persona:{persona_id}:preferences"
-
-        try:
-            # 최근 본 영화 리스트 (최신순 10개)
-            recent_movies = await self.redis.zrevrange(view_activity_key, 0, 9)
-            # 장르 선호도 전체 데이터
-            preferences = await self.redis.hgetall(pref_key)
-        except Exception as e:
-            print(f"[Redis Error] Failed to get context for {persona_id}: {e}")
-            # 추천 엔진 조회가 중단되지 않도록 빈 데이터 반환 (Fallback)
-            recent_movies = []
-            preferences = {}
-
-        return {
-            "persona_id": persona_id,
-            "recent_movie_ids": recent_movies,
-            "genre_preferences": preferences
-        }
 
 # 싱글톤 인스턴스
 recommendation_service = RecommendationService()

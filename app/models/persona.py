@@ -8,10 +8,8 @@ class Persona(Base):
     __tablename__ = "persona"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)    
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
-    nickname = Column(String(50), nullable=False) 
-    tag = Column(String(10), nullable=False) 
+    nickname = Column(String(50), nullable=False) # 내부 관리/식별용 이름
     profile_image_url = Column(String(500)) 
-    profile_msg = Column(String(200))    
     persona_type = Column(String(50))      
     status = Column(String(20), default="ACTIVE") 
     deleted_at = Column(DateTime, nullable=True) 
@@ -22,11 +20,6 @@ class Persona(Base):
     fav_genres = relationship("FavGenre", cascade="all, delete-orphan")
     fav_people = relationship("FavPeople", cascade="all, delete-orphan")
     fav_movies = relationship("FavMovie", cascade="all, delete-orphan")
-
-    __table_args__ = (
-        UniqueConstraint('nickname', 'tag', name='uq_persona_nickname_tag'),
-        Index('ix_persona_nickname_trgm', 'nickname', postgresql_using='gin', postgresql_ops={'nickname': 'gin_trgm_ops'}),
-    )
 
 class FavGenre(Base):
     __tablename__ = "fav_genre"

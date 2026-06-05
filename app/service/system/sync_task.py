@@ -7,6 +7,15 @@ from app.models import Post, Comment, EntityRelationshipLog
 
 logger = logging.getLogger(__name__)
 
+# Lua 스크립트: Redis의 값이 내가 방금 DB에 동기화한 값과 일치할 때만 키를 삭제 (Race Condition 방지)
+DELETE_IF_MATCH_SCRIPT = """
+if redis.call("get", KEYS[1]) == ARGV[1] then
+    return redis.call("del", KEYS[1])
+else
+    return 0
+end
+"""
+
 async def stat_sync_worker():
     """
     [3.4 통계 데이터 완충 계층 정책] 
@@ -31,6 +40,8 @@ async def stat_sync_worker():
                     
                     post_updates = []
                     comment_updates = []
+                    valid_keys = []
+                    valid_values = []
                     
                     for key, current_val in zip(keys, values):
                         if current_val is None:
@@ -80,27 +91,27 @@ async def ml_log_sync_worker():
             # 1분(60초) 주기로 일괄 처리 (운영 환경에 따라 조절 가능)
             await asyncio.sleep(60)
             
-            # 트랜잭션 안전성을 위해 파이프라인을 사용해 최대 1000건을 가져오고 큐에서 삭제
-            pipeline = redis_client.pipeline()
-            pipeline.lrange(queue_key, 0, 999)
-            pipeline.ltrim(queue_key, 1000, -1)
-            results = await pipeline.execute()
-            
-            raw_logs = results[0]
+            # 1. 큐에서 데이터 조회만 먼저 수행 (삭제하지 않음)
+            raw_logs = await redis_client.lrange(queue_key, 0, 999)
             if not raw_logs:
                 continue
                 
             logs_to_insert = [json.loads(raw_log) for raw_log in raw_logs]
+            processed_count = len(logs_to_insert)
             
             db = SessionLocal()
             try:
                 # [최적화] Bulk Insert를 통해 단 1번의 쿼리로 수백/수천 건의 로그 저장
                 db.bulk_insert_mappings(EntityRelationshipLog, logs_to_insert)
                 db.commit()
-                logger.info(f"Successfully bulk inserted {len(logs_to_insert)} ML logs to DB.")
+                logger.info(f"Successfully bulk inserted {processed_count} ML logs to DB.")
+                
+                # 2. DB 저장이 완벽하게 성공한 것을 확인한 후 Redis 큐에서 처리한 만큼만 삭제 (데이터 유실 방지)
+                await redis_client.ltrim(queue_key, processed_count, -1)
             except Exception as e:
                 db.rollback()
                 logger.error(f"ML log Bulk Insert Error: {e}")
+                # 에러 발생 시 ltrim을 실행하지 않으므로 다음 주기에 똑같은 데이터를 다시 가져와 재시도합니다.
             finally:
                 db.close()
                 

@@ -9,6 +9,7 @@ class Comment(Base):
     id = Column(Integer, primary_key=True)    
     post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), nullable=False)    
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="SET NULL"), nullable=True)
     parent_id = Column(Integer, ForeignKey("comment.id", ondelete="CASCADE"), nullable=True) 
     content = Column(String(1000))    
     is_spoiler = Column(SmallInteger, default=0) 
@@ -33,6 +34,7 @@ class LikeLog(Base):
     __tablename__ = "like_log"
     id = Column(Integer, primary_key=True, autoincrement=True)    
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="SET NULL"), nullable=True) # ML 점수 롤백을 위해 액션을 발생시킨 주체 기록
     target_type = Column(String(20), nullable=False) 
     target_id = Column(Integer, nullable=False)    
     is_active = Column(SmallInteger, default=1) 

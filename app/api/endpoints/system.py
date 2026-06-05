@@ -32,8 +32,7 @@ def test_db(db: Session = Depends(get_db)):
 @router.get("/redis-test")
 async def test_redis():
     try:
-        # 이미 상단에서 가져온 redis_client 사용
-        await redis_client.set("test_key", "Hello Redis!", ex=60) # 60초 후 만료 예시
+        await redis_client.set("test_key", "Hello Redis!", ex=60)
         value = await redis_client.get("test_key")
         return {"status": "success", "value": value}
     except Exception as e:

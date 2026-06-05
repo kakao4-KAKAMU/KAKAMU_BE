@@ -48,31 +48,9 @@ class PersonaUpdateService:
                         detail={"code": "SAME_NICKNAME", "message": "기존과 동일한 닉네임입니다."}
                     )
                 
-                # 새 닉네임에 부여할 유니크 태그 발급 (최대 10회 재시도)
-                tag = None
-                MAX_RETRY = 10
-                with tracer.start_as_current_span("persona.generate_new_tag"):
-                    for _ in range(MAX_RETRY):
-                        candidate_tag = PersonaCreateService.generate_random_tag()
-                        exist_stmt = select(Persona).where(
-                            and_(Persona.nickname == persona_data.nickname, Persona.tag == candidate_tag)
-                        )
-                        if not db.scalar(exist_stmt):
-                            tag = candidate_tag
-                            break
-                    
-                    if tag is None:
-                        raise HTTPException(
-                            status_code=500,
-                            detail={"code": "TAG_GENERATION_FAILED", "message": "새로운 태그 발급에 실패했습니다."}
-                        )
-                
                 persona.nickname = persona_data.nickname
-                persona.tag = tag
 
-            # 3. 기본 프로필 정보 업데이트
-            if persona_data.profile_msg is not None:
-                persona.profile_msg = persona_data.profile_msg
+            # 3. 프로필 이미지 업데이트
             if persona_data.profile_image_url is not None:
                 persona.profile_image_url = persona_data.profile_image_url
 

@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Post, PostMovie, Hashtag, PostHashtag, Persona, PostMention
+from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention
 from app.utils.parser import parse_content
 from app.service.recommendation.recommendation_service import recommendation_service
 from app.schemas.post.update import PostUpdate
@@ -70,11 +70,11 @@ class PostUpdateService:
                 if "#" not in mention_str:
                     continue
                 nickname, tag = mention_str.split("#", 1)
-                target_persona = db.query(Persona).filter(
-                    Persona.nickname == nickname, Persona.tag == tag, Persona.status == "ACTIVE"
+                target_user = db.query(User).filter(
+                    User.nickname == nickname, User.tag == tag, User.status == "ACTIVE"
                 ).first()
-                if target_persona:
-                    db.add(PostMention(post_id=post.id, user_id=target_persona.user_id))
+                if target_user:
+                    db.add(PostMention(post_id=post.id, user_id=target_user.id))
 
         db.commit()
         return post.id

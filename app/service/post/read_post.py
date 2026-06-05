@@ -4,23 +4,23 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, select, or_
 from fastapi import HTTPException
 
-from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block, Persona, PostMention, Follow
+from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block, User, PostMention, Follow, Persona
 
 class PostReadService:
     def _get_mentions_for_posts(self, db: Session, post_ids: List[int]) -> Dict[int, List[Dict[str, Any]]]:
         if not post_ids:
             return {}
         
-        mentions_query = db.query(PostMention.post_id, Persona.id, Persona.nickname, Persona.tag)\
-            .join(Persona, Persona.id == PostMention.persona_id)\
-            .filter(PostMention.post_id.in_(post_ids), Persona.status == "ACTIVE").all()
+        mentions_query = db.query(PostMention.post_id, User.id, User.nickname)\
+            .join(User, User.id == PostMention.user_id)\
+            .filter(PostMention.post_id.in_(post_ids), User.status == "ACTIVE").all()
             
         mentions_map = {pid: [] for pid in post_ids}
         for m in mentions_query:
             mentions_map[m.post_id].append({
                 "id": m.id,
                 "nickname": m.nickname,
-                "tag": m.tag
+                "tag": m.tag # User로 통합된 태그 사용
             })
         return mentions_map
 
@@ -47,70 +47,70 @@ class PostReadService:
             
         return {pid: count for pid, count in counts}
 
-    def _get_followed_author_ids(self, db: Session, current_persona_id: UUID, author_ids: List[UUID]) -> set:
-        if not author_ids:
+    def _get_followed_user_ids(self, db: Session, current_user_id: UUID, target_user_ids: List[UUID]) -> set:
+        if not target_user_ids:
             return set()
         follows = db.query(Follow.following_id).filter(
-            Follow.follower_id == current_persona_id,
-            Follow.following_id.in_(author_ids)
+            Follow.follower_id == current_user_id,
+            Follow.following_id.in_(target_user_ids)
         ).all()
         return {f[0] for f in follows}
 
-    def get_posts(self, db: Session, current_persona_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
+    def get_posts(self, db: Session, current_user_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
         """게시물 피드 조회 로직"""
-        # 1. 차단 관계 서브쿼리 (메모리에 올리지 않고 DB 엔진 레벨의 NOT IN 활용)
-        blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_persona_id)
-        blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_persona_id)
+        # 1. 차단 관계 서브쿼리 (user_id 기준)
+        blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_user_id)
+        blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_user_id)
 
-        # 2. 게시물과 작성자(Persona) 조인 및 필터링 적용
-        query = db.query(Post).join(Persona, Post.persona_id == Persona.id).filter(
+        # 2. 게시물과 작성자(User) 조인 및 필터링 적용
+        query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
             Post.status == "ACTIVE",
-            Persona.status == "ACTIVE",            # 탈퇴/삭제 유예 기간인 작성자 숨김
-            Post.persona_id.notin_(blocked_by_me), # 내가 차단한 사람 숨김
-            Post.persona_id.notin_(blocking_me)    # 나를 차단한 사람 숨김
+            User.status == "ACTIVE",               # 탈퇴/삭제 유예 기간인 작성자 숨김
+            Post.user_id.notin_(blocked_by_me),    # 내가 차단한 유저 숨김
+            Post.user_id.notin_(blocking_me)       # 나를 차단한 유저 숨김
         )
 
         if cursor:
             query = query.filter(Post.id < cursor)
         
-        posts = query.order_by(Post.id.desc()).limit(limit).all()
+        posts_with_author = query.order_by(Post.id.desc()).limit(limit).all()
         
-        post_ids = [post.id for post in posts]
+        post_ids = [post.id for post, author in posts_with_author]
         liked_post_ids = set()
-        followed_author_ids = set()
+        followed_user_ids = set()
         mentions_map = {}
         hashtags_map = {}
         comment_counts_map = {}
         
         if post_ids:
             liked_logs = db.query(LikeLog.target_id).filter(
-                LikeLog.persona_id == current_persona_id,
+                LikeLog.user_id == current_user_id, # 좋아요는 user_id 기준 공유
                 LikeLog.target_type == "POST",
                 LikeLog.target_id.in_(post_ids),
                 LikeLog.is_active == 1
             ).all()
             liked_post_ids = {log[0] for log in liked_logs}
             
-            author_ids = list({post.persona_id for post in posts})
-            followed_author_ids = self._get_followed_author_ids(db, current_persona_id, author_ids)
+            author_user_ids = list({post.user_id for post, author in posts_with_author})
+            followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
             
             mentions_map = self._get_mentions_for_posts(db, post_ids)
             hashtags_map = self._get_hashtags_for_posts(db, post_ids)
             comment_counts_map = self._get_comment_counts_for_posts(db, post_ids)
             
         result = []
-        for post in posts:
-            author = post.persona
-            author_name = "알 수 없음" if author.status == "DELETED" else f"{author.nickname}#{author.tag}"
+        for post, author in posts_with_author:
+            is_deleted = not author or author.status == "DELETED"
+            author_name = "알 수 없음" if is_deleted else f"{author.nickname}#{author.tag}"
             is_spoiler = post.is_spoiler == 1
 
             result.append({
                 "id": post.id,
-                "author_id": None if author.status == "DELETED" else author.id,
+                "author_id": None if is_deleted else author.id,
                 "author": author_name,
-                "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
-                "author_tag": None if author.status == "DELETED" else author.tag,
-                "author_image": None if author.status == "DELETED" else author.profile_image_url,
+                "author_nickname": "알 수 없음" if is_deleted else author.nickname,
+                "author_tag": None if is_deleted else author.tag,
+                "author_image": None if is_deleted else author.profile_image_url,
                 "title": post.title,
                 "content": post.content,
                 "image_urls": post.image_urls,
@@ -123,66 +123,66 @@ class PostReadService:
                 "like_count": post.like_count, # Use the model field instead of querying LikeLog
                 "comment_count": comment_counts_map.get(post.id, 0),
                 "is_liked": post.id in liked_post_ids,
-                "is_following": author.id in followed_author_ids if author.status != "DELETED" else False
+                "is_following": post.user_id in followed_user_ids if not is_deleted else False
             })
         
         next_cursor = result[-1]["id"] if result else None
         return {"items": result, "next_cursor": next_cursor, "has_next": len(result) == limit}
 
-    def get_my_liked_posts(self, db: Session, current_persona_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
+    def get_my_liked_posts(self, db: Session, current_user_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
         """내가 좋아요 누른 게시물 조회 로직"""
-        # 1. 차단 관계 서브쿼리
-        blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_persona_id)
-        blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_persona_id)
+        # 1. 차단 관계 서브쿼리 (user_id 기준)
+        blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_user_id)
+        blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_user_id)
 
         # 2. 내가 좋아요한 게시물 ID 서브쿼리
         liked_post_ids_subquery = select(LikeLog.target_id).where(
-            LikeLog.persona_id == current_persona_id,
+            LikeLog.user_id == current_user_id,
             LikeLog.target_type == "POST",
             LikeLog.is_active == 1
         )
 
         # 3. 조인 및 필터 적용
-        query = db.query(Post).join(Persona, Post.persona_id == Persona.id).filter(
+        query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
             Post.id.in_(liked_post_ids_subquery), 
             Post.status == "ACTIVE",
-            Persona.status == "ACTIVE",
-            Post.persona_id.notin_(blocked_by_me),
-            Post.persona_id.notin_(blocking_me)
+            User.status == "ACTIVE",
+            Post.user_id.notin_(blocked_by_me),
+            Post.user_id.notin_(blocking_me)
         )
 
         if cursor:
             query = query.filter(Post.id < cursor)
         
-        posts = query.order_by(Post.id.desc()).limit(limit).all()
+        posts_with_author = query.order_by(Post.id.desc()).limit(limit).all()
         
-        post_ids = [post.id for post in posts]
-        followed_author_ids = set()
+        post_ids = [post.id for post, author in posts_with_author]
+        followed_user_ids = set()
         mentions_map = {}
         hashtags_map = {}
         comment_counts_map = {}
         
         if post_ids:
-            author_ids = list({post.persona_id for post in posts})
-            followed_author_ids = self._get_followed_author_ids(db, current_persona_id, author_ids)
+            author_user_ids = list({post.user_id for post, author in posts_with_author})
+            followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
 
             mentions_map = self._get_mentions_for_posts(db, post_ids)
             hashtags_map = self._get_hashtags_for_posts(db, post_ids)
             comment_counts_map = self._get_comment_counts_for_posts(db, post_ids)
 
         result = []
-        for post in posts:
-            author = post.persona
-            author_name = "알 수 없음" if author.status == "DELETED" else f"{author.nickname}#{author.tag}"
+        for post, author in posts_with_author:
+            is_deleted = not author or author.status == "DELETED"
+            author_name = "알 수 없음" if is_deleted else f"{author.nickname}#{author.tag}"
             is_spoiler = post.is_spoiler == 1
 
             result.append({
                 "id": post.id, 
-                "author_id": None if author.status == "DELETED" else author.id, 
+                "author_id": None if is_deleted else author.id, 
                 "author": author_name,
-                "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
-                "author_tag": None if author.status == "DELETED" else author.tag,
-                "author_image": None if author.status == "DELETED" else author.profile_image_url,
+                "author_nickname": "알 수 없음" if is_deleted else author.nickname,
+                "author_tag": None if is_deleted else author.tag,
+                "author_image": None if is_deleted else author.profile_image_url,
                 "title": post.title,
                 "content": post.content,
                 "image_urls": post.image_urls, "is_spoiler": is_spoiler, 
@@ -193,72 +193,76 @@ class PostReadService:
                 "like_count": post.like_count, # Use the model field
                 "comment_count": comment_counts_map.get(post.id, 0),
                 "is_liked": True,
-                "is_following": author.id in followed_author_ids if author.status != "DELETED" else False
+                "is_following": post.user_id in followed_user_ids if not is_deleted else False
             })
         
         next_cursor = result[-1]["id"] if result else None
         return {"items": result, "next_cursor": next_cursor, "has_next": len(result) == limit}
 
-    def get_persona_posts(self, db: Session, target_persona_id: UUID, current_persona_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
+    def get_user_posts(self, db: Session, target_persona_id: UUID, current_persona_id: UUID, current_user_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
         """특정 페르소나가 작성한 게시물 조회 로직"""
-        # 프로필 주인이 나와 차단 관계인지 데이터베이스에서 직접 확인 (1건 조회로 최적화)
+        target_user_id = db.scalar(select(Persona.user_id).where(Persona.id == target_persona_id))
+        if not target_user_id:
+            raise HTTPException(status_code=404, detail={"code": "PERSONA_NOT_FOUND", "message": "대상을 찾을 수 없습니다."})
+
+        # 프로필 주인이 나와 차단 관계인지 데이터베이스에서 직접 확인 (user_id 기준)
         is_blocked = db.query(Block).filter(
             or_(
-                (Block.blocker_id == current_persona_id) & (Block.blocked_id == target_persona_id),
-                (Block.blocker_id == target_persona_id) & (Block.blocked_id == current_persona_id)
+                (Block.blocker_id == current_user_id) & (Block.blocked_id == target_user_id),
+                (Block.blocker_id == target_user_id) & (Block.blocked_id == current_user_id)
             )
         ).first()
 
         if is_blocked:
             return {"items": [], "next_cursor": None, "has_next": False}
 
-        query = db.query(Post).join(Persona, Post.persona_id == Persona.id).filter(
-            Post.persona_id == target_persona_id, 
+        query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
+            Post.user_id == target_user_id, 
             Post.status == "ACTIVE",
-            Persona.status == "ACTIVE"
+            User.status == "ACTIVE"
         )
         
         if cursor:
             query = query.filter(Post.id < cursor)
         
-        posts = query.order_by(Post.id.desc()).limit(limit).all()
+        posts_with_author = query.order_by(Post.id.desc()).limit(limit).all()
         
-        post_ids = [post.id for post in posts]
+        post_ids = [post.id for post, author in posts_with_author]
         liked_post_ids = set()
-        followed_author_ids = set()
+        followed_user_ids = set()
         mentions_map = {}
         hashtags_map = {}
         comment_counts_map = {}
         
         if post_ids:
             liked_logs = db.query(LikeLog.target_id).filter(
-                LikeLog.persona_id == current_persona_id,
+                LikeLog.user_id == current_user_id,
                 LikeLog.target_type == "POST",
                 LikeLog.target_id.in_(post_ids),
                 LikeLog.is_active == 1
             ).all()
             liked_post_ids = {log[0] for log in liked_logs}
             
-            author_ids = list({post.persona_id for post in posts})
-            followed_author_ids = self._get_followed_author_ids(db, current_persona_id, author_ids)
+            author_user_ids = list({post.user_id for post, author in posts_with_author})
+            followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
             
             mentions_map = self._get_mentions_for_posts(db, post_ids)
             hashtags_map = self._get_hashtags_for_posts(db, post_ids)
             comment_counts_map = self._get_comment_counts_for_posts(db, post_ids)
 
         result = []
-        for post in posts:
-            author = post.persona
-            author_name = "알 수 없음" if author.status == "DELETED" else f"{author.nickname}#{author.tag}"
+        for post, author in posts_with_author:
+            is_deleted = not author or author.status == "DELETED"
+            author_name = "알 수 없음" if is_deleted else f"{author.nickname}#{author.tag}"
             is_spoiler = post.is_spoiler == 1
 
             result.append({
                 "id": post.id, 
-                "author_id": None if author.status == "DELETED" else author.id, 
+                "author_id": None if is_deleted else author.id, 
                 "author": author_name,
-                "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
-                "author_tag": None if author.status == "DELETED" else author.tag,
-                "author_image": None if author.status == "DELETED" else author.profile_image_url,
+                "author_nickname": "알 수 없음" if is_deleted else author.nickname,
+                "author_tag": None if is_deleted else author.tag,
+                "author_image": None if is_deleted else author.profile_image_url,
                 "title": post.title,
                 "content": post.content,
                 "image_urls": post.image_urls, "is_spoiler": is_spoiler, 
@@ -269,57 +273,60 @@ class PostReadService:
                 "like_count": post.like_count, 
                 "comment_count": comment_counts_map.get(post.id, 0),
                 "is_liked": post.id in liked_post_ids,
-                "is_following": author.id in followed_author_ids if author.status != "DELETED" else False
+                "is_following": post.user_id in followed_user_ids if not is_deleted else False
             })
         
         next_cursor = result[-1]["id"] if result else None
         return {"items": result, "next_cursor": next_cursor, "has_next": len(result) == limit}
 
-    def get_post_detail(self, db: Session, post_id: int, current_persona_id: UUID) -> Dict[str, Any]:
+    def get_post_detail(self, db: Session, post_id: int, current_persona_id: UUID, current_user_id: UUID) -> Dict[str, Any]:
         """게시물 상세 조회 로직"""
-        post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()
-        if not post:
+        db_result = db.query(Post, User).join(User, Post.user_id == User.id)\
+            .filter(Post.id == post_id, Post.status == "ACTIVE").first()
+            
+        if not db_result:
             raise HTTPException(status_code=404, detail={"code": "POST_NOT_FOUND", "message": "게시물을 찾을 수 없습니다."})
             
-        # 직접 링크를 통해 접속하더라도 본인과의 차단(Block) 관계가 있으면 차단
+        post, author = db_result
+        # 직접 링크를 통해 접속하더라도 본인과의 차단(Block) 관계가 있으면 차단 (user_id 기준)
         is_blocked = db.query(Block).filter(
             or_(
-                (Block.blocker_id == current_persona_id) & (Block.blocked_id == post.persona_id),
-                (Block.blocker_id == post.persona_id) & (Block.blocked_id == current_persona_id)
+                (Block.blocker_id == current_user_id) & (Block.blocked_id == post.user_id),
+                (Block.blocker_id == post.user_id) & (Block.blocked_id == current_user_id)
             )
         ).first()
         
         if is_blocked:
             raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_BLOCKED_POST", "message": "차단된 사용자의 게시물입니다."})
 
-        author = post.persona
-        author_name = "알 수 없음" if author.status == "DELETED" else f"{author.nickname}#{author.tag}"
+        is_deleted = not author or author.status == "DELETED"
+        author_name = "알 수 없음" if is_deleted else f"{author.nickname}#{author.tag}"
         
         hashtags_map = self._get_hashtags_for_posts(db, [post.id])
         mentions_map = self._get_mentions_for_posts(db, [post.id])
         comment_counts_map = self._get_comment_counts_for_posts(db, [post.id])
         
         is_liked = db.query(LikeLog).filter(
-            LikeLog.persona_id == current_persona_id,
+            LikeLog.user_id == current_user_id,
             LikeLog.target_type == "POST",
             LikeLog.target_id == post.id,
             LikeLog.is_active == 1
         ).first() is not None
 
         is_following = False
-        if author.status != "DELETED":
+        if not is_deleted:
             is_following = db.query(Follow).filter(
-                Follow.follower_id == current_persona_id,
-                Follow.following_id == author.id
+                Follow.follower_id == current_user_id,
+                Follow.following_id == post.user_id
             ).first() is not None
 
         return {
             "id": post.id, 
-            "author_id": None if author.status == "DELETED" else author.id, 
+            "author_id": None if is_deleted else author.id, 
             "author": author_name,
-            "author_nickname": "알 수 없음" if author.status == "DELETED" else author.nickname,
-            "author_tag": None if author.status == "DELETED" else author.tag,
-            "author_image": None if author.status == "DELETED" else author.profile_image_url,
+            "author_nickname": "알 수 없음" if is_deleted else author.nickname,
+            "author_tag": None if is_deleted else author.tag,
+            "author_image": None if is_deleted else author.profile_image_url,
             "title": post.title, "content": post.content, "image_urls": post.image_urls, "is_spoiler": post.is_spoiler == 1,
             "movies": [{"id": m.id, "title": m.title} for m in post.movies], 
             "hashtags": hashtags_map.get(post.id, []),

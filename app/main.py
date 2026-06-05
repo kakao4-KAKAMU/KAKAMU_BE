@@ -14,8 +14,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.redis import redis_client
-from app.api.api import api_router
 from app.service.system.sync_task import stat_sync_worker, ml_log_sync_worker
+from app.api.api import api_router
 from app.worker.search_batch import run_daily_search_aggregation
 from app.worker.persona_batch import hard_delete_old_personas
 from app.worker.user_batch import hard_delete_old_users
@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     # 앱 시작 시 실행될 로직 (Startup)
     create_database_if_not_exists()
     run_migrations()
-    
+
     try:
         await redis_client.ping()
         print("Successfully connected to Redis!")
@@ -55,8 +55,8 @@ async def lifespan(app: FastAPI):
     
     sync_task.cancel() # 서버 종료 시 워커 중지
     ml_log_task.cancel()
-    scheduler.shutdown()
     await redis_client.close()
+    scheduler.shutdown()
     
     # 앱 종료 시 실행될 로직 (Shutdown)이 필요하다면 여기에 작성
     print("Shutting down...")
