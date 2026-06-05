@@ -60,8 +60,8 @@ def upgrade() -> None:
     op.drop_constraint('follow_follower_id_fkey', 'follow', type_='foreignkey')
 
     # Drop primary keys temporarily to avoid duplicates during update
-    op.execute("ALTER TABLE block DROP CONSTRAINT block_pkey")
-    op.execute("ALTER TABLE follow DROP CONSTRAINT follow_pkey")
+    op.execute("ALTER TABLE block DROP CONSTRAINT IF EXISTS block_pkey")
+    op.execute("ALTER TABLE follow DROP CONSTRAINT IF EXISTS follow_pkey")
 
     # Update UUIDs from persona_id to user_id
     op.execute("""
@@ -119,7 +119,7 @@ def upgrade() -> None:
         WHERE a.comment_id = b.comment_id AND a.user_id = b.user_id AND a.ctid > b.ctid;
     """)
     op.drop_constraint('comment_mention_persona_id_fkey', 'comment_mention', type_='foreignkey')
-    op.execute("ALTER TABLE comment_mention DROP CONSTRAINT comment_mention_pkey;")
+    op.execute("ALTER TABLE comment_mention DROP CONSTRAINT IF EXISTS comment_mention_pkey;")
     op.create_foreign_key('comment_mention_user_id_fkey', 'comment_mention', 'user', ['user_id'], ['id'], ondelete='CASCADE')
     op.execute("ALTER TABLE comment_mention ADD PRIMARY KEY (comment_id, user_id);")
     op.drop_column('comment_mention', 'persona_id')
@@ -153,7 +153,7 @@ def upgrade() -> None:
         WHERE a.post_id = b.post_id AND a.user_id = b.user_id AND a.ctid > b.ctid;
     """)
     op.drop_constraint('post_mention_persona_id_fkey', 'post_mention', type_='foreignkey')
-    op.execute("ALTER TABLE post_mention DROP CONSTRAINT post_mention_pkey;")
+    op.execute("ALTER TABLE post_mention DROP CONSTRAINT IF EXISTS post_mention_pkey;")
     op.create_foreign_key('post_mention_user_id_fkey', 'post_mention', 'user', ['user_id'], ['id'], ondelete='CASCADE')
     op.execute("ALTER TABLE post_mention ADD PRIMARY KEY (post_id, user_id);")
     op.drop_column('post_mention', 'persona_id')
@@ -193,8 +193,11 @@ def upgrade() -> None:
     op.drop_constraint('uq_persona_nickname_tag', 'persona', type_='unique')
     op.drop_column('persona', 'tag')
     op.drop_column('persona', 'profile_msg')
+    
+    op.drop_column('entity_relationship_log', 'sentiment_score')
 
 def downgrade() -> None:
+    op.add_column('entity_relationship_log', sa.Column('sentiment_score', sa.Numeric(precision=10, scale=4), autoincrement=False, nullable=True))
     op.add_column('persona', sa.Column('profile_msg', sa.VARCHAR(length=200), autoincrement=False, nullable=True))
     op.add_column('persona', sa.Column('tag', sa.VARCHAR(length=10), server_default='0000', autoincrement=False, nullable=False))
     op.create_unique_constraint('uq_persona_nickname_tag', 'persona', ['nickname', 'tag'])

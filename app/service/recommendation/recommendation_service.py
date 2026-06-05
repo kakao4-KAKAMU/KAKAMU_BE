@@ -31,7 +31,7 @@ class RecommendationService:
         :param is_undo: True일 경우 사용자가 행동을 취소한 것으로 간주하고 점수를 역전시킴
         """
         # 1. 취소 이벤트일 경우 기존 점수의 역수(음수)를 취함
-        final_score = -base_score if is_undo else base_score
+        # final_score = -base_score if is_undo else base_score
         
         # 2. 로깅할 액션 이름 결정 (예: "like" -> 취소시 "undo_like")
         log_action = f"undo_{action}" if is_undo else action
@@ -42,7 +42,7 @@ class RecommendationService:
             relation_type=log_action,
             target_type=target_type,
             target_id=target_id,
-            sentiment_score=float(final_score),
+            # sentiment_score=float(final_score),
             weight=1.0
         )
         db.add(new_log)

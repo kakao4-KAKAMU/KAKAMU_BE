@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.redis import redis_client
-from app.service.system.sync_task import stat_sync_worker, ml_log_sync_worker
+from app.service.system.sync_task import stat_sync_worker
 from app.api.api import api_router
 from app.worker.search_batch import run_daily_search_aggregation
 from app.worker.persona_batch import hard_delete_old_personas
@@ -40,7 +40,6 @@ async def lifespan(app: FastAPI):
         
     # 백그라운드 워커 실행 (Redis -> DB 주기적 동기화 시작)
     sync_task = asyncio.create_task(stat_sync_worker())
-    ml_log_task = asyncio.create_task(ml_log_sync_worker())
 
     # 매일 새벽 3시에 검색어 일일 통계 배치 실행
     scheduler = BackgroundScheduler()
@@ -54,7 +53,6 @@ async def lifespan(app: FastAPI):
     yield
     
     sync_task.cancel() # 서버 종료 시 워커 중지
-    ml_log_task.cancel()
     await redis_client.close()
     scheduler.shutdown()
     

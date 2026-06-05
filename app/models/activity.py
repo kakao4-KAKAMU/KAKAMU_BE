@@ -53,7 +53,7 @@ class EntityRelationshipLog(Base):
     relation_type = Column(String(30))    
     target_type = Column(String(30))    
     target_id = Column(Integer)    
-    sentiment_score = Column(Numeric(10, 4))    
+    # sentiment_score = Column(Numeric(10, 4))    
     weight = Column(Double)    
     created_at = Column(DateTime, server_default=func.now())    
 
