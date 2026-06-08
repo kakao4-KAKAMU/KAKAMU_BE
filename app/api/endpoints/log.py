@@ -2,12 +2,13 @@ from fastapi import APIRouter, Depends, BackgroundTasks
 from uuid import UUID
 
 from app.api.deps import get_current_persona
-from app.schemas.log import ActivityLogCreate
+from app.schemas.request.log import ActivityLogCreate
 from app.service.log.activity_log import activity_log_service
+from app.schemas.response.common import SuccessResponse
 
 router = APIRouter()
 
-@router.post("/activity", status_code=202)
+@router.post("/activity", status_code=202, response_model=SuccessResponse)
 async def log_activity(
     log_in: ActivityLogCreate,
     background_tasks: BackgroundTasks,

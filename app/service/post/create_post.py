@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention
 from app.utils.parser import parse_content
 from app.service.recommendation.recommendation_service import recommendation_service
-from app.schemas.post.create import PostCreate
+from app.schemas.request.post import PostCreate
 
 class PostCreateService:
     async def create_post(self, db: Session, post_in: PostCreate, user_id: UUID, persona_id: UUID) -> int:
@@ -15,6 +15,7 @@ class PostCreateService:
         try:
             new_post = Post(
                 user_id=user_id,
+                persona_id=persona_id,
                 title=post_in.title,
                 content=post_in.content,
                 image_urls=post_in.image_urls,

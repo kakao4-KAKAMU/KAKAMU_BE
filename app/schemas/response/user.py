@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from uuid import UUID
 from typing import Optional
@@ -16,7 +16,3 @@ class UserResponse(UserBase):
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
-
-class UserUpdate(BaseModel):
-    nickname: Optional[str] = Field(None, max_length=50, description="수정할 닉네임")
-    profile_image_url: Optional[str] = Field(None, max_length=500, description="수정할 프로필 이미지 URL")

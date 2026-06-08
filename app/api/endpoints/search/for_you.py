@@ -8,10 +8,11 @@ from app.db.session import get_db
 from app.models import Post
 from app.api.deps import get_current_persona
 from .utils import handle_search_request, get_search_pattern
+from app.schemas.response.search import CursorSearchResponse
 
 router = APIRouter()
 
-@router.get("/v1/search/for-you", tags=["Search - Tabs"])
+@router.get("/v1/search/for-you", tags=["Search - Tabs"], response_model=CursorSearchResponse)
 async def search_for_you(
     request: Request,
     background_tasks: BackgroundTasks,

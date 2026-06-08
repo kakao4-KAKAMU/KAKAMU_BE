@@ -5,12 +5,14 @@ from app.db.session import get_db
 from app.api.deps.auth import get_active_user
 from app.api.deps import get_current_persona
 from app.models.user import User
-from app.schemas.post.comment import CommentCreate
+from app.schemas.request.post import CommentCreate
+from app.schemas.response.post import CommentListResponse
+from app.schemas.response.common import CommentIdResponse
 from app.service.comment.comment_service import comment_service
 
 router = APIRouter()
 
-@router.post("/", status_code=201)
+@router.post("/", status_code=201, response_model=CommentIdResponse)
 def create_comment(
     post_id: int, 
     comment_in: CommentCreate, 
@@ -22,13 +24,14 @@ def create_comment(
     comment_id = comment_service.create_comment(db, post_id, comment_in, current_user.id, current_persona_id)
     return {"status": "success", "comment_id": comment_id}
 
-@router.get("/")
+@router.get("/", response_model=CommentListResponse)
 def get_comments(
     post_id: int,
     page: int = Query(1, ge=1, description="페이지 번호 (1부터 시작)"),
     size: int = Query(20, ge=1, le=100, description="페이지당 반환할 댓글 수"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_active_user)
 ):
     """게시물의 댓글 목록을 페이징 처리하여 조회합니다. 스포일러 댓글은 내용이 마스킹 처리됩니다."""
-    comments_data = comment_service.get_comments(db, post_id, page=page, size=size)
+    comments_data = comment_service.get_comments(db, post_id, current_user.id, page=page, size=size)
     return {"status": "success", **comments_data}

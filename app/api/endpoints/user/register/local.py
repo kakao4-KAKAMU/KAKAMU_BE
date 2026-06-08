@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.schemas.user import UserResponse
-from app.schemas.register.local import UserRegister, LocalLinkRequest
+from app.schemas.response.user import UserResponse
+from app.schemas.request.auth import UserRegister, LocalLinkRequest
 from app.models import User, LocalAuth, SocialAuth
 from app.core.security import get_password_hash
 from app.api.deps import validate_local_registration, get_current_user

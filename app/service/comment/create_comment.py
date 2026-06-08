@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from uuid import UUID
 
 from app.models import Comment, Post, User, CommentMention
-from app.schemas.post.comment import CommentCreate
+from app.schemas.request.post import CommentCreate
 from app.utils.parser import parse_content
 
 class CommentCreateService:

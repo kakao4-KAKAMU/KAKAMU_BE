@@ -7,10 +7,11 @@ from sqlalchemy import desc, case, func, or_
 from app.db.session import get_db
 from app.models import Post, Movie, FavGenre, Genre
 from .utils import handle_search_request
+from app.schemas.response.search import CustomSearchResponse
 
 router = APIRouter()
 
-@router.get("/v1/search")
+@router.get("/v1/search", response_model=CustomSearchResponse)
 async def search_contents(
     request: Request,
     background_tasks: BackgroundTasks,

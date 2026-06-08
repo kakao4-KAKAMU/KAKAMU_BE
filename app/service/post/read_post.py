@@ -1,6 +1,6 @@
 from uuid import UUID
 from typing import Optional, Dict, Any, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, select, or_
 from fastapi import HTTPException
 
@@ -68,7 +68,7 @@ class PostReadService:
             User.status == "ACTIVE",               # 탈퇴/삭제 유예 기간인 작성자 숨김
             Post.user_id.notin_(blocked_by_me),    # 내가 차단한 유저 숨김
             Post.user_id.notin_(blocking_me)       # 나를 차단한 유저 숨김
-        )
+        ).options(selectinload(Post.movies))
 
         if cursor:
             query = query.filter(Post.id < cursor)
@@ -149,7 +149,7 @@ class PostReadService:
             User.status == "ACTIVE",
             Post.user_id.notin_(blocked_by_me),
             Post.user_id.notin_(blocking_me)
-        )
+        ).options(selectinload(Post.movies))
 
         if cursor:
             query = query.filter(Post.id < cursor)
@@ -220,7 +220,7 @@ class PostReadService:
             Post.user_id == target_user_id, 
             Post.status == "ACTIVE",
             User.status == "ACTIVE"
-        )
+        ).options(selectinload(Post.movies))
         
         if cursor:
             query = query.filter(Post.id < cursor)
@@ -282,6 +282,7 @@ class PostReadService:
     def get_post_detail(self, db: Session, post_id: int, current_persona_id: UUID, current_user_id: UUID) -> Dict[str, Any]:
         """게시물 상세 조회 로직"""
         db_result = db.query(Post, User).join(User, Post.user_id == User.id)\
+            .options(selectinload(Post.movies))\
             .filter(Post.id == post_id, Post.status == "ACTIVE").first()
             
         if not db_result:

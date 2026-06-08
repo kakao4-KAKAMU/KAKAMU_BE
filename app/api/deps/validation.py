@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models import LocalAuth, SocialAuth
-from app.schemas.register.local import UserRegister
-from app.schemas.register.social import SocialRegisterRequest
+from app.schemas.request.auth import UserRegister
+from app.schemas.request.auth import SocialRegisterRequest
 from app.core.firebase import verify_firebase_token
 from app.service.user.social_auth import get_kakao_user_info
 

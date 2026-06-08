@@ -5,7 +5,8 @@ from uuid import UUID
 
 from app.db.session import get_db
 from app.api.deps.auth import get_active_user
-from app.schemas.relation import RelationResponse, BlockRequest, FollowListResponse
+from app.schemas.response.relation import RelationResponse, FollowListResponse
+from app.schemas.request.relation import BlockRequest
 from app.service.relation.relation_service import relation_service
 from app.models import Follow, User
 

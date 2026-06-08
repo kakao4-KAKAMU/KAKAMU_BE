@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
 
-from app.schemas.post.like import LikeToggleRequest
+from app.schemas.request.post import LikeToggleRequest
 from app.models import LikeLog, Post, Comment
 from app.service.recommendation.recommendation_service import recommendation_service
 from app.core.redis import redis_client

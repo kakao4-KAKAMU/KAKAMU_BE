@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention
 from app.utils.parser import parse_content
 from app.service.recommendation.recommendation_service import recommendation_service
-from app.schemas.post.update import PostUpdate
+from app.schemas.request.post import PostUpdate
 
 class PostUpdateService:
     async def update_post(self, db: Session, post_id: int, post_in: PostUpdate, user_id: UUID, persona_id: UUID) -> int:

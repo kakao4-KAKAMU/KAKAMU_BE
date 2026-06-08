@@ -6,12 +6,13 @@ from app.db.session import get_db
 from app.api.deps import get_current_persona
 from app.api.deps.auth import get_active_user
 from app.models.user import User
-from app.schemas.post.update import PostUpdate
+from app.schemas.request.post import PostUpdate
+from app.schemas.response.common import PostIdResponse
 from app.service.post.update_post import post_update_service
 
 router = APIRouter()
 
-@router.put("/{post_id}")
+@router.put("/{post_id}", response_model=PostIdResponse)
 async def update_post(
     post_id: int,
     post_in: PostUpdate,

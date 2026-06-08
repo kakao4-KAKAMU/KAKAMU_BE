@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.api.deps.auth import get_active_user
 from app.models.user import User
-from app.schemas.user import UserUpdate, UserResponse
+from app.schemas.request.user import UserUpdate
+from app.schemas.response.user import UserResponse
 from app.service.user.update_user import user_update_service
 
 router = APIRouter()

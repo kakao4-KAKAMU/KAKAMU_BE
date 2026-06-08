@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from uuid import UUID
 
 from app.models import Comment, User, CommentMention
-from app.schemas.post.comment import CommentUpdate
+from app.schemas.request.post import CommentUpdate
 from app.utils.parser import parse_content
 
 class CommentUpdateService:

@@ -1,18 +1,10 @@
 from pydantic import BaseModel
-from enum import Enum
 from typing import List, Optional
 from uuid import UUID
-
-class BlockLevel(str, Enum):
-    PERSONA = "PERSONA"
-    USER = "USER"
 
 class RelationResponse(BaseModel):
     status: str
     message: str
-
-class BlockRequest(BaseModel):
-    level: BlockLevel = BlockLevel.USER
 
 class UserSimpleInfo(BaseModel):
     id: UUID

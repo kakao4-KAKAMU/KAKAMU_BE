@@ -1,18 +1,7 @@
 from pydantic import BaseModel, ConfigDict, field_serializer
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 from app.core.config import settings
-
-
-# 페르소나 프로필 생성
-class PersonaCreate(BaseModel):
-    nickname: str # 닉네임
-    profile_image_url: Optional[str] = None # 이미지 url
-    
-    fav_movie_ids: Optional[List[int]] = None # 선호 영화 ID 목록
-    fav_genre_ids: Optional[List[int]] = None # 선호 장르 ID 목록
-    fav_people_ids: Optional[List[int]] = None # 선호 인물(배우/감독) ID 목록
-
 
 # 개별 프로필(페르소나) 정보
 class PersonaResponse(BaseModel):
@@ -36,12 +25,3 @@ class PersonaResponse(BaseModel):
         return f"{settings.IMAGE_SERVER_URL.rstrip('/')}/{value.lstrip('/')}"
 
     model_config = ConfigDict(from_attributes=True)
-
-# 페르소나 수정
-class PersonaEdit(BaseModel):
-    nickname: Optional[str] = None
-    profile_image_url: Optional[str] = None
-
-    fav_movie_ids: Optional[List[int]] = None # 선호 영화 ID 목록
-    fav_genre_ids: Optional[List[int]] = None # 선호 장르 ID 목록
-    fav_people_ids: Optional[List[int]] = None # 선호 인물(배우/감독) ID 목록

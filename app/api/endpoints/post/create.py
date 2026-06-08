@@ -7,12 +7,13 @@ from app.db.session import get_db
 from app.api.deps import get_current_persona
 from app.api.deps.auth import get_active_user
 from app.models.user import User
-from app.schemas.post.create import PostCreate
+from app.schemas.request.post import PostCreate
+from app.schemas.response.common import PostIdResponse
 from app.service.post.create_post import post_create_service
 
 router = APIRouter()
 
-@router.post("/", status_code=201)
+@router.post("/", status_code=201, response_model=PostIdResponse)
 async def create_post(
     post_in: PostCreate,
     db: Session = Depends(get_db),

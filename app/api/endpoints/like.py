@@ -4,12 +4,13 @@ from uuid import UUID
 from app.db.session import get_db
 from app.api.deps import get_current_persona, get_active_user
 from app.models.user import User
-from app.schemas.post.like import LikeToggleRequest
+from app.schemas.request.post import LikeToggleRequest
+from app.schemas.response.post import LikeToggleResponse
 from app.service.like.like_service import like_service
 
 router = APIRouter()
 
-@router.post("/")
+@router.post("/", response_model=LikeToggleResponse)
 async def toggle_like(
     req: LikeToggleRequest, 
     db: Session = Depends(get_db), 

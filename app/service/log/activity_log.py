@@ -1,6 +1,6 @@
 import logging
 from uuid import UUID
-from app.schemas.log import ActivityLogCreate
+from app.schemas.request.log import ActivityLogCreate
 from app.models import EntityRelationshipLog
 from app.db.session import SessionLocal
 

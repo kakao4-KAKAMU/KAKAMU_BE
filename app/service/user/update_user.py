@@ -5,7 +5,7 @@ from sqlalchemy import select, and_
 from fastapi import HTTPException
 
 from app.models.user import User
-from app.schemas.user import UserUpdate
+from app.schemas.request.user import UserUpdate
 
 class UserUpdateService:
     async def update_user(self, db: Session, user_id: UUID, user_in: UserUpdate) -> User:
