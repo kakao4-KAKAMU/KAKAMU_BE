@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_active_user
 from app.db.session import get_db
 from app.models import User
-from app.schemas.profile import PersonaCreate, PersonaResponse
+from app.schemas.request.profile import PersonaCreate
+from app.schemas.response.profile import PersonaResponse
 from app.service.profile.create_persona import PersonaCreateService
 
 router = APIRouter()

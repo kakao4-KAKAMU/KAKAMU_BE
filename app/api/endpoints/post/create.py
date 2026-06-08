@@ -5,19 +5,23 @@ from uuid import UUID
 
 from app.db.session import get_db
 from app.api.deps import get_current_persona
-from app.schemas.post.create import PostCreate
+from app.api.deps.auth import get_active_user
+from app.models.user import User
+from app.schemas.request.post import PostCreate
+from app.schemas.response.common import PostIdResponse
 from app.service.post.create_post import post_create_service
 
 router = APIRouter()
 
-@router.post("/", status_code=201)
+@router.post("/", status_code=201, response_model=PostIdResponse)
 async def create_post(
     post_in: PostCreate,
     db: Session = Depends(get_db),
-    persona_id: UUID = Depends(get_current_persona) # 현재 활성화된 페르소나 ID
+    current_user: User = Depends(get_active_user),
+    persona_id: UUID = Depends(get_current_persona) # 현재 활성화된 페르소나 ID (추천용)
 ) -> Any:
     """새로운 게시물을 작성하고 해시태그 및 멘션을 파싱하여 연결합니다."""
-    post_id = await post_create_service.create_post(db, post_in, persona_id)
+    post_id = await post_create_service.create_post(db, post_in, current_user.id, persona_id)
     return {"status": "success", "post_id": post_id}
 
 # --- 차후 백엔드에서 이미지를 직접 업로드 받아야 할 경우를 대비한 예시 코드 ---

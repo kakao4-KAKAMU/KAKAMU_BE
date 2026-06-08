@@ -3,11 +3,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models import User
+from app.schemas.response.common import SuccessMessageResponse
 from app.service.user.restore_service import account_restore_service
 
 router = APIRouter()
 
-@router.post("/users/me/restore", status_code=status.HTTP_200_OK)
+@router.post("/users/me/restore", status_code=status.HTTP_200_OK, response_model=SuccessMessageResponse)
 async def restore_my_account(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

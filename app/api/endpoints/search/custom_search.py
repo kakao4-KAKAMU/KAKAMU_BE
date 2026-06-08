@@ -7,10 +7,11 @@ from sqlalchemy import desc, case, func, or_
 from app.db.session import get_db
 from app.models import Post, Movie, FavGenre, Genre
 from .utils import handle_search_request
+from app.schemas.response.search import CustomSearchResponse
 
 router = APIRouter()
 
-@router.get("/v1/search")
+@router.get("/v1/search", response_model=CustomSearchResponse)
 async def search_contents(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -42,28 +43,33 @@ async def search_contents(
             next_cursor = str(items[-1].id)
 
     elif tab == "for-you":
-        # [For You 탭] 스코어 공식 = TextAccuracy*0.4 + LikeCount*0.2 + PersonaPreferenceWeight*0.4
-        
+        # -------------------------------------------------------------------------
+        # [V2: 이상적인 ML 연동 상태]
+        # 백엔드에서 직접 점수를 계산하지 않고, 머신러닝 서버(Airflow/Spark 등)가 
+        # 비동기로 분석하여 Redis에 적재한 '추천 게시물 ID 목록'을 그대로 가져옵니다.
+        # -------------------------------------------------------------------------
+        ml_recommended_ids = []
+
+        # -------------------------------------------------------------------------
+        # [V1: 규칙 기반(Heuristic) 추천 로직] (ML 도입 전 기존 코드 - 주석 처리됨)
+        # -------------------------------------------------------------------------
+        """
         # TextAccuracy 가중치 (정확히 일치하면 1.0, 부분 일치면 0.5 부여)
         text_accuracy = case((Post.title == q, 1.0), else_=0.5)
         
-        # [수정] Redis 대신 RDB의 FavGenre를 조회하여 취향 가중치 추출
         fav_genres = db.query(Genre.name).join(
             FavGenre, FavGenre.genre_id == Genre.id
         ).filter(FavGenre.persona_id == active_persona_id).all()
         
         preferred_categories = [g[0] for g in fav_genres]
         
-        # 사용자의 선호 장르 카테고리에 포함되면 가중치 부여
         pref_weight = case((Post.category.in_(preferred_categories), 1.0), else_=0.0) if preferred_categories else 0.0
         
-        # 최종 점수 계산
         score_calc = (text_accuracy * 0.4) + (Post.like_count * 0.2) + (pref_weight * 0.4)
         score_label = score_calc.label("sort_score")
         
         query_with_score = base_query.add_columns(score_label)
 
-        # 복합 커서 처리 (score + id)
         if cursor:
             try:
                 last_score, last_id = map(float, cursor.split("_"))
@@ -71,15 +77,26 @@ async def search_contents(
                     (score_calc < last_score) | ((score_calc == last_score) & (Post.id < int(last_id)))
                 )
             except (ValueError, TypeError):
-                pass  # 잘못된 커서 형식은 무시하고 첫 페이지부터 조회
+                pass  
 
-        # 점수 내림차순, ID 내림차순 정렬
         results = query_with_score.order_by(desc(score_label), desc(Post.id)).limit(limit).all()
-        
-        items = [row.Post for row in results] # ORM 객체만 추출
+        items = [row.Post for row in results]
         if len(results) == limit:
             last_row = results[-1]
             next_cursor = f"{last_row.sort_score}_{last_row.Post.id}"
+        """
+
+        # [V2 Fallback 로직] ML 서버 파이프라인 연동 전/데이터가 비어있을 때의 기본 서빙
+        if cursor:
+            try:
+                base_query = base_query.filter(Post.id < int(cursor))
+            except (ValueError, TypeError):
+                pass
+        
+        results = base_query.order_by(desc(Post.like_count), desc(Post.created_at)).limit(limit).all()
+        items = results
+        if len(results) == limit:
+            next_cursor = str(results[-1].id)
 
     # 3. 예외 처리 (Zero-Result Fallback)
     if not items:

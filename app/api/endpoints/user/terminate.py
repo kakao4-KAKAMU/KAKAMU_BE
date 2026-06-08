@@ -5,11 +5,12 @@ from uuid import UUID
 from app.db.session import get_db
 from app.api.deps import get_active_user
 from app.models import User
+from app.schemas.response.common import SuccessResponse
 from app.service.user.terminate_service import account_termination_service
 
 router = APIRouter()
 
-@router.post("/v1/account/terminate", tags=["Account"])
+@router.post("/v1/account/terminate", tags=["Account"], response_model=SuccessResponse)
 async def terminate_account(
     db: Session = Depends(get_db),
     user: User = Depends(get_active_user)

@@ -8,11 +8,12 @@ from app.db.session import get_db
 from app.models import Post
 from app.api.deps import get_current_persona
 from .utils import handle_search_request, get_search_pattern
+from app.schemas.response.search import CursorSearchResponse
 
 router = APIRouter()
 
-@router.get("/v1/search/for-you", tags=["Search - Tabs"])
-def search_for_you(
+@router.get("/v1/search/for-you", tags=["Search - Tabs"], response_model=CursorSearchResponse)
+async def search_for_you(
     request: Request,
     background_tasks: BackgroundTasks,
     q: str = Query(..., min_length=1, description="검색어"),
@@ -24,6 +25,17 @@ def search_for_you(
     handle_search_request(request, background_tasks, str(active_persona_id), q)
     search_pattern = get_search_pattern(q)
 
+    # -------------------------------------------------------------------------
+    # [V2: 이상적인 ML 연동 상태] 
+    # 머신러닝 서버가 Redis에 사전에 계산해둔 유저별 맞춤 피드를 그대로 서빙합니다.
+    # 백엔드는 복잡한 연산을 하지 않고 단순 데이터 파이프 역할만 수행합니다.
+    # -------------------------------------------------------------------------
+    ml_recommended_ids = []
+
+    # -------------------------------------------------------------------------
+    # [V1: 기존 규칙 기반(Heuristic) 추천 로직 주석 처리]
+    # -------------------------------------------------------------------------
+    """
     query = db.query(Post).filter(
         Post.status == "ACTIVE",
         or_(Post.title.ilike(search_pattern), Post.content.ilike(search_pattern))
@@ -43,10 +55,8 @@ def search_for_you(
         final_score = (text_accuracy * 0.4) + (popularity * 0.2) + (persona_pref * 0.4)
         scored_results.append({"post": post, "score": final_score})
 
-    # 정렬: 점수 내림차순, ID 내림차순 (동점일 경우 최신순)
     scored_results.sort(key=lambda x: (x["score"], x["post"].id), reverse=True)
 
-    # 커서 기반 페이징 적용
     if cursor:
         try:
             last_score_str, last_id_str = cursor.split("_")
@@ -58,7 +68,7 @@ def search_for_you(
                 if res["score"] < last_score or (res["score"] == last_score and res["post"].id < last_id)
             ]
         except (ValueError, TypeError):
-            pass # 잘못된 커서 형식은 무시
+            pass
 
     paginated_results = scored_results[:limit]
     
@@ -68,4 +78,27 @@ def search_for_you(
         next_cursor = f"{last_item['score']}_{last_item['post'].id}"
 
     items = [{"id": p["post"].id, "title": p["post"].title, "content": p["post"].content} for p in paginated_results]
+    return {"status": "success", "items": items, "next_cursor": next_cursor}
+    """
+
+    # [V2 Fallback 로직]
+    query = db.query(Post).filter(
+        Post.status == "ACTIVE",
+        or_(Post.title.ilike(search_pattern), Post.content.ilike(search_pattern))
+    )
+    if cursor:
+        try:
+            query = query.filter(Post.id < int(cursor))
+        except (ValueError, TypeError):
+            pass
+            
+    # 추천 결과가 없으므로 좋아요 높은 순서 위주로 기본 서빙
+    paginated_results = query.order_by(Post.like_count.desc(), Post.id.desc()).limit(limit).all()
+    
+    if not paginated_results:
+        return {"status": "success", "items": [], "fallback": True, "message": "결과가 없어 추천 항목을 제공합니다."}
+        
+    next_cursor = str(paginated_results[-1].id) if len(paginated_results) == limit else None
+    items = [{"id": p.id, "title": p.title, "content": p.content} for p in paginated_results]
+    
     return {"status": "success", "items": items, "next_cursor": next_cursor}

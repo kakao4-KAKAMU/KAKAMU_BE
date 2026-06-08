@@ -1,6 +1,7 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from uuid import UUID
+from typing import Optional
 
 class UserBase(BaseModel):
     username: str = Field(..., max_length=50)
@@ -9,6 +10,9 @@ class UserBase(BaseModel):
 
 class UserResponse(UserBase):
     id: UUID
+    tag: str
+    profile_image_url: Optional[str] = None
+    profile_msg: Optional[str] = None
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)

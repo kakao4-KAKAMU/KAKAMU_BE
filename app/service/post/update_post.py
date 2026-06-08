@@ -3,19 +3,19 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Post, PostMovie, Hashtag, PostHashtag, Persona, PostMention
+from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention
 from app.utils.parser import parse_content
 from app.service.recommendation.recommendation_service import recommendation_service
-from app.schemas.post.update import PostUpdate
+from app.schemas.request.post import PostUpdate
 
 class PostUpdateService:
-    async def update_post(self, db: Session, post_id: int, post_in: PostUpdate, persona_id: UUID) -> int:
+    async def update_post(self, db: Session, post_id: int, post_in: PostUpdate, user_id: UUID, persona_id: UUID) -> int:
         """게시물 수정 로직"""
         post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()
         if not post:
             raise HTTPException(status_code=404, detail={"code": "POST_NOT_FOUND", "message": "게시물을 찾을 수 없습니다."})
             
-        if post.persona_id != persona_id:
+        if post.user_id != user_id:
             raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_POST_UPDATE", "message": "본인이 작성한 게시물만 수정할 수 있습니다."})
 
         # 업데이트할 필드 적용
@@ -65,6 +65,16 @@ class PostUpdateService:
                     db.add(hashtag_obj)
                     db.flush()
                 db.add(PostHashtag(post_id=post.id, hashtag_id=hashtag_obj.id))
+
+            for mention_str in mentions:
+                if "#" not in mention_str:
+                    continue
+                nickname, tag = mention_str.split("#", 1)
+                target_user = db.query(User).filter(
+                    User.nickname == nickname, User.tag == tag, User.status == "ACTIVE"
+                ).first()
+                if target_user:
+                    db.add(PostMention(post_id=post.id, user_id=target_user.id))
 
         db.commit()
         return post.id

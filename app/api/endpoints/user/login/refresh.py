@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from app.schemas.login.local import Token, RefreshRequest
+from app.schemas.request.auth import RefreshRequest
+from app.schemas.response.auth import TokenResponse as Token
 from app.core.security import create_access_token, create_refresh_token
 import jwt
 from app.core.config import settings

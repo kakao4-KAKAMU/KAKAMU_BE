@@ -6,7 +6,7 @@ from sqlalchemy import select, and_, func
 from sqlalchemy.orm import Session
 from app.models import Persona
 from app.models import FavMovie, FavGenre, FavPeople
-from app.schemas.profile import PersonaCreate
+from app.schemas.request.profile import PersonaCreate
 from opentelemetry import trace
 
 from app.utils.image_upload import upload_profile_image, IMAGE_PUBLIC_BASE_URL
@@ -15,12 +15,6 @@ tracer = trace.get_tracer(__name__)
 
 
 class PersonaCreateService:
-
-    # 태그 랜덤 생성 함수
-    @staticmethod
-    def generate_random_tag(length: int = 5) -> str:
-        characters = string.ascii_lowercase + string.digits  # 소문자와 숫자 조합
-        return ''.join(random.choices(characters, k=length))  # 길이는 5글자
 
     @staticmethod
     async def create_new_persona(
@@ -34,41 +28,12 @@ class PersonaCreateService:
         with tracer.start_as_current_span("persona.create") as span:
             span.set_attribute("user_id", str(user_id))
 
-            DEFAULT_PROFILE_IMAGE_URL = "/static/default_profile_image.png"
-            MAX_RETRY = 10
-
             name = persona_data.nickname
 
             if not name:
                 raise HTTPException(
                     status_code=400,
                     detail={"code": "MISSING_NICKNAME", "message": "닉네임을 입력해주세요"}
-                )
-
-            tag = None
-
-            with tracer.start_as_current_span("persona.generate_unique_tag") as tag_span:
-                for _ in range(MAX_RETRY): # 10번 태그 생성 시도
-                    candidate_tag = PersonaCreateService.generate_random_tag() # 랜덤 태그 생성
-
-                    exist_stmt = select(Persona).where(
-                        and_(
-                            Persona.nickname == name,  # and 연산으로 name, tag 비교
-                            Persona.tag == candidate_tag
-                        )
-                    )
-
-                    existing_persona = db.scalar(exist_stmt) # 닉네임 + 태그로 중복 검사
-
-                    if not existing_persona: # 만약 없으면
-                        tag = candidate_tag # 태그를 생성된 태그로 지정하고
-                        break # 반복문 종료
-
-            if tag is None:
-                span.set_attribute("error.reason", "tag_generation_failed")
-                raise HTTPException(
-                    status_code=500,
-                    detail={"code": "TAG_GENERATION_FAILED", "message": "태그 생성에 실패했습니다. 다시 시도해주세요."}
                 )
 
             with tracer.start_as_current_span("persona.count_user_personas") as count_span:
@@ -89,14 +54,11 @@ class PersonaCreateService:
                 profile_image_url = (
                     persona_data.profile_image_url
                     if persona_data.profile_image_url
-                    else DEFAULT_PROFILE_IMAGE_URL
+                    else "/static/default_profile_image.png"
                 )
-
                 new_profile = Persona(
                     user_id=user_id,
                     nickname=name,
-                    profile_msg=persona_data.profile_msg,
-                    tag=tag,
                     profile_image_url=profile_image_url,
                     status="ACTIVE",
                     deleted_at=None

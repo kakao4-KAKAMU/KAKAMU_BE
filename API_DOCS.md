@@ -3,6 +3,16 @@
 현재 프로젝트에 구현된 주요 API 경로와 설명입니다.  
 상세한 API 요청/응답 스키마와 테스트는 서버 실행 후 **Swagger UI (`/docs` 또는 `/api/docs`)**를 통해 확인할 수 있습니다.
 
+## 🔐 API 인증 및 공통 헤더 안내
+본 프로젝트는 **상태 비저장(Stateless)** 아키텍처를 채택하고 있습니다. 페르소나의 이름으로 활동(글쓰기, 팔로우, 좋아요 등)하는 모든 API는 다음 두 가지를 요청 헤더(Header)에 포함해야 합니다.
+
+1. **Authorization**: `Bearer <Access_Token>` (유저 본인 인증)
+2. **X-Persona-Id**: `<현재 활성화된 페르소나의 UUID>` (페르소나 권한 인가)
+
+*💡 프론트엔드는 로그인 후 `/personas` API를 통해 페르소나 목록을 조회하고, 유저가 사용할 페르소나를 선택하면 해당 ID를 로컬 환경에 저장해 두었다가 매 API 호출 시 전송해야 합니다.*
+
+---
+
 ## 1. System (시스템 상태 및 연결 확인)
 | Method | Path | Description |
 |---|---|---|
@@ -79,19 +89,35 @@
 | `GET` | `/v1/genre/list` | 전체 영화 장르 목록 가나다순 조회 |
 | `GET` | `/v1/search/trend` | 일간 인기 검색어(트렌드) Top 10 순위 조회 |
 
-## 9. Profiles (페르소나 관리)
+## 9. Personas (페르소나 관리)
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/personas` | 현재 로그인된 유저의 모든 페르소나 목록 조회 |
 | `POST` | `/personas` | 신규 페르소나 생성 (최대 5개 제한, 고유 태그 발급) |
 | `GET` | `/personas/{persona_id}` | 특정 페르소나 상세 정보 조회 |
-| `PUT` | `/personas/{persona_id}` | 특정 페르소나 정보(닉네임, 프로필 이미지 등) 수정 |
+| `PUT` | `/personas/{persona_id}` | 특정 페르소나 정보(닉네임, 프로필 이미지, 취향 정보 등) 수정 |
 | `DELETE` | `/personas/{persona_id}` | 특정 페르소나 삭제 (Soft Delete, 최소 1개 유지) |
 | `POST` | `/personas/{persona_id}/restore` | 유예 기간 내의 페르소나 복구 (활성화) |
-| `GET` | `/public/{target_persona_id}` | 타인의 공개 페르소나 프로필 조회 |
+| `GET` | `/personas/public/{target_persona_id}` | 타인의 공개 페르소나 프로필 조회 |
 
+## 10. Static Files (정적 파일 제공)
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/static/*` | 서버에 저장된 정적 파일(이미지 등) 서빙 |
+
+---
+## 11. Activity Logging (사용자 행동 로그)
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/logs/activity` | 프론트엔드에서 수집한 유저 행동(클릭, 호버 등) 로그를 비동기 큐에 적재 |
 ---
 
 ### API Prefix 안내
 애플리케이션(FastAPI) 설정 시 `main.py`에 적용된 `root_path` 설정에 따라 위 경로 앞에 특정 Prefix(예: `/api`)가 붙을 수 있습니다.  
 * 예: `/users/me` ➔ `http://localhost:8000/api/users/me`
+
+---
+
+## 🚨 주요 에러 코드 안내 (Error Codes)
+본 프로젝트의 에러 코드 명세는 단일 진실 공급원(SSOT) 유지를 위해 별도의 문서로 분리되었습니다.
+API 호출 시 발생할 수 있는 주요 예외 상황과 커스텀 에러 코드(`code`), HTTP 상태 코드 및 발생 원인은 **ERROR_CODES.md**를 참조해 주시기 바랍니다.

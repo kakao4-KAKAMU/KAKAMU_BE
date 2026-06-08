@@ -1,41 +1,43 @@
-from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request, Header
+from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from typing import Optional
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, select
 from uuid import UUID
 
 from app.db.session import get_db
-from app.models import Persona, Block
+from app.models import User, Block
+from app.api.deps import get_active_user, get_current_persona
 from .utils import handle_search_request, get_search_pattern
+from app.schemas.response.search import CursorSearchResponse
 
 router = APIRouter()
 
-@router.get("/v1/search/user", tags=["Search - Tabs"])
+@router.get("/v1/search/user", tags=["Search - Tabs"], response_model=CursorSearchResponse)
 def search_user(
     request: Request,
     background_tasks: BackgroundTasks,
     q: str = Query(..., min_length=1, description="검색어"),
     cursor: Optional[str] = Query(None, description="페이징 커서 (nickname,id)"),
     limit: int = Query(20, le=50),
-    x_persona_id: Optional[UUID] = Header(None, alias="X-Persona-Id", description="현재 활성화된 페르소나 ID"),
+    current_user: User = Depends(get_active_user),
+    active_persona_id: UUID = Depends(get_current_persona),
     db: Session = Depends(get_db)
 ):
-    handle_search_request(request, background_tasks, str(x_persona_id) if x_persona_id else None, q)
+    handle_search_request(request, background_tasks, str(active_persona_id), q)
     search_pattern = get_search_pattern(q)
 
     # 💡 차단 유저 필터링: 내가 차단했거나 나를 차단한 유저의 ID 목록 추출
-    excluded_persona_ids = []
-    if x_persona_id:
-        blocked_by_me = db.query(Block.blocked_id).filter(Block.blocker_id == x_persona_id).all()
-        blocking_me = db.query(Block.blocker_id).filter(Block.blocked_id == x_persona_id).all()
-        excluded_persona_ids = [b[0] for b in blocked_by_me] + [b[0] for b in blocking_me]
+    blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_user.id)
+    blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_user.id)
 
-    # 닉네임 단독 검색 및 '닉네임#태그' 형태의 복합 검색 모두 지원
-    query = db.query(Persona).filter(
-        Persona.status == "ACTIVE",
+    # 닉네임 단독 검색 및 '닉네임#태그' 형태의 복합 검색 모두 지원 (User 검색으로 변경)
+    query = db.query(User).filter(
+        User.status == "ACTIVE",
+        User.id.notin_(blocked_by_me),
+        User.id.notin_(blocking_me),
         or_(
-            Persona.nickname.ilike(search_pattern),
-            func.concat(Persona.nickname, "#", Persona.tag).ilike(search_pattern)
+            User.nickname.ilike(search_pattern),
+            func.concat(User.nickname, "#", User.tag).ilike(search_pattern)
         )
     )
     
@@ -44,22 +46,21 @@ def search_user(
         try:
             last_nickname, last_id_str = cursor.rsplit(',', 1)
             last_id = UUID(last_id_str)
-            # (nickname > last_nickname) OR (nickname = last_nickname AND id < last_id)
             query = query.filter(
                 or_(
-                    Persona.nickname > last_nickname,
-                    (Persona.nickname == last_nickname) & (Persona.id < last_id)
+                    User.nickname > last_nickname,
+                    (User.nickname == last_nickname) & (User.id < last_id)
                 )
             )
         except (ValueError, TypeError):
             # 잘못된 커서 형식은 무시하고 첫 페이지부터 조회
             pass
 
-    # 결정적 정렬 보장: 닉네임 오름차순을 기본으로 하되, 고유 ID로 2차 정렬
-    query = query.order_by(Persona.nickname.asc(), Persona.id.desc())
+    # 결정적 정렬 보장: 닉네임 오름차순 기본, 고유 ID로 2차 정렬
+    query = query.order_by(User.nickname.asc(), User.id.desc())
     
     results = query.limit(limit).all()
-    items = [{"id": str(p.id), "nickname": p.nickname, "tag": p.tag} for p in results]
+    items = [{"id": str(p.id), "nickname": p.nickname, "tag": p.tag, "profile_image_url": p.profile_image_url} for p in results]
 
     next_cursor = None
     if len(results) == limit:

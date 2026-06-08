@@ -4,12 +4,13 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models import User, LocalAuth
 from app.core.security import get_password_hash
-from app.schemas.login.reset import PasswordResetRequest
+from app.schemas.request.auth import PasswordResetRequest
+from app.schemas.response.common import SuccessResponse
 from app.core.firebase import verify_firebase_token
 
 router = APIRouter()
 
-@router.post("/local/reset-password")
+@router.post("/local/reset-password", response_model=SuccessResponse)
 def reset_local_password(
     request: PasswordResetRequest,
     db: Session = Depends(get_db)

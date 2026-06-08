@@ -6,13 +6,13 @@ from app.models import Post, Comment, LikeLog, PostMovie
 from app.service.recommendation.recommendation_service import recommendation_service
 
 class PostDeleteService:
-    async def delete_post(self, db: Session, post_id: int, persona_id: UUID) -> None:
+    async def delete_post(self, db: Session, post_id: int, user_id: UUID, persona_id: UUID) -> None:
         """게시물 소프트 삭제 및 연관 데이터 처리 로직"""
         post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()
         if not post:
             raise HTTPException(status_code=404, detail={"code": "POST_NOT_FOUND", "message": "게시물을 찾을 수 없습니다."})
             
-        if post.persona_id != persona_id:
+        if post.user_id != user_id:
             raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_POST_DELETE", "message": "본인이 작성한 게시물만 삭제할 수 있습니다."})
 
         post.status = "INACTIVE"

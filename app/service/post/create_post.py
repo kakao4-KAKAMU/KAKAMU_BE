@@ -4,16 +4,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 
-from app.models import Post, PostMovie, Hashtag, PostHashtag, Persona, PostMention
+from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention
 from app.utils.parser import parse_content
 from app.service.recommendation.recommendation_service import recommendation_service
-from app.schemas.post.create import PostCreate
+from app.schemas.request.post import PostCreate
 
 class PostCreateService:
-    async def create_post(self, db: Session, post_in: PostCreate, persona_id: UUID) -> int:
+    async def create_post(self, db: Session, post_in: PostCreate, user_id: UUID, persona_id: UUID) -> int:
         """게시물 생성 및 해시태그/멘션/추천 가중치 연동 로직"""
         try:
             new_post = Post(
+                user_id=user_id,
                 persona_id=persona_id,
                 title=post_in.title,
                 content=post_in.content,
@@ -49,11 +50,11 @@ class PostCreateService:
                 if "#" not in mention_str:
                     continue
                 nickname, tag = mention_str.split("#", 1)
-                target_persona = db.query(Persona).filter(
-                    Persona.nickname == nickname, Persona.tag == tag, Persona.status == "ACTIVE"
+                target_user = db.query(User).filter(
+                    User.nickname == nickname, User.tag == tag, User.status == "ACTIVE"
                 ).first()
-                if target_persona:
-                    db.add(PostMention(post_id=new_post.id, persona_id=target_persona.id))
+                if target_user:
+                    db.add(PostMention(post_id=new_post.id, user_id=target_user.id))
 
             db.commit()
             

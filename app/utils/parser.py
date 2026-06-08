@@ -17,8 +17,8 @@ def parse_content(content: str) -> Tuple[List[str], List[str]]:
     normalized_hashtags = list(set(tag.lower() for tag in raw_hashtags if tag))
 
     # 2. 멘션 파싱: @ 문자로 시작하고, '닉네임#태그' 형식을 정확히 추출
-    # 닉네임: 2~12자(한/영/숫자), 태그: 3~5자(영/숫자)
-    mention_pattern = re.compile(r'@([a-zA-Z0-9가-힣]{2,12}#[a-zA-Z0-9]{3,5})')
+    # 닉네임: 2~12자(한/영/숫자), 태그: 4자(숫자)
+    mention_pattern = re.compile(r'@([a-zA-Z0-9가-힣]{2,12}#[0-9]{4})')
     mentions = list(set(mention_pattern.findall(content)))
 
     return normalized_hashtags, mentions
