@@ -8,11 +8,19 @@ from app.models.user import User
 from app.schemas.request.post import CommentCreate
 from app.schemas.response.post import CommentListResponse
 from app.schemas.response.common import CommentIdResponse
+from app.schemas.errors import ERROR_POST_NOT_FOUND_FOR_COMMENT
 from app.service.comment.comment_service import comment_service
 
 router = APIRouter()
 
-@router.post("/", status_code=201, response_model=CommentIdResponse)
+@router.post(
+    "/",
+    status_code=201,
+    response_model=CommentIdResponse,
+    responses={
+        404: ERROR_POST_NOT_FOUND_FOR_COMMENT
+    }
+)
 def create_comment(
     post_id: int, 
     comment_in: CommentCreate, 

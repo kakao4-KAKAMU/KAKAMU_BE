@@ -6,11 +6,22 @@ from app.api.deps import get_current_persona, get_active_user
 from app.models.user import User
 from app.schemas.request.post import LikeToggleRequest
 from app.schemas.response.post import LikeToggleResponse
+from app.schemas.errors import (
+    ERROR_UNSUPPORTED_TARGET_TYPE,
+    ERROR_TARGET_NOT_FOUND
+)
 from app.service.like.like_service import like_service
 
 router = APIRouter()
 
-@router.post("/", response_model=LikeToggleResponse)
+@router.post(
+    "/",
+    response_model=LikeToggleResponse,
+    responses={
+        400: ERROR_UNSUPPORTED_TARGET_TYPE,
+        404: ERROR_TARGET_NOT_FOUND
+    }
+)
 async def toggle_like(
     req: LikeToggleRequest, 
     db: Session = Depends(get_db), 

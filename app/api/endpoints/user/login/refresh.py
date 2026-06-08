@@ -4,10 +4,15 @@ from app.schemas.response.auth import TokenResponse as Token
 from app.core.security import create_access_token, create_refresh_token
 import jwt
 from app.core.config import settings
+from app.schemas.errors import ERROR_REFRESH_TOKEN_FAILURES
 
 router = APIRouter()
 
-@router.post("/refresh", response_model=Token)
+@router.post(
+    "/refresh",
+    response_model=Token,
+    responses={401: ERROR_REFRESH_TOKEN_FAILURES}
+)
 def refresh_access_token(request: RefreshRequest):
     """리프레시 토큰을 검증하고 새로운 액세스 토큰을 발급합니다."""
     try:

@@ -17,10 +17,13 @@
 | `401` | `INVALID_KAKAO_TOKEN` | 유효하지 않은 카카오 액세스 토큰 |
 | `403` | `ACCOUNT_IN_GRACE_PERIOD` | 탈퇴 유예 기간(30일) 내의 계정으로 로그인 시도. 복구 절차 필요 |
 | `404` | `USER_NOT_FOUND` | 요청한 사용자를 찾을 수 없음 |
+| `400` | `NICKNAME_UNAVAILABLE` | 해당 닉네임은 현재 사용할 수 없음 (회원정보 수정 시 태그 발급 20회 모두 실패) |
 | `500` | `KAKAO_API_KEY_NOT_SET` | 서버에 카카오 REST API 키가 설정되지 않음 |
 | `500` | `KAKAO_API_CONNECTION_ERROR` | 카카오 API 서버 통신 에러 |
 | `500` | `REGISTRATION_FAILED` | 회원가입 처리 중 예기치 않은 서버 에러 발생 |
 | `500` | `LOGIN_UNEXPECTED_ERROR` | 로그인 처리 중 예기치 않은 서버 에러 발생 |
+| `500` | `USER_UPDATE_FAILED` | 사용자 정보 수정 중 서버(DB) 오류 발생 |
+| `500` | `DB_COMMIT_ERROR` | 비밀번호 재설정 등 정보 갱신 중 서버(DB) 오류 발생 |
 
 ## 2. Profile (페르소나 관련)
 | HTTP Status | Error Code | 발생 원인 / 설명 |
@@ -69,6 +72,12 @@
 | HTTP Status | Error Code | 발생 원인 / 설명 |
 |:---:|:---|:---|
 | `500` | `DB_CONNECTION_FAILED` | `/db-test` Health check 중 데이터베이스 연결 실패 |
+
+## 8. Global (공통 API 에러)
+| HTTP Status | Error Code | 발생 원인 / 설명 |
+|:---:|:---|:---|
+| `401` | `UNAUTHORIZED` | JWT 액세스 토큰이 누락되었거나, 만료/유효하지 않은 토큰으로 보호된 API에 접근 시도 |
+| `422` | `VALIDATION_ERROR` | 요청 데이터 형식(JSON 바디, 파라미터 등)이 올바르지 않음 (FastAPI 전역 예외 처리) |
 
 ---
 

@@ -9,11 +9,19 @@ from app.api.deps.auth import get_active_user
 from app.models.user import User
 from app.schemas.request.post import PostCreate
 from app.schemas.response.common import PostIdResponse
+from app.schemas.errors import ERROR_HASHTAG_LIMIT_EXCEEDED
 from app.service.post.create_post import post_create_service
 
 router = APIRouter()
 
-@router.post("/", status_code=201, response_model=PostIdResponse)
+@router.post(
+    "/",
+    status_code=201,
+    response_model=PostIdResponse,
+    responses={
+        400: ERROR_HASHTAG_LIMIT_EXCEEDED
+    }
+)
 async def create_post(
     post_in: PostCreate,
     db: Session = Depends(get_db),

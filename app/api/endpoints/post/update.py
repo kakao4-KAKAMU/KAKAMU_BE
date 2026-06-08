@@ -8,11 +8,24 @@ from app.api.deps.auth import get_active_user
 from app.models.user import User
 from app.schemas.request.post import PostUpdate
 from app.schemas.response.common import PostIdResponse
+from app.schemas.errors import (
+    ERROR_HASHTAG_LIMIT_EXCEEDED,
+    ERROR_FORBIDDEN_POST_UPDATE,
+    ERROR_POST_NOT_FOUND
+)
 from app.service.post.update_post import post_update_service
 
 router = APIRouter()
 
-@router.put("/{post_id}", response_model=PostIdResponse)
+@router.put(
+    "/{post_id}",
+    response_model=PostIdResponse,
+    responses={
+        400: ERROR_HASHTAG_LIMIT_EXCEEDED,
+        403: ERROR_FORBIDDEN_POST_UPDATE,
+        404: ERROR_POST_NOT_FOUND
+    }
+)
 async def update_post(
     post_id: int,
     post_in: PostUpdate,
