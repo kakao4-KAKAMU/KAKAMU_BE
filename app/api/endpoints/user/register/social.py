@@ -7,10 +7,20 @@ from app.models import User, SocialAuth
 from app.core.security import create_access_token, create_refresh_token
 from app.api.deps import validate_social_registration, get_current_user
 from app.service.user.social_auth import get_kakao_user_info
+from app.schemas.errors import (
+    ERROR_SOCIAL_AUTH_ALREADY_LINKED,
+    ERROR_REGISTRATION_FAILED,
+    ERROR_SOCIAL_LINK_FAILURES,
+    ERROR_INVALID_SOCIAL_TOKEN
+)
 
 router = APIRouter()
 
-@router.post("/social", response_model=TokenResponse)
+@router.post(
+    "/social",
+    response_model=TokenResponse,
+    responses={400: ERROR_SOCIAL_AUTH_ALREADY_LINKED, 500: ERROR_REGISTRATION_FAILED}
+)
 def register_social_user(db: Session = Depends(get_db), val_data: dict = Depends(validate_social_registration)):
     """추가 정보를 받아 User와 SocialAuth를 생성하고 JWT를 발급합니다."""
     request: SocialRegisterRequest = val_data["request"]
@@ -37,7 +47,14 @@ def register_social_user(db: Session = Depends(get_db), val_data: dict = Depends
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail={"code": "REGISTRATION_FAILED", "message": f"An unexpected error occurred: {str(e)}"})
 
-@router.post("/social/link", response_model=TokenResponse)
+@router.post(
+    "/social/link",
+    response_model=TokenResponse,
+    responses={
+        400: ERROR_SOCIAL_LINK_FAILURES,
+        401: ERROR_INVALID_SOCIAL_TOKEN
+    }
+)
 async def link_social_user(
     request: SocialLinkRequest,
     db: Session = Depends(get_db), 

@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.models import User
 from app.schemas.response.profile import PersonaResponse
 from app.service.profile import PersonaService
+from app.schemas.errors import ERROR_PERSONA_NOT_FOUND
 
 router = APIRouter()
 
@@ -25,7 +26,13 @@ async def get_my_personas(
     )
 
 # 특정 페르소나만 조회
-@router.get("/personas/{persona_id}", response_model=PersonaResponse)
+@router.get(
+    "/personas/{persona_id}",
+    response_model=PersonaResponse,
+    responses={
+        404: ERROR_PERSONA_NOT_FOUND
+    }
+)
 async def get_persona_detail(
     persona_id: UUID,
     user: User = Depends(get_active_user),
@@ -38,7 +45,13 @@ async def get_persona_detail(
     )
 
 # 타인의 공개 프로필(페르소나) 조회
-@router.get("/public/{target_persona_id}", response_model=PersonaResponse)
+@router.get(
+    "/public/{target_persona_id}",
+    response_model=PersonaResponse,
+    responses={
+        404: ERROR_PERSONA_NOT_FOUND
+    }
+)
 async def get_public_profile(
     target_persona_id: UUID,
     viewer_persona_id: UUID = Depends(get_current_persona),

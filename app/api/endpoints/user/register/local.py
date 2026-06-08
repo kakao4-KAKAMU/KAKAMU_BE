@@ -6,10 +6,19 @@ from app.schemas.request.auth import UserRegister, LocalLinkRequest
 from app.models import User, LocalAuth, SocialAuth
 from app.core.security import get_password_hash
 from app.api.deps import validate_local_registration, get_current_user
+from app.schemas.errors import (
+    ERROR_LOCAL_AUTH_ALREADY_LINKED,
+    ERROR_REGISTRATION_FAILED,
+    ERROR_LOCAL_LINK_FAILURES
+)
 
 router = APIRouter()
 
-@router.post("/local", response_model=UserResponse)
+@router.post(
+    "/local",
+    response_model=UserResponse,
+    responses={400: ERROR_LOCAL_AUTH_ALREADY_LINKED, 500: ERROR_REGISTRATION_FAILED}
+)
 def register_local_user(db: Session = Depends(get_db), val_data: dict = Depends(validate_local_registration)):
     """Firebase 토큰으로 본인/중복 확인 후, 이메일/비밀번호 기반 계정을 생성합니다."""
     user_in: UserRegister = val_data["user_in"]
@@ -34,7 +43,11 @@ def register_local_user(db: Session = Depends(get_db), val_data: dict = Depends(
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail={"code": "REGISTRATION_FAILED", "message": f"An unexpected error occurred: {str(e)}"})
 
-@router.post("/local/link", response_model=UserResponse)
+@router.post(
+    "/local/link",
+    response_model=UserResponse,
+    responses={400: ERROR_LOCAL_LINK_FAILURES}
+)
 def link_local_user(
     request: LocalLinkRequest,
     db: Session = Depends(get_db), 

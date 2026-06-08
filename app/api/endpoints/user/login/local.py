@@ -6,10 +6,16 @@ from app.schemas.request.auth import LocalLoginRequest
 from app.schemas.response.auth import TokenResponse as Token
 from app.core.security import verify_password, create_access_token, create_refresh_token
 from opentelemetry import trace
+from app.schemas.errors import ERROR_LOGIN_FAILED
+
 tracer = trace.get_tracer(__name__)
 router = APIRouter()
 
-@router.post("/local", response_model=Token)
+@router.post(
+    "/local",
+    response_model=Token,
+    responses={401: ERROR_LOGIN_FAILED}
+)
 def login_local(request: LocalLoginRequest, db: Session = Depends(get_db)):
     """JSON 형식(LocalLoginRequest)으로 이메일과 비밀번호를 받아 일반 로그인을 처리합니다."""
 

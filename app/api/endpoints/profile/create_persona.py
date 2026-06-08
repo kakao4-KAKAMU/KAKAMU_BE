@@ -6,10 +6,22 @@ from app.models import User
 from app.schemas.request.profile import PersonaCreate
 from app.schemas.response.profile import PersonaResponse
 from app.service.profile.create_persona import PersonaCreateService
+from app.schemas.errors import (
+    ERROR_DATABASE_SAVE_FAILED,
+    ERROR_CREATE_PERSONA_FAILURES
+)
 
 router = APIRouter()
 
-@router.post("/personas", response_model=PersonaResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/personas",
+    response_model=PersonaResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: ERROR_CREATE_PERSONA_FAILURES,
+        500: ERROR_DATABASE_SAVE_FAILED
+    }
+)
 async def create_persona(
     request: PersonaCreate,
     user: User = Depends(get_active_user),

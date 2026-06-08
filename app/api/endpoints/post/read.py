@@ -8,6 +8,10 @@ from app.api.deps.auth import get_active_user
 from app.models.user import User
 from app.service.post.read_post import post_read_service
 from app.schemas.response.post import PostListResponse, PostResponse
+from app.schemas.errors import (
+    ERROR_FORBIDDEN_BLOCKED_POST,
+    ERROR_POST_NOT_FOUND
+)
 
 router = APIRouter()
 
@@ -50,7 +54,14 @@ def get_user_posts(
     """
     return post_read_service.get_user_posts(db, target_persona_id, current_persona_id, current_user.id, cursor, limit)
 
-@router.get("/{post_id}", response_model=PostResponse)
+@router.get(
+    "/{post_id}",
+    response_model=PostResponse,
+    responses={
+        403: ERROR_FORBIDDEN_BLOCKED_POST,
+        404: ERROR_POST_NOT_FOUND
+    }
+)
 def get_post_detail(
     post_id: int, 
     db: Session = Depends(get_db),

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.redis import redis_client
 from sqlalchemy import text
+from app.schemas.errors import ERROR_DB_CONNECTION_FAILED
 
 router = APIRouter()
 
@@ -16,7 +17,10 @@ def read_root():
     return {"message": "Welcome to KAKAMU_BE Platform"}
 
 # DB 연결 테스트용 엔드포인트
-@router.get("/db-test")
+@router.get(
+    "/db-test",
+    responses={500: ERROR_DB_CONNECTION_FAILED}
+)
 def test_db(db: Session = Depends(get_db)):
     try:
         # 실제로 가벼운 쿼리를 날려 커넥션이 진짜 살아있는지 확인

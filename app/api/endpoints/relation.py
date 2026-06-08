@@ -9,10 +9,18 @@ from app.schemas.response.relation import RelationResponse, FollowListResponse
 from app.schemas.request.relation import BlockRequest
 from app.service.relation.relation_service import relation_service
 from app.models import Follow, User
+from app.schemas.errors import (
+    ERROR_CANNOT_FOLLOW_SELF,
+    ERROR_CANNOT_BLOCK_SELF
+)
 
 router = APIRouter()
 
-@router.post("/follows/{following_id}", response_model=RelationResponse)
+@router.post(
+    "/follows/{following_id}",
+    response_model=RelationResponse,
+    responses={400: ERROR_CANNOT_FOLLOW_SELF}
+)
 async def follow_user(
     following_id: UUID,
     db: Session = Depends(get_db),
@@ -32,7 +40,11 @@ async def unfollow_user(
     """특정 유저에 대한 팔로우를 해제합니다."""
     return await relation_service.unfollow(db, follower_id=current_user.id, following_id=following_id)
 
-@router.post("/blocks/{blocked_id}", response_model=RelationResponse)
+@router.post(
+    "/blocks/{blocked_id}",
+    response_model=RelationResponse,
+    responses={400: ERROR_CANNOT_BLOCK_SELF}
+)
 async def block_user(
     blocked_id: UUID,
     block_in: BlockRequest,

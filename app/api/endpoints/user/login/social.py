@@ -7,10 +7,18 @@ from app.schemas.response.auth import TokenResponse
 from app.service.user.social_auth import get_kakao_user_info
 from app.models import SocialAuth, Persona
 from app.core.security import create_access_token, create_refresh_token
+from app.schemas.errors import (
+    ERROR_UNSUPPORTED_SOCIAL_PROVIDER,
+    ERROR_LOGIN_UNEXPECTED_ERROR
+)
 
 router = APIRouter()
 
-@router.post("/social", response_model=TokenResponse)
+@router.post(
+    "/social",
+    response_model=TokenResponse,
+    responses={400: ERROR_UNSUPPORTED_SOCIAL_PROVIDER, 500: ERROR_LOGIN_UNEXPECTED_ERROR}
+)
 async def social_login(request: SocialLoginRequest, db: Session = Depends(get_db)):
     """소셜 토큰을 검증하고, 기존 회원이면 JWT 발급, 신규 회원이면 회원가입 유도 응답을 보냅니다."""
     try:

@@ -6,10 +6,18 @@ from app.db.session import get_db
 from app.models import User
 from app.schemas.response.profile import PersonaResponse
 from app.service.profile.restore_persona import PersonaRestoreService
+from app.schemas.errors import ERROR_PERSONA_NOT_FOUND
 
 router = APIRouter()
 
-@router.post("/personas/{persona_id}/restore", response_model=PersonaResponse, status_code=status.HTTP_200_OK)
+@router.post(
+    "/personas/{persona_id}/restore",
+    response_model=PersonaResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        404: ERROR_PERSONA_NOT_FOUND
+    }
+)
 async def restore_persona(
     persona_id: UUID,
     user: User = Depends(get_active_user),

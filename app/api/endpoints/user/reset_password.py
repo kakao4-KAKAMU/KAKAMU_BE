@@ -7,10 +7,25 @@ from app.core.security import get_password_hash
 from app.schemas.request.auth import PasswordResetRequest
 from app.schemas.response.common import SuccessResponse
 from app.core.firebase import verify_firebase_token
+from app.schemas.errors import (
+    ERROR_USER_NOT_FOUND,
+    ERROR_RESET_PASSWORD_FAILURES,
+    ERROR_VALIDATION_ERROR,
+    ERROR_DB_COMMIT_ERROR
+)
 
 router = APIRouter()
 
-@router.post("/local/reset-password", response_model=SuccessResponse)
+@router.post(
+    "/local/reset-password",
+    response_model=SuccessResponse,
+    responses={
+        400: ERROR_RESET_PASSWORD_FAILURES,
+        404: ERROR_USER_NOT_FOUND,
+        422: ERROR_VALIDATION_ERROR,
+        500: ERROR_DB_COMMIT_ERROR
+    }
+)
 def reset_local_password(
     request: PasswordResetRequest,
     db: Session = Depends(get_db)
