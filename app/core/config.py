@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # Social Auth
     KAKAO_REST_API_KEY: str = Field(default="", env="KAKAO_REST_API_KEY")
 
+    # ML Server
+    ML_API_BASE_URL: str = Field(default="http://ml-server:8000", env="ML_API_BASE_URL")
+
     def get_database_url(self) -> str:
         # 주입된 URL이 있으면 그것을 반환하고, 없으면 생성합니다. (단, 템플릿 변수가 포함된 경우 제외)
         if self.DATABASE_URL and "${" not in self.DATABASE_URL:

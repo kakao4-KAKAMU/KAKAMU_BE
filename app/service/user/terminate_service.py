@@ -5,7 +5,7 @@ from sqlalchemy import func, or_
 from uuid import UUID
 from datetime import datetime, timezone
 
-from app.models import User, Persona, Post, Comment, LikeLog, Follow, FavMovie, FavGenre, FavPeople, EntityRelationshipLog
+from app.models import User, Persona, Post, Comment, LikeLog, Follow, FavMovie, FavGenre, FavPeople
 
 logger = logging.getLogger(__name__)
 

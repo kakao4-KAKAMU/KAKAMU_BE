@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_
 from app.db.session import SessionLocal
-from app.models import User, Persona, Post, Comment, LikeLog, Follow, FavMovie, FavGenre, FavPeople, EntityRelationshipLog
+from app.models import User, Persona, Post, Comment, LikeLog, Follow, FavMovie, FavGenre, FavPeople
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,6 @@ def hard_delete_old_users():
             db.query(FavMovie).filter(FavMovie.persona_id.in_(persona_ids)).delete(synchronize_session=False)
             db.query(FavGenre).filter(FavGenre.persona_id.in_(persona_ids)).delete(synchronize_session=False)
             db.query(FavPeople).filter(FavPeople.persona_id.in_(persona_ids)).delete(synchronize_session=False)
-            db.query(EntityRelationshipLog).filter(or_(EntityRelationshipLog.persona_id.in_(persona_ids), EntityRelationshipLog.target_id.in_(persona_ids))).delete(synchronize_session=False)
             db.query(Persona).filter(Persona.user_id.in_(user_ids)).delete(synchronize_session=False)
 
         # 4. 최종 유저(User) 계정 영구 삭제 (LocalAuth/SocialAuth 필요시 추가)
