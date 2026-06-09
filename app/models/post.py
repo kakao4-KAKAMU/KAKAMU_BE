@@ -36,7 +36,7 @@ class Post(Base):
 class PostMovie(Base):
     __tablename__ = "post_movie"
     post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), primary_key=True)    
-    movie_id = Column(Integer, ForeignKey("movie.id", ondelete="CASCADE"), primary_key=True)    
+    movie_id = Column(UUID(as_uuid=True), ForeignKey("movie.id", ondelete="CASCADE"), primary_key=True)    
 
 class Hashtag(Base):
     __tablename__ = "hashtag"

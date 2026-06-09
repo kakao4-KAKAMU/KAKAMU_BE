@@ -24,15 +24,15 @@ class Persona(Base):
 class FavGenre(Base):
     __tablename__ = "fav_genre"
     persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
-    genre_id = Column(Integer, ForeignKey("genre.id", ondelete="CASCADE"), primary_key=True)    
+    genre_id = Column(UUID(as_uuid=True), ForeignKey("genre.id", ondelete="CASCADE"), primary_key=True)    
 
 class FavPeople(Base):
     __tablename__ = "fav_people"
     persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
-    people_id = Column(Integer, ForeignKey("people.id", ondelete="CASCADE"), primary_key=True)    
+    people_id = Column(UUID(as_uuid=True), ForeignKey("person.id", ondelete="CASCADE"), primary_key=True)    
     type = Column(String(30))    
 
 class FavMovie(Base):
     __tablename__ = "fav_movie"
     persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), primary_key=True)    
-    movie_id = Column(Integer, ForeignKey("movie.id", ondelete="CASCADE"), primary_key=True)    
+    movie_id = Column(UUID(as_uuid=True), ForeignKey("movie.id", ondelete="CASCADE"), primary_key=True)    
