@@ -53,8 +53,7 @@ class EntityRelationshipLog(Base):
     relation_type = Column(String(30))    
     target_type = Column(String(30))    
     target_id = Column(Integer)    
-    # sentiment_score = Column(Numeric(10, 4))    
-    weight = Column(Double)    
+    # weight나 점수 계산은 ML 서버에서 담당하므로 백엔드에서는 원본 액션만 기록
     created_at = Column(DateTime, server_default=func.now())    
 
     __table_args__ = (

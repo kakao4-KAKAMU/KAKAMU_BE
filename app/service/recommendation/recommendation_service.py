@@ -20,30 +20,24 @@ class RecommendationService:
         target_type: str, 
         target_id: int, 
         action: str, 
-        base_score: float, 
         is_undo: bool = False
     ):
         """
-        [ML 로깅] 이벤트 소싱 패턴을 사용한 감성 점수 기록
-        사용자가 행동(좋아요, 댓글 등)을 하거나 취소할 때 호출됩니다.
-        삭제하지 않고 역수(음수)를 저장하여 알고리즘을 보정합니다.
+        [ML 로깅] 이벤트 소싱 패턴을 사용한 사용자 상호작용 기록
+        사용자가 행동(태그, 좋아요 등)을 하거나 취소할 때 원본 액션만 기록합니다.
+        실제 가중치 판별 및 점수 계산은 추천(ML) 서버에서 배치로 수행합니다.
         
-        :param is_undo: True일 경우 사용자가 행동을 취소한 것으로 간주하고 점수를 역전시킴
+        :param is_undo: True일 경우 사용자가 행동을 취소한 것으로 간주 (예: undo_create_post)
         """
-        # 1. 취소 이벤트일 경우 기존 점수의 역수(음수)를 취함
-        # final_score = -base_score if is_undo else base_score
-        
-        # 2. 로깅할 액션 이름 결정 (예: "like" -> 취소시 "undo_like")
+        # 1. 로깅할 액션 이름 결정 (예: "create_post" -> 취소시 "undo_create_post")
         log_action = f"undo_{action}" if is_undo else action
 
-        # 3. 즉시 DB에 적재 (Direct Insert)
+        # 2. 즉시 DB에 적재 (Direct Insert)
         new_log = EntityRelationshipLog(
             persona_id=persona_id,
             relation_type=log_action,
             target_type=target_type,
-            target_id=target_id,
-            # sentiment_score=float(final_score),
-            weight=1.0
+            target_id=target_id
         )
         db.add(new_log)
         db.commit()

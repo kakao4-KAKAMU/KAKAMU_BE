@@ -58,10 +58,10 @@ class PostCreateService:
 
             db.commit()
             
-            # 추천 알고리즘 로깅: 게시물 작성 시 능동적 가중치 반영
+            # 추천 알고리즘 로깅: 게시물 작성 기록 (가중치는 ML에서 판별)
             for m_id in post_in.movie_ids:
                 await recommendation_service.record_ml_relationship_log(
-                    db, persona_id, "MOVIE", m_id, "create_post", base_score=2.0
+                    db, persona_id, "MOVIE", m_id, "create_post"
                 )
                 
             return new_post.id
