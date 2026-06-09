@@ -57,7 +57,7 @@ async def search_contents(
         # TextAccuracy 가중치 (정확히 일치하면 1.0, 부분 일치면 0.5 부여)
         text_accuracy = case((Post.title == q, 1.0), else_=0.5)
         
-        fav_genres = db.query(Genre.name).join(
+        fav_genres = db.query(Genre.genre_name).join(
             FavGenre, FavGenre.genre_id == Genre.id
         ).filter(FavGenre.persona_id == active_persona_id).all()
         
@@ -101,7 +101,7 @@ async def search_contents(
     # 3. 예외 처리 (Zero-Result Fallback)
     if not items:
         # 속한 취향 그룹 내 실시간 인기 영화 5건 추천 (Fallback)
-        fallback_movies = db.query(Movie).order_by(desc(Movie.avg_rating)).limit(5).all()
+        fallback_movies = db.query(Movie).order_by(desc(Movie.producing_year)).limit(5).all()
         return {"items": fallback_movies, "is_fallback": True, "message": "검색 결과가 없어 인기 영화를 추천합니다."}
 
     # 4. 검색 성공 시 통합 로깅 함수 호출 (Rate Limit 및 RDB 저장)
