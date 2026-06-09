@@ -2,26 +2,26 @@ import logging
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_
 from app.db.session import SessionLocal
-from app.models import User, Persona, Post, Comment, LikeLog, Follow, FavMovie, FavGenre, FavPeople, EntityRelationshipLog
+from app.models import User, Persona, Post, Comment, LikeLog, Follow, FavMovie, FavGenre, FavPeople
 
 logger = logging.getLogger(__name__)
 
 def hard_delete_old_users():
     """
-    [매일 실행] 회원 탈퇴(Soft Delete) 후 30일이 경과한 유저 데이터 최종 영구 파기 및 마스킹
+    [매일 실행] 회원 탈퇴(Soft Delete) 후 7일이 경과한 유저 데이터 최종 영구 파기 및 마스킹
     """
     db = SessionLocal()
     try:
-        delete_threshold = datetime.now(timezone.utc) - timedelta(days=30)
+        delete_threshold = datetime.now(timezone.utc) - timedelta(days=7)
         
-        # 30일이 지나 영구 삭제 대상이 된 탈퇴 유저 조회
+        # 7일이 지나 영구 삭제 대상이 된 탈퇴 유저 조회
         target_users = db.query(User).filter(
             User.status == "DELETED",
             User.deleted_at <= delete_threshold
         ).all()
 
         if not target_users:
-            logger.debug("[Batch] 30일 경과 영구 탈퇴 대상 유저 없음")
+            logger.debug("[Batch] 7일 경과 영구 탈퇴 대상 유저 없음")
             return
 
         user_ids = [u.id for u in target_users]
@@ -71,13 +71,12 @@ def hard_delete_old_users():
             db.query(FavMovie).filter(FavMovie.persona_id.in_(persona_ids)).delete(synchronize_session=False)
             db.query(FavGenre).filter(FavGenre.persona_id.in_(persona_ids)).delete(synchronize_session=False)
             db.query(FavPeople).filter(FavPeople.persona_id.in_(persona_ids)).delete(synchronize_session=False)
-            db.query(EntityRelationshipLog).filter(or_(EntityRelationshipLog.persona_id.in_(persona_ids), EntityRelationshipLog.target_id.in_(persona_ids))).delete(synchronize_session=False)
             db.query(Persona).filter(Persona.user_id.in_(user_ids)).delete(synchronize_session=False)
 
         # 4. 최종 유저(User) 계정 영구 삭제 (LocalAuth/SocialAuth 필요시 추가)
         deleted_users_count = db.query(User).filter(User.id.in_(user_ids)).delete(synchronize_session=False)
         db.commit()
-        logger.info(f"[Batch] 30일 경과 탈퇴 유저 영구 삭제 완료: {deleted_users_count}명")
+        logger.info(f"[Batch] 7일 경과 탈퇴 유저 영구 삭제 완료: {deleted_users_count}명")
 
     except Exception as e:
         db.rollback()

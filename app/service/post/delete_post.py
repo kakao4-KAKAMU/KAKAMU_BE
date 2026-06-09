@@ -23,11 +23,11 @@ class PostDeleteService:
         # 게시물에 달린 좋아요 무효화
         db.query(LikeLog).filter(LikeLog.target_type == "POST", LikeLog.target_id == post.id).update({"is_active": 0})
         
-        # 게시물 삭제 시 추천 엔진 가중치 롤백 (작성 시 부여된 2.0 가중치 회수)
+        # 게시물 삭제 시 추천 엔진 로깅 (취소 기록)
         post_movies = db.query(PostMovie).filter(PostMovie.post_id == post.id).all()
         for pm in post_movies:
             await recommendation_service.record_ml_relationship_log(
-                db, persona_id, "MOVIE", pm.movie_id, "create_post", base_score=2.0, is_undo=True
+                db, persona_id, "MOVIE", pm.movie_id, "create_post", is_undo=True
             )
 
         db.commit()

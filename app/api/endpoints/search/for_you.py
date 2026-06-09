@@ -1,3 +1,5 @@
+import logging
+import httpx
 from fastapi import APIRouter, Depends, Query, BackgroundTasks, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -5,12 +7,15 @@ from typing import Optional
 from uuid import UUID
 
 from app.db.session import get_db
+from app.core.config import settings
 from app.models import Post
 from app.api.deps import get_current_persona
 from .utils import handle_search_request, get_search_pattern
 from app.schemas.response.search import CursorSearchResponse
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 @router.get("/v1/search/for-you", tags=["Search - Tabs"], response_model=CursorSearchResponse)
 async def search_for_you(
@@ -26,11 +31,22 @@ async def search_for_you(
     search_pattern = get_search_pattern(q)
 
     # -------------------------------------------------------------------------
-    # [V2: 이상적인 ML 연동 상태] 
-    # 머신러닝 서버가 Redis에 사전에 계산해둔 유저별 맞춤 피드를 그대로 서빙합니다.
-    # 백엔드는 복잡한 연산을 하지 않고 단순 데이터 파이프 역할만 수행합니다.
+    # [V2: ML 서버 추천 결과 호출] 
+    # 프론트엔드의 검색 요청을 받아 ML 서버로 전달하고,
+    # 계산된 맞춤 검색 결과를 그대로 반환하는 API Gateway 역할을 수행합니다.
     # -------------------------------------------------------------------------
-    ml_recommended_ids = []
+    ML_API_URL = f"{settings.ML_API_BASE_URL}/api/recommendation/search/posts"
+    params = {"persona_id": str(active_persona_id), "q": q, "limit": limit}
+    if cursor:
+        params["cursor"] = cursor
+        
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(ML_API_URL, params=params, timeout=3.0)
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.warning(f"[ForYou Search] ML 서버 통신 실패, 기본 정렬로 Fallback을 실행합니다: {e}")
 
     # -------------------------------------------------------------------------
     # [V1: 기존 규칙 기반(Heuristic) 추천 로직 주석 처리]

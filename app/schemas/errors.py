@@ -37,7 +37,7 @@ ERROR_RESET_PASSWORD_FAILURES = {
 ERROR_LOGIN_FAILED = create_error_schema("로그인 실패", "LOGIN_FAILED", "일반 로그인 시 이메일 또는 비밀번호 불일치")
 ERROR_INVALID_KAKAO_TOKEN = create_error_schema("유효하지 않은 카카오 토큰", "INVALID_KAKAO_TOKEN", "유효하지 않은 카카오 액세스 토큰")
 
-ERROR_ACCOUNT_IN_GRACE_PERIOD = create_error_schema("탈퇴 유예 기간", "ACCOUNT_IN_GRACE_PERIOD", "탈퇴 유예 기간(30일) 내의 계정으로 로그인 시도. 복구 절차 필요")
+ERROR_ACCOUNT_IN_GRACE_PERIOD = create_error_schema("탈퇴 유예 기간", "ACCOUNT_IN_GRACE_PERIOD", "탈퇴 유예 기간(7일) 내의 계정으로 로그인 시도. 복구 절차 필요")
 
 ERROR_USER_NOT_FOUND = create_error_schema("사용자 없음", "USER_NOT_FOUND", "요청한 사용자를 찾을 수 없음")
 

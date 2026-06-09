@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends
+import httpx
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
 from app.db.session import get_db
+from app.core.config import settings
 from app.service.recommendation.recommendation_service import recommendation_service
 from app.api.deps import get_current_persona
 from app.schemas.response.movie import WatchMovieResponse, MovieRecommendationResponse
@@ -14,7 +16,23 @@ async def watch_movie(movie_id: int, persona_id: UUID = Depends(get_current_pers
     # 현재는 아무 동작도 하지 않습니다.
     return {"status": "success", "message": f"Persona {persona_id} watched movie {movie_id}"}
 
-@router.get("/recommend", response_model=MovieRecommendationResponse)
+# response_model을 제거하거나 ML 응답 형식에 맞춰 수정할 수 있도록 유연하게 해제합니다.
+@router.get("/recommend")
 async def get_movies(active_persona_id: UUID = Depends(get_current_persona)):
-    # ML 서버 연동 후 추천 결과를 서빙할 예정입니다.
-    return {"recommendations": "추천 데이터 연동 준비 중", "for_persona": active_persona_id}
+    """
+    [API Gateway] 프론트엔드의 영화 추천 요청을 받아 ML 서버로 전달하고,
+    계산된 맞춤 추천 영화 목록을 그대로 프론트엔드에 반환합니다.
+    """
+    ML_API_URL = f"{settings.ML_API_BASE_URL}/api/recommendation/movies?persona_id={active_persona_id}"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(ML_API_URL, timeout=3.0)
+            response.raise_for_status()
+            
+            # ML 서버가 반환한 JSON(추천 영화 목록)을 프론트엔드에 그대로 전달
+            return response.json()
+            
+    except httpx.RequestError as e:
+        # 추천 서버가 다운되었거나 타임아웃 발생 시 503 에러 반환 (또는 Fallback 로직 추가 가능)
+        raise HTTPException(status_code=503, detail={"code": "ML_SERVER_UNAVAILABLE", "message": "추천 서버와 통신할 수 없거나 지연되고 있습니다."})

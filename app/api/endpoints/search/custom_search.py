@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, case, func, or_
+from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
 from app.models import Post, Movie, FavGenre, Genre
@@ -101,8 +102,12 @@ async def search_contents(
     # 3. 예외 처리 (Zero-Result Fallback)
     if not items:
         # 속한 취향 그룹 내 실시간 인기 영화 5건 추천 (Fallback)
-        fallback_movies = db.query(Movie).order_by(desc(Movie.producing_year)).limit(5).all()
-        return {"items": fallback_movies, "is_fallback": True, "message": "검색 결과가 없어 인기 영화를 추천합니다."}
+        fallback_movies = db.query(Movie).options(selectinload(Movie.titles)).order_by(desc(Movie.producing_year)).limit(5).all()
+        formatted_movies = [
+            {"id": m.id, "title": m.titles[0].title_name if m.titles else "제목 없음", "poster_url": m.poster_url}
+            for m in fallback_movies
+        ]
+        return {"items": formatted_movies, "is_fallback": True, "message": "검색 결과가 없어 인기 영화를 추천합니다."}
 
     # 4. 검색 성공 시 통합 로깅 함수 호출 (Rate Limit 및 RDB 저장)
     handle_search_request(request, background_tasks, str(active_persona_id), q)

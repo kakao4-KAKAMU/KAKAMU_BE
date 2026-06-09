@@ -46,21 +46,6 @@ class LikeLog(Base):
         Index('ix_likelog_target', 'target_type', 'target_id'),
     )
 
-class EntityRelationshipLog(Base):
-    __tablename__ = "entity_relationship_log"
-    id = Column(Integer, primary_key=True)    
-    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)    
-    relation_type = Column(String(30))    
-    target_type = Column(String(30))    
-    target_id = Column(Integer)    
-    # sentiment_score = Column(Numeric(10, 4))    
-    weight = Column(Double)    
-    created_at = Column(DateTime, server_default=func.now())    
-
-    __table_args__ = (
-        Index('ix_entity_log_target', 'target_type', 'target_id'),
-    )
-
 class SemanticAnalysis(Base):
     __tablename__ = "semantic_analysis"
     id = Column(Integer, primary_key=True)    

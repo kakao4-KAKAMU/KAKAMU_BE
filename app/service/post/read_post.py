@@ -1,12 +1,37 @@
+import time
 from uuid import UUID
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, select, or_
 from fastapi import HTTPException
 
-from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block, User, PostMention, Follow, Persona
+from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block, User, PostMention, Follow, Persona, Movie
 
 class PostReadService:
+    def __init__(self):
+        # 차단 유저 인메모리 캐시 (Key: current_user_id, Value: (timestamp, {blocked_user_ids}))
+        self._block_cache = {}
+        self._cache_ttl = 60  # 캐시 유지 시간 (60초)
+
+    def _get_cached_blocked_user_ids(self, db: Session, user_id: UUID) -> set:
+        now = time.time()
+        
+        # 메모리 누수 방지: 캐시된 유저가 10,000명을 넘어가면 캐시 초기화
+        if len(self._block_cache) > 10000:
+            self._block_cache.clear()
+            
+        if user_id in self._block_cache:
+            cached_time, block_set = self._block_cache[user_id]
+            if now - cached_time < self._cache_ttl:
+                return block_set
+                
+        blocked_by_me = db.query(Block.blocked_id).filter(Block.blocker_id == user_id).all()
+        blocking_me = db.query(Block.blocker_id).filter(Block.blocked_id == user_id).all()
+        
+        block_set = {b[0] for b in blocked_by_me} | {b[0] for b in blocking_me}
+        self._block_cache[user_id] = (now, block_set)
+        return block_set
+
     def _get_mentions_for_posts(self, db: Session, post_ids: List[int]) -> Dict[int, List[Dict[str, Any]]]:
         if not post_ids:
             return {}
@@ -58,17 +83,17 @@ class PostReadService:
 
     def get_posts(self, db: Session, current_user_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
         """게시물 피드 조회 로직"""
-        # 1. 차단 관계 서브쿼리 (user_id 기준)
-        blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_user_id)
-        blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_user_id)
+        # 1. 차단 유저 목록 캐시에서 가져오기
+        blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
 
         # 2. 게시물과 작성자(User) 조인 및 필터링 적용
         query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
             Post.status == "ACTIVE",
-            User.status == "ACTIVE",               # 탈퇴/삭제 유예 기간인 작성자 숨김
-            Post.user_id.notin_(blocked_by_me),    # 내가 차단한 유저 숨김
-            Post.user_id.notin_(blocking_me)       # 나를 차단한 유저 숨김
-        ).options(selectinload(Post.movies))
+            User.status == "ACTIVE"                # 탈퇴/삭제 유예 기간인 작성자 숨김
+        ).options(selectinload(Post.movies).selectinload(Movie.titles))
+
+        if blocked_user_ids:
+            query = query.filter(Post.user_id.notin_(blocked_user_ids))
 
         if cursor:
             query = query.filter(Post.id < cursor)
@@ -117,7 +142,7 @@ class PostReadService:
                 "is_spoiler": is_spoiler,
                 "created_at": post.created_at,
                 "updated_at": post.updated_at,
-                "movies": [{"id": m.id, "title": m.title} for m in post.movies],
+                "movies": [{"id": m.id, "title": m.titles[0].title_name if m.titles else "제목 없음"} for m in post.movies],
                 "hashtags": hashtags_map.get(post.id, []),
                 "mentions": mentions_map.get(post.id, []),
                 "like_count": post.like_count, # Use the model field instead of querying LikeLog
@@ -131,9 +156,8 @@ class PostReadService:
 
     def get_my_liked_posts(self, db: Session, current_user_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
         """내가 좋아요 누른 게시물 조회 로직"""
-        # 1. 차단 관계 서브쿼리 (user_id 기준)
-        blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_user_id)
-        blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_user_id)
+        # 1. 차단 유저 목록 캐시에서 가져오기
+        blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
 
         # 2. 내가 좋아요한 게시물 ID 서브쿼리
         liked_post_ids_subquery = select(LikeLog.target_id).where(
@@ -146,10 +170,11 @@ class PostReadService:
         query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
             Post.id.in_(liked_post_ids_subquery), 
             Post.status == "ACTIVE",
-            User.status == "ACTIVE",
-            Post.user_id.notin_(blocked_by_me),
-            Post.user_id.notin_(blocking_me)
-        ).options(selectinload(Post.movies))
+            User.status == "ACTIVE"
+        ).options(selectinload(Post.movies).selectinload(Movie.titles))
+        
+        if blocked_user_ids:
+            query = query.filter(Post.user_id.notin_(blocked_user_ids))
 
         if cursor:
             query = query.filter(Post.id < cursor)
@@ -187,7 +212,7 @@ class PostReadService:
                 "content": post.content,
                 "image_urls": post.image_urls, "is_spoiler": is_spoiler, 
                 "created_at": post.created_at, "updated_at": post.updated_at,
-                "movies": [{"id": m.id, "title": m.title} for m in post.movies], 
+                "movies": [{"id": m.id, "title": m.titles[0].title_name if m.titles else "제목 없음"} for m in post.movies], 
                 "hashtags": hashtags_map.get(post.id, []),
                 "mentions": mentions_map.get(post.id, []),
                 "like_count": post.like_count, # Use the model field
@@ -205,22 +230,16 @@ class PostReadService:
         if not target_user_id:
             raise HTTPException(status_code=404, detail={"code": "PERSONA_NOT_FOUND", "message": "대상을 찾을 수 없습니다."})
 
-        # 프로필 주인이 나와 차단 관계인지 데이터베이스에서 직접 확인 (user_id 기준)
-        is_blocked = db.query(Block).filter(
-            or_(
-                (Block.blocker_id == current_user_id) & (Block.blocked_id == target_user_id),
-                (Block.blocker_id == target_user_id) & (Block.blocked_id == current_user_id)
-            )
-        ).first()
-
-        if is_blocked:
+        # 프로필 주인이 나와 차단 관계인지 캐시에서 확인 (user_id 기준)
+        blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
+        if target_user_id in blocked_user_ids:
             return {"items": [], "next_cursor": None, "has_next": False}
 
         query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
             Post.user_id == target_user_id, 
             Post.status == "ACTIVE",
             User.status == "ACTIVE"
-        ).options(selectinload(Post.movies))
+        ).options(selectinload(Post.movies).selectinload(Movie.titles))
         
         if cursor:
             query = query.filter(Post.id < cursor)
@@ -267,7 +286,7 @@ class PostReadService:
                 "content": post.content,
                 "image_urls": post.image_urls, "is_spoiler": is_spoiler, 
                 "created_at": post.created_at, "updated_at": post.updated_at,
-                "movies": [{"id": m.id, "title": m.title} for m in post.movies], 
+                "movies": [{"id": m.id, "title": m.titles[0].title_name if m.titles else "제목 없음"} for m in post.movies], 
                 "hashtags": hashtags_map.get(post.id, []),
                 "mentions": mentions_map.get(post.id, []),
                 "like_count": post.like_count, 
@@ -282,22 +301,16 @@ class PostReadService:
     def get_post_detail(self, db: Session, post_id: int, current_persona_id: UUID, current_user_id: UUID) -> Dict[str, Any]:
         """게시물 상세 조회 로직"""
         db_result = db.query(Post, User).join(User, Post.user_id == User.id)\
-            .options(selectinload(Post.movies))\
+            .options(selectinload(Post.movies).selectinload(Movie.titles))\
             .filter(Post.id == post_id, Post.status == "ACTIVE").first()
             
         if not db_result:
             raise HTTPException(status_code=404, detail={"code": "POST_NOT_FOUND", "message": "게시물을 찾을 수 없습니다."})
             
         post, author = db_result
-        # 직접 링크를 통해 접속하더라도 본인과의 차단(Block) 관계가 있으면 차단 (user_id 기준)
-        is_blocked = db.query(Block).filter(
-            or_(
-                (Block.blocker_id == current_user_id) & (Block.blocked_id == post.user_id),
-                (Block.blocker_id == post.user_id) & (Block.blocked_id == current_user_id)
-            )
-        ).first()
-        
-        if is_blocked:
+        # 차단 관계인지 캐시에서 확인
+        blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
+        if post.user_id in blocked_user_ids:
             raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_BLOCKED_POST", "message": "차단된 사용자의 게시물입니다."})
 
         is_deleted = not author or author.status == "DELETED"
@@ -329,7 +342,7 @@ class PostReadService:
             "author_tag": None if is_deleted else author.tag,
             "author_image": None if is_deleted else author.profile_image_url,
             "title": post.title, "content": post.content, "image_urls": post.image_urls, "is_spoiler": post.is_spoiler == 1,
-            "movies": [{"id": m.id, "title": m.title} for m in post.movies], 
+            "movies": [{"id": m.id, "title": m.titles[0].title_name if m.titles else "제목 없음"} for m in post.movies], 
             "hashtags": hashtags_map.get(post.id, []),
             "mentions": mentions_map.get(post.id, []),
             "like_count": post.like_count, # Use the model field

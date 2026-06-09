@@ -14,7 +14,7 @@ async def restore_my_account(
     db: Session = Depends(get_db)
 ):
     """
-    탈퇴 유예 기간(30일) 내에 로그인하여 회원 탈퇴를 철회하고 계정을 복구합니다.
+    탈퇴 유예 기간(7일) 내에 로그인하여 회원 탈퇴를 철회하고 계정을 복구합니다.
     (로그인 JWT 토큰 필요)
     """
     await account_restore_service.restore_account(db=db, user_id=user.id)
