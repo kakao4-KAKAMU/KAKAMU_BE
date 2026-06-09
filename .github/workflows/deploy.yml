@@ -23,26 +23,36 @@ jobs:
     - name: Set short SHA
       run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
-    - name: Build and push
+    - name: Docker Build
       uses: docker/build-push-action@v5
       with:
         context: .
-        push: true
+        push: false # 빌드만 수행함
+        load: true # 깃허브 액션 러너로 가져옴 후에 Push 하기 위해서
         tags: |
           ${{ secrets.DOCKER_USERNAME }}/filma-backend:latest
           ${{ secrets.DOCKER_USERNAME }}/filma-backend:${{ env.SHORT_SHA }}
           ${{ secrets.DOCKER_USERNAME }}/filma-backend:1.${{ github.run_number }}
 
-
-    - name: Build and push # 3. 도커 이미지 빌드하고 도커 허브로 push
-      uses: docker/build-push-action@v5
+    - name: Run Trivy for Security Report # 보안 리포트 생성
+      uses: aquasecurity/trivy-action@dea62cf79abc269fc35dfd161a4539f0d1f92293 # 트리비 0.70 버전
       with:
-        context: .
-        push: true
-        tags: |
-          ${{ secrets.DOCKER_USERNAME }}/filma-backend:latest 
-          ${{ secrets.DOCKER_USERNAME }}/filma-backend:${{ github.sha }}
-          ${{ secrets.DOCKER_USERNAME }}/filma-backend:1.${{ github.run_number }}
+        image-ref: '${{ secrets.DOCKER_USERNAME }}/filma-backend:${{ env.SHORT_SHA }}'
+        format: 'table'
+        exit-code: '0' # 문제가 발견되도 무시
+        severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL" # 모든 위험도 다 검사
+        ignore-unfixed: false
+
+
+    - name: Docker push
+      env:
+        docker_user: ${{ secrets.DOCKER_USERNAME }}
+        sha: ${{ env.SHORT_SHA }}
+        number: ${{ github.run_number }}
+      run: |
+        docker push $docker_user/filma-backend:latest
+        docker push $docker_user/filma-backend:$sha
+        docker push $docker_user/filma-backend:1.$number
 
     - name: Checkout Helm Chart Repo
       uses: actions/checkout@v4 # helm repo 코드 다운
