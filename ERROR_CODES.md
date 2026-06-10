@@ -72,6 +72,7 @@
 | HTTP Status | Error Code | 발생 원인 / 설명 |
 |:---:|:---|:---|
 | `500` | `DB_CONNECTION_FAILED` | `/db-test` Health check 중 데이터베이스 연결 실패 |
+| `503` | `ML_SERVER_UNAVAILABLE` | 추천 서버(ML/VLLM)와 통신할 수 없거나 응답이 지연됨 |
 
 ## 8. Global (공통 API 에러)
 | HTTP Status | Error Code | 발생 원인 / 설명 |

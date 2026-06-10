@@ -106,7 +106,12 @@
 | `GET` | `/static/*` | 서버에 저장된 정적 파일(이미지 등) 서빙 |
 
 ---
-## 11. Activity Logging (사용자 행동 로그)
+## 11. AI & Chatbot (VLLM 연동)
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/chat/completions` | VLLM 서버와 통신하여 챗봇 응답 생성 (이전 대화 내역 전달 가능) |
+
+## 12. Activity Logging (사용자 행동 로그)
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/logs/activity` | 프론트엔드에서 수집한 유저 행동(클릭, 호버 등) 로그를 비동기 큐에 적재 |

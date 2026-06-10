@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.service.recommendation.recommendation_service import recommendation_service
 from app.api.deps import get_current_persona
 from app.schemas.response.movie import WatchMovieResponse, MovieRecommendationResponse
+from app.schemas.errors import ERROR_ML_SERVER_UNAVAILABLE
 
 router = APIRouter()
 
@@ -16,8 +17,11 @@ async def watch_movie(movie_id: int, persona_id: UUID = Depends(get_current_pers
     # 현재는 아무 동작도 하지 않습니다.
     return {"status": "success", "message": f"Persona {persona_id} watched movie {movie_id}"}
 
-# response_model을 제거하거나 ML 응답 형식에 맞춰 수정할 수 있도록 유연하게 해제합니다.
-@router.get("/recommend")
+@router.get(
+    "/recommend",
+    response_model=MovieRecommendationResponse,
+    responses={503: ERROR_ML_SERVER_UNAVAILABLE}
+)
 async def get_movies(active_persona_id: UUID = Depends(get_current_persona)):
     """
     [API Gateway] 프론트엔드의 영화 추천 요청을 받아 ML 서버로 전달하고,
@@ -35,4 +39,4 @@ async def get_movies(active_persona_id: UUID = Depends(get_current_persona)):
             
     except httpx.RequestError as e:
         # 추천 서버가 다운되었거나 타임아웃 발생 시 503 에러 반환 (또는 Fallback 로직 추가 가능)
-        raise HTTPException(status_code=503, detail={"code": "ML_SERVER_UNAVAILABLE", "message": "추천 서버와 통신할 수 없거나 지연되고 있습니다."})
+        raise HTTPException(status_code=503, detail={"code": "ML_SERVER_UNAVAILABLE", "message": "추천 서버(ML/VLLM)와 통신할 수 없거나 응답이 지연되고 있습니다."})
