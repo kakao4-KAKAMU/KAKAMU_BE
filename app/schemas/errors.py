@@ -150,6 +150,7 @@ ERROR_CANNOT_BLOCK_SELF = create_error_schema("본인 차단 불가", "CANNOT_BL
 # 7. System (시스템 공통)
 # ==========================================
 ERROR_DB_CONNECTION_FAILED = create_error_schema("DB 연결 실패", "DB_CONNECTION_FAILED", "/db-test Health check 중 데이터베이스 연결 실패")
+ERROR_ML_SERVER_UNAVAILABLE = create_error_schema("추천 서버 통신 불가", "ML_SERVER_UNAVAILABLE", "추천 서버(ML/VLLM)와 통신할 수 없거나 응답이 지연되고 있습니다.")
 
 # ==========================================
 # 8. Global (공통 API 에러)
