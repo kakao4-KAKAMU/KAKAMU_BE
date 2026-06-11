@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from uuid import UUID
 
 # 페르소나 프로필 생성
 class PersonaCreate(BaseModel):

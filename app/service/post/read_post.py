@@ -2,7 +2,7 @@ import time
 from uuid import UUID
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import func, select, or_
+from sqlalchemy import func, select
 from fastapi import HTTPException
 
 from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block, User, PostMention, Follow, Persona, Movie

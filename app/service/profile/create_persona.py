@@ -1,15 +1,12 @@
-import re,random, string
-from typing import Optional
 from uuid import UUID
-from fastapi import HTTPException, status, UploadFile
-from sqlalchemy import select, and_, func
+from fastapi import HTTPException
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models import Persona
 from app.models import FavMovie, FavGenre, FavPeople
 from app.schemas.request.profile import PersonaCreate
 from opentelemetry import trace
 
-from app.utils.image_upload import upload_profile_image, IMAGE_PUBLIC_BASE_URL
 
 tracer = trace.get_tracer(__name__)
 

@@ -1,6 +1,7 @@
 # 로그 포맷, JSON 포맷 , 로그 레벨 설정
 
-import json,logging # 로그 구조화를 위한 라이브러리
+import json
+import logging # 로그 구조화를 위한 라이브러리
 
 class JsonFormatter(logging.Formatter):
     def format(self, record):

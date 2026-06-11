@@ -46,7 +46,7 @@ class UserUpdateService:
             db.commit()
             db.refresh(user)
             return user
-        except Exception as e:
+        except Exception:
             db.rollback()
             raise HTTPException(status_code=500, detail={"code": "USER_UPDATE_FAILED", "message": "사용자 정보 수정 중 오류가 발생했습니다."})
 

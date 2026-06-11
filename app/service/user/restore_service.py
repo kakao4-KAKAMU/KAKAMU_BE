@@ -40,7 +40,7 @@ class AccountRestoreService:
             db.commit()
             return True
 
-        except Exception as e:
+        except Exception:
             db.rollback()
             raise HTTPException(
                 status_code=500, 

@@ -40,7 +40,8 @@ def register_local_user(db: Session = Depends(get_db), val_data: dict = Depends(
         return db_user
     except Exception as e:
         db.rollback()
-        if isinstance(e, HTTPException): raise e
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail={"code": "REGISTRATION_FAILED", "message": f"An unexpected error occurred: {str(e)}"})
 
 @router.post(

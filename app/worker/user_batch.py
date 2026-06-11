@@ -36,7 +36,7 @@ def hard_delete_old_users():
                 LikeLog.target_id, 
                 func.count(LikeLog.id).label("like_count")
             ).filter(
-                LikeLog.persona_id.in_(persona_ids),
+                LikeLog.user_id.in_(user_ids),
                 LikeLog.target_type == "POST",
                 LikeLog.is_active == 1 
             ).group_by(LikeLog.target_id).all()
@@ -48,7 +48,7 @@ def hard_delete_old_users():
                 )
 
             # 2. 작성했던 게시물 및 댓글 외래키 마스킹 처리
-            user_posts = db.query(Post).filter(Post.persona_id.in_(persona_ids)).all()
+            user_posts = db.query(Post).filter(Post.user_id.in_(user_ids)).all()
             for post in user_posts:
                 comment_count = db.query(Comment).filter(Comment.post_id == post.id).count()
                 if comment_count == 0:
@@ -57,17 +57,19 @@ def hard_delete_old_users():
                     post.title = "탈퇴한 사용자의 게시물입니다."
                     post.content = "탈퇴한 사용자의 게시물입니다."
                     post.status = "INACTIVE"
+                    post.user_id = None
                     post.persona_id = None
 
-            db.query(Comment).filter(Comment.persona_id.in_(persona_ids)).update({
+            db.query(Comment).filter(Comment.user_id.in_(user_ids)).update({
                 "content": "탈퇴한 사용자의 댓글입니다.",
                 "status": "INACTIVE",
+                "user_id": None,
                 "persona_id": None
             }, synchronize_session=False)
 
             # 3. 기타 종속 데이터들 최종 Hard Delete
-            db.query(LikeLog).filter(LikeLog.persona_id.in_(persona_ids)).delete(synchronize_session=False)
-            db.query(Follow).filter(or_(Follow.follower_id.in_(persona_ids), Follow.following_id.in_(persona_ids))).delete(synchronize_session=False)
+            db.query(LikeLog).filter(LikeLog.user_id.in_(user_ids)).delete(synchronize_session=False)
+            db.query(Follow).filter(or_(Follow.follower_id.in_(user_ids), Follow.following_id.in_(user_ids))).delete(synchronize_session=False)
             db.query(FavMovie).filter(FavMovie.persona_id.in_(persona_ids)).delete(synchronize_session=False)
             db.query(FavGenre).filter(FavGenre.persona_id.in_(persona_ids)).delete(synchronize_session=False)
             db.query(FavPeople).filter(FavPeople.persona_id.in_(persona_ids)).delete(synchronize_session=False)
