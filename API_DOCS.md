@@ -70,13 +70,6 @@
 | `GET` | `/relations/{target_persona_id}/followers` | 특정 페르소나의 팔로워 목록 조회 (무한 스크롤) |
 | `GET` | `/relations/{target_persona_id}/followings` | 특정 페르소나의 팔로잉 목록 조회 (무한 스크롤) |
 
-## 7. Test (개발 및 테스트용)
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/test/activity` | 페르소나 활동 강제 기록 테스트 (Redis 데이터 갱신) |
-| `GET` | `/test/context/{persona_id}` | 특정 페르소나의 실시간 컨텍스트(활동 기록 및 장르 선호도) 조회 |
-| `GET` | `/test/test-500` | 에러 핸들링 및 로깅 테스트용 강제 500 에러 발생 |
-
 ## 8. Search (통합 탐색 및 메타데이터)
 | Method | Path | Description |
 |---|---|---|
