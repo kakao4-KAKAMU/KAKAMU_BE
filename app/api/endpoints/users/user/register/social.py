@@ -44,7 +44,8 @@ def register_social_user(db: Session = Depends(get_db), val_data: dict = Depends
         return TokenResponse(access_token=create_access_token(data={"sub": str(db_user.id)}), refresh_token=create_refresh_token(data={"sub": str(db_user.id)}), is_new_user=False)
     except Exception as e:
         db.rollback()
-        if isinstance(e, HTTPException): raise e
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail={"code": "REGISTRATION_FAILED", "message": f"An unexpected error occurred: {str(e)}"})
 
 @router.post(

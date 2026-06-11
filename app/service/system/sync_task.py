@@ -39,8 +39,6 @@ async def stat_sync_worker():
                     
                     post_updates = []
                     comment_updates = []
-                    valid_keys = []
-                    valid_values = []
                     
                     for key, current_val in zip(keys, values):
                         if current_val is None:

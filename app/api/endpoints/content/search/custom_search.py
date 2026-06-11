@@ -2,11 +2,11 @@ from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, case, func, or_
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
-from app.models import Post, Movie, FavGenre, Genre
+from app.models import Post, Movie
 from .utils import handle_search_request
 from app.schemas.response.search import CustomSearchResponse
 
@@ -47,9 +47,8 @@ async def search_contents(
         # -------------------------------------------------------------------------
         # [V2: 이상적인 ML 연동 상태]
         # 백엔드에서 직접 점수를 계산하지 않고, 머신러닝 서버(Airflow/Spark 등)가 
-        # 비동기로 분석하여 Redis에 적재한 '추천 게시물 ID 목록'을 그대로 가져옵니다.
+        # 비동기로 분석하여 Redis에 적재된 '추천 게시물 ID 목록'을 그대로 가져옵니다.
         # -------------------------------------------------------------------------
-        ml_recommended_ids = []
 
         # -------------------------------------------------------------------------
         # [V1: 규칙 기반(Heuristic) 추천 로직] (ML 도입 전 기존 코드 - 주석 처리됨)

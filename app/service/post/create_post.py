@@ -66,12 +66,12 @@ class PostCreateService:
                 
             return new_post.id
             
-        except IntegrityError as e:
+        except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=400, detail={"code": "INVALID_REFERENCE_DATA", "message": "잘못된 참조 데이터가 포함되어 있습니다. (예: 존재하지 않는 영화 ID)"})
         except HTTPException:
             raise
-        except Exception as e:
+        except Exception:
             db.rollback()
             raise HTTPException(status_code=500, detail={"code": "POST_CREATION_FAILED", "message": "게시물 작성 중 서버 오류가 발생했습니다."})
 

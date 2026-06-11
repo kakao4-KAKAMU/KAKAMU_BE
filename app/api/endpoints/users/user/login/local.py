@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models import LocalAuth, Persona
+from app.models import LocalAuth
 from app.schemas.request.auth import LocalLoginRequest
 from app.schemas.response.auth import TokenResponse as Token
 from app.core.security import verify_password, create_access_token, create_refresh_token

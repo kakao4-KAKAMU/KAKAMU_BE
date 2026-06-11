@@ -49,7 +49,7 @@ class LikeService:
             new_like_count += 1 if is_liked else -1
             
         if target.user_id != user_id:
-            await recommendation_service.record_ml_relationship_log(db, persona_id, req.target_type, req.target_id, "like", 1.0, is_undo=not is_liked)
+            await recommendation_service.record_ml_relationship_log(db, persona_id, req.target_type, req.target_id, "like", is_undo=not is_liked)
             
         # DB(target.like_count)에 즉시 업데이트하지 않고 Redis(sync_task)의 Bulk Update에 맡김
 

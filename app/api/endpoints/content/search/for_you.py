@@ -1,6 +1,6 @@
 import logging
 import httpx
-from fastapi import APIRouter, Depends, Query, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import Optional

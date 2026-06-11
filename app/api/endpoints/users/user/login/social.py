@@ -5,7 +5,7 @@ from app.db.session import get_db
 from app.schemas.request.auth import SocialLoginRequest
 from app.schemas.response.auth import TokenResponse
 from app.service.user.social_auth import get_kakao_user_info
-from app.models import SocialAuth, Persona
+from app.models import SocialAuth
 from app.core.security import create_access_token, create_refresh_token
 from app.schemas.errors import (
     ERROR_UNSUPPORTED_SOCIAL_PROVIDER,

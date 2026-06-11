@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 from app.core.install import install_requirements
 
 # 3rd-party 모듈들을 임포트하기 전에 설치를 우선 진행합니다.
@@ -18,7 +19,6 @@ from app.service.system.sync_task import stat_sync_worker
 from app.api.api import api_router
 from app.worker.search_batch import run_daily_search_aggregation
 from app.worker.user_batch import hard_delete_old_users
-from app.db.session import engine
 
 from app.middleware.logging_middleware import LoggingMiddleware
 from app.core.exceptions import setup_exception_handlers

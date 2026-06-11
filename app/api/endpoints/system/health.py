@@ -26,7 +26,7 @@ def test_db(db: Session = Depends(get_db)):
         # 실제로 가벼운 쿼리를 날려 커넥션이 진짜 살아있는지 확인
         db.execute(text("SELECT 1"))
         return {"status": "Database connection successful"}
-    except Exception as e:
+    except Exception:
         # DB가 죽었다면 500 에러를 던짐.
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

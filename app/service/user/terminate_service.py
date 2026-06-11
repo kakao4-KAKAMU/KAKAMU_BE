@@ -1,11 +1,9 @@
 import logging
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
 from uuid import UUID
-from datetime import datetime, timezone
 
-from app.models import User, Persona, Post, Comment, LikeLog, Follow, FavMovie, FavGenre, FavPeople
+from app.models import User
 
 logger = logging.getLogger(__name__)
 

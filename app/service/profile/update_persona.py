@@ -1,4 +1,3 @@
-from typing import Optional
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import select, and_
@@ -6,7 +5,6 @@ from sqlalchemy.orm import Session
 
 from app.models import Persona, FavMovie, FavGenre, FavPeople
 from app.schemas.request.profile import PersonaEdit
-from app.service.profile.create_persona import PersonaCreateService
 from opentelemetry import trace
 
 tracer = trace.get_tracer(__name__)

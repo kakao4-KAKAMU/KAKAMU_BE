@@ -1,5 +1,4 @@
-from datetime import datetime,timezone
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models import Persona, Post, Comment

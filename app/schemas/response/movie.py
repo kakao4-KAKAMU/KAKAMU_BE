@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from typing import Optional
 from uuid import UUID
 from app.schemas.response.common import SuccessResponse
 

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from app.db.session import get_db
 from app.models.movie import Movie, Genre, People, MovieTitle, MovieStaff
 from app.models.search_log import SearchDailyStat
-from app.api.deps import get_active_user
+from app.api.deps import get_current_persona
 from .utils import handle_search_request, get_search_pattern
 from app.schemas.response.search import GenreListResponse, PaginatedSearchResponse, TrendSearchResponse
 
@@ -23,10 +23,10 @@ def search_content(
     cursor: Optional[str] = Query(None, description="페이징 커서(ID)"),
     limit: int = Query(20, le=50),
     sort: str = Query("accuracy", description="정렬 기준 (accuracy: 정확도순, popularity: 인기순, latest: 최신순, name_asc: 이름 오름차순, name_desc: 이름 내림차순)"),
-    user = Depends(get_active_user),
+    active_persona_id: UUID = Depends(get_current_persona),
     db: Session = Depends(get_db)
 ):
-    handle_search_request(request, background_tasks, None, q)
+    handle_search_request(request, background_tasks, str(active_persona_id), q)
     search_pattern = get_search_pattern(q)
 
     # 서브쿼리(EXISTS)를 사용해 중복 조회 방지
@@ -39,7 +39,7 @@ def search_content(
     elif sort == "latest":
         query = query.order_by(Movie.release_date.desc().nullslast(), Movie.id.desc())
     elif sort in ("name_asc", "name_desc"):
-        query = query.outerjoin(MovieTitle, and_(Movie.id == MovieTitle.movie_id, MovieTitle.is_original == True))
+        query = query.outerjoin(MovieTitle, and_(Movie.id == MovieTitle.movie_id, MovieTitle.is_original))
         if sort == "name_asc":
             query = query.order_by(MovieTitle.title_name.asc(), Movie.id.desc())
         else:
@@ -87,7 +87,7 @@ def search_movies(
     
     # 모든 정렬에 결정적 정렬(Deterministic Sorting)을 위한 보조키 id.desc() 추가
     if sort in ("name_asc", "name_desc"):
-        query = query.outerjoin(MovieTitle, and_(Movie.id == MovieTitle.movie_id, MovieTitle.is_original == True))
+        query = query.outerjoin(MovieTitle, and_(Movie.id == MovieTitle.movie_id, MovieTitle.is_original))
         if sort == "name_asc": 
             query = query.order_by(MovieTitle.title_name.asc(), Movie.id.desc())
         else: 

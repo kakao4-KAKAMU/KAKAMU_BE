@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Any, Dict, List
+from typing import Optional
 
 class SuccessResponse(BaseModel):
     status: str = Field(default="success", description="응답 상태")

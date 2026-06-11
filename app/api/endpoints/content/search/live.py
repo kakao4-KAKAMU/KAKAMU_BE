@@ -6,7 +6,7 @@ from uuid import UUID
 
 from app.db.session import get_db
 from app.models import Post
-from app.api.deps import get_active_user
+from app.api.deps import get_current_persona
 from .utils import handle_search_request, get_search_pattern
 from app.schemas.response.search import CursorSearchResponse
 
@@ -19,17 +19,18 @@ def search_live(
     q: str = Query(..., min_length=1, description="검색어 (부분 일치 검색)"),
     cursor: Optional[int] = Query(None, description="페이징 커서(ID)"),
     limit: int = Query(20, le=50),
-    user = Depends(get_active_user),
+    active_persona_id: UUID = Depends(get_current_persona),
     db: Session = Depends(get_db)
 ):
-    handle_search_request(request, background_tasks, None, q)
+    handle_search_request(request, background_tasks, str(active_persona_id), q)
     search_pattern = get_search_pattern(q)
 
     query = db.query(Post).filter(
         Post.status == "ACTIVE",
         or_(Post.title.ilike(search_pattern), Post.content.ilike(search_pattern))
     )
-    if cursor: query = query.filter(Post.id < cursor)
+    if cursor:
+        query = query.filter(Post.id < cursor)
         
     posts = query.order_by(Post.id.desc()).limit(limit).all()
     items = [{"id": p.id, "title": p.title, "content": p.content} for p in posts]
