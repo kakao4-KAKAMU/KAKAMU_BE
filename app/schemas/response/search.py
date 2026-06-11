@@ -1,12 +1,13 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Any
 from datetime import date
+from uuid import UUID
 
 class SearchBaseResponse(BaseModel):
     status: str = Field(default="success")
 
 class GenreItem(BaseModel):
-    id: int
+    id: UUID
     name: str
 
 class GenreListResponse(SearchBaseResponse):
