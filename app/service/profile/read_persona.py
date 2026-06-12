@@ -17,8 +17,8 @@ class PersonaReadService:
 
         personas = list(db.scalars(stmt).all())
         for persona in personas:
-            follower_count = db.scalar(select(func.count(Follow.id)).where(Follow.following_id == user_id))
-            following_count = db.scalar(select(func.count(Follow.id)).where(Follow.follower_id == user_id))
+            follower_count = db.scalar(select(func.count()).where(Follow.following_id == user_id))
+            following_count = db.scalar(select(func.count()).where(Follow.follower_id == user_id))
             post_count = db.scalar(select(func.count(Post.id)).where(Post.persona_id == persona.id, Post.status == "ACTIVE"))
             setattr(persona, "follower_count", follower_count)
             setattr(persona, "following_count", following_count)
