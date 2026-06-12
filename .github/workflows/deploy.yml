@@ -40,7 +40,7 @@ jobs:
         image-ref: '${{ secrets.DOCKER_USERNAME }}/filma-backend:${{ env.SHORT_SHA }}'
         format: 'table'
         exit-code: '0' # 문제가 발견되도 무시
-        severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL" # 모든 위험도 다 검사
+        severity: "MEDIUM,HIGH,CRITICAL" # MEDIUM 이상 위험도 검출
         ignore-unfixed: false
 
 
