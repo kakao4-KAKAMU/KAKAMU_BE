@@ -1,7 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
-import os
 
 # 1. settings.DATABASE_URL을 사용하여 엔진 생성
 # (settings.py에서 이미 POSTGRES_SERVER 등을 읽어 URL을 만들었으므로 이를 믿고 사용합니다.)
