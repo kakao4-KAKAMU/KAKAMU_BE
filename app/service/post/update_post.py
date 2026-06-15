@@ -27,6 +27,8 @@ class PostUpdateService:
             post.image_urls = post_in.image_urls
         if post_in.is_spoiler is not None:
             post.is_spoiler = post_in.is_spoiler
+        
+        # post.persona_id = persona_id  # 💡 만약 수정 시 현재 페르소나로 작성자를 갱신하고 싶다면 주석 해제
 
         # 영화 태그 수정 로직
         if post_in.movie_ids is not None:
