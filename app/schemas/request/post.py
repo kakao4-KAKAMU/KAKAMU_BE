@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional
 from app.schemas.request.common import NotEmptyStr, OptionalNotEmptyStr
+from typing import List, Optional, Literal
 
 class PostCreate(BaseModel):
     title: NotEmptyStr = Field(..., max_length=255, description="게시물 제목")
@@ -39,5 +39,5 @@ class CommentUpdate(BaseModel):
     is_spoiler: Optional[int] = Field(default=None, ge=0, le=1, description="스포일러 여부 (0: 일반, 1: 스포일러)")
 
 class LikeToggleRequest(BaseModel):
-    target_type: str = Field(..., description="POST 또는 COMMENT")
+    target_type: Literal["POST", "COMMENT"] = Field(..., description="POST 또는 COMMENT")
     target_id: int = Field(..., description="대상 게시물/댓글 ID")

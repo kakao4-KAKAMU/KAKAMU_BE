@@ -6,7 +6,7 @@ class SearchLog(Base):
     __tablename__ = "search_log"
     
     id = Column(Integer, primary_key=True, index=True)
-    persona_id = Column(String(50), index=True, nullable=True) # 로그인하지 않은 유저도 고려하여 Nullable
+    user_id = Column(String(50), index=True, nullable=True) # 로그인하지 않은 유저도 고려하여 Nullable
     keyword = Column(String(100), index=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 

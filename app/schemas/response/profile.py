@@ -9,10 +9,6 @@ class PersonaResponse(BaseModel):
     user_id: UUID # 유저 id
     nickname: str # 닉네임
     profile_image_url: Optional[str] = None # 이미지 경로
-    is_following: Optional[bool] = False # 팔로우 상태 필드 추가
-    follower_count: Optional[int] = 0
-    following_count: Optional[int] = 0
-    post_count: Optional[int] = 0
 
     @field_serializer("profile_image_url")
     def serialize_profile_image_url(self, value: str):

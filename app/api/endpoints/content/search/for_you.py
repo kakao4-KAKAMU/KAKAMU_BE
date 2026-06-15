@@ -8,8 +8,8 @@ from uuid import UUID
 
 from app.db.session import get_db
 from app.core.config import settings
-from app.models import Post
-from app.api.deps import get_current_persona
+from app.models import Post, User
+from app.api.deps import get_active_user, get_current_persona
 from .utils import handle_search_request, get_search_pattern
 from app.schemas.response.search import CursorSearchResponse
 
@@ -24,10 +24,11 @@ async def search_for_you(
     q: str = Query(..., min_length=1, description="검색어"),
     cursor: Optional[str] = Query(None, description="페이징 커서 (score_id)"),
     limit: int = Query(20, le=50),
+    current_user: User = Depends(get_active_user),
     active_persona_id: UUID = Depends(get_current_persona),
     db: Session = Depends(get_db)
 ):
-    handle_search_request(request, background_tasks, str(active_persona_id), q)
+    handle_search_request(request, background_tasks, str(current_user.id), q)
     search_pattern = get_search_pattern(q)
 
     # -------------------------------------------------------------------------

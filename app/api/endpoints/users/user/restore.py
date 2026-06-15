@@ -8,7 +8,7 @@ from app.service.user.restore_service import account_restore_service
 
 router = APIRouter()
 
-@router.post("/users/me/restore", status_code=status.HTTP_200_OK, response_model=SuccessMessageResponse)
+@router.post("/me/restore", status_code=status.HTTP_200_OK, response_model=SuccessMessageResponse)
 async def restore_my_account(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

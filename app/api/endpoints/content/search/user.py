@@ -6,7 +6,7 @@ from uuid import UUID
 
 from app.db.session import get_db
 from app.models import User, Block
-from app.api.deps import get_active_user, get_current_persona
+from app.api.deps import get_active_user
 from .utils import handle_search_request, get_search_pattern
 from app.schemas.response.search import CursorSearchResponse
 
@@ -20,22 +20,22 @@ def search_user(
     cursor: Optional[str] = Query(None, description="페이징 커서 (nickname,id)"),
     limit: int = Query(20, le=50),
     current_user: User = Depends(get_active_user),
-    active_persona_id: UUID = Depends(get_current_persona),
     db: Session = Depends(get_db)
 ):
-    handle_search_request(request, background_tasks, str(active_persona_id), q)
+    handle_search_request(request, background_tasks, str(current_user.id), q)
     search_pattern = get_search_pattern(q)
 
     # 💡 차단 유저 필터링: 내가 차단했거나 나를 차단한 유저의 ID 목록 추출
     blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_user.id)
     blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_user.id)
 
-    # 닉네임 단독 검색 및 '닉네임#태그' 형태의 복합 검색 모두 지원 (User 검색으로 변경)
+    # 닉네임/유저네임 단독 검색 및 '닉네임#태그' 형태의 복합 검색 지원
     query = db.query(User).filter(
         User.status == "ACTIVE",
         User.id.notin_(blocked_by_me),
         User.id.notin_(blocking_me),
         or_(
+            User.username.ilike(search_pattern),
             User.nickname.ilike(search_pattern),
             func.concat(User.nickname, "#", User.tag).ilike(search_pattern)
         )
@@ -60,7 +60,7 @@ def search_user(
     query = query.order_by(User.nickname.asc(), User.id.desc())
     
     results = query.limit(limit).all()
-    items = [{"id": str(p.id), "nickname": p.nickname, "tag": p.tag, "profile_image_url": p.profile_image_url} for p in results]
+    items = [{"id": str(p.id), "username": p.username, "nickname": p.nickname, "tag": p.tag, "profile_image_url": p.profile_image_url} for p in results]
 
     next_cursor = None
     if len(results) == limit:

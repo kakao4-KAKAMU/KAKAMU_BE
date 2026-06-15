@@ -224,11 +224,8 @@ class PostReadService:
         next_cursor = result[-1]["id"] if result else None
         return {"items": result, "next_cursor": next_cursor, "has_next": len(result) == limit}
 
-    def get_user_posts(self, db: Session, target_persona_id: UUID, current_persona_id: UUID, current_user_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
-        """특정 페르소나가 작성한 게시물 조회 로직"""
-        target_user_id = db.scalar(select(Persona.user_id).where(Persona.id == target_persona_id))
-        if not target_user_id:
-            raise HTTPException(status_code=404, detail={"code": "PERSONA_NOT_FOUND", "message": "대상을 찾을 수 없습니다."})
+    def get_user_posts(self, db: Session, target_user_id: UUID, current_user_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
+        """특정 유저가 작성한 게시물 조회 로직"""
 
         # 프로필 주인이 나와 차단 관계인지 캐시에서 확인 (user_id 기준)
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
@@ -298,7 +295,7 @@ class PostReadService:
         next_cursor = result[-1]["id"] if result else None
         return {"items": result, "next_cursor": next_cursor, "has_next": len(result) == limit}
 
-    def get_post_detail(self, db: Session, post_id: int, current_persona_id: UUID, current_user_id: UUID) -> Dict[str, Any]:
+    def get_post_detail(self, db: Session, post_id: int, current_user_id: UUID) -> Dict[str, Any]:
         """게시물 상세 조회 로직"""
         db_result = db.query(Post, User).join(User, Post.user_id == User.id)\
             .options(selectinload(Post.movies).selectinload(Movie.titles))\

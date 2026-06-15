@@ -63,19 +63,19 @@
 ## 6. Relations (팔로우 및 차단)
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/relations/follows/{following_id}` | 특정 페르소나 팔로우 |
-| `DELETE` | `/relations/follows/{following_id}` | 특정 페르소나 팔로우 해제 |
-| `POST` | `/relations/blocks/{blocked_id}` | 특정 페르소나 차단 (레벨: PERSONA/USER 설정 가능) |
-| `DELETE` | `/relations/blocks/{blocked_id}` | 특정 페르소나 차단 해제 |
-| `GET` | `/relations/{target_persona_id}/followers` | 특정 페르소나의 팔로워 목록 조회 (무한 스크롤) |
-| `GET` | `/relations/{target_persona_id}/followings` | 특정 페르소나의 팔로잉 목록 조회 (무한 스크롤) |
+| `POST` | `/relations/follows/{following_user_id}` | 특정 유저 팔로우 |
+| `DELETE` | `/relations/follows/{following_user_id}` | 특정 유저 팔로우 해제 |
+| `POST` | `/relations/blocks/{blocked_user_id}` | 특정 유저 차단 |
+| `DELETE` | `/relations/blocks/{blocked_user_id}` | 특정 유저 차단 해제 |
+| `GET` | `/relations/users/{target_user_id}/followers` | 특정 유저의 팔로워 목록 조회 (무한 스크롤) |
+| `GET` | `/relations/users/{target_user_id}/followings` | 특정 유저의 팔로잉 목록 조회 (무한 스크롤) |
 
 ## 8. Search (통합 탐색 및 메타데이터)
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/v1/search/for-you` | 통합 검색 - 추천(For You) 탭 게시물 (취향+정확도+인기도 기반 재정렬) |
 | `GET` | `/v1/search/live` | 통합 검색 - 실시간(Live) 탭 게시물 (커서 기반 무한 스크롤, 최신순) |
-| `GET` | `/v1/search/user` | 통합 검색 - 유저 탭 페르소나 목록 (본명 은닉, 복합 커서 기반 무한 스크롤) |
+| `GET` | `/v1/search/user` | 통합 검색 - 유저 탭 유저 목록 (본명 은닉, 복합 커서 기반 무한 스크롤) |
 | `GET` | `/v1/search/content` | 통합 검색 - 영화 정보 탭 (영화 메타데이터 검색, 정렬 및 무한 스크롤) |
 | `GET` | `/v1/search/movie` | 영화 상세 필터 검색 (이름, 연도, 장르 필터 및 정렬, Offset 페이징) |
 | `GET` | `/v1/search/person` | 인물(배우/감독) 검색 (직업 필터, 이름 정렬, Offset 페이징) |
@@ -90,8 +90,6 @@
 | `GET` | `/personas/{persona_id}` | 특정 페르소나 상세 정보 조회 |
 | `PUT` | `/personas/{persona_id}` | 특정 페르소나 정보(닉네임, 프로필 이미지, 취향 정보 등) 수정 |
 | `DELETE` | `/personas/{persona_id}` | 특정 페르소나 삭제 (Soft Delete, 최소 1개 유지) |
-| `POST` | `/personas/{persona_id}/restore` | 유예 기간 내의 페르소나 복구 (활성화) |
-| `GET` | `/personas/public/{target_persona_id}` | 타인의 공개 페르소나 프로필 조회 |
 
 ## 10. Static Files (정적 파일 제공)
 | Method | Path | Description |

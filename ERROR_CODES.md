@@ -65,8 +65,8 @@
 ## 6. Relation (팔로우 및 차단 관련)
 | HTTP Status | Error Code | 발생 원인 / 설명 |
 |:---:|:---|:---|
-| `400` | `CANNOT_FOLLOW_SELF` | 본인의 페르소나를 팔로우 대상으로 지정 |
-| `400` | `CANNOT_BLOCK_SELF` | 본인의 페르소나를 차단 대상으로 지정 |
+| `400` | `CANNOT_FOLLOW_SELF` | 본인을 팔로우 대상으로 지정 |
+| `400` | `CANNOT_BLOCK_SELF` | 본인을 차단 대상으로 지정 |
 
 ## 7. System (시스템 공통)
 | HTTP Status | Error Code | 발생 원인 / 설명 |
