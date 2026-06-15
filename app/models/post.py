@@ -8,7 +8,7 @@ class Post(Base):
     __tablename__ = "post"
     id = Column(Integer, primary_key=True)    
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)    
-    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="SET NULL"), nullable=True) # 화면 렌더링을 위한 작성 당시 페르소나
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="SET NULL"), nullable=True)    
     title = Column(String(255), nullable=False)    
     content = Column(Text)    
     image_urls = Column(JSON) 
@@ -22,7 +22,6 @@ class Post(Base):
     like_count = Column(Integer, default=0, nullable=False, index=True)
 
     user = relationship("User", back_populates="posts")    
-    persona = relationship("Persona") # 게시물 작성 페르소나 정보 조회용
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")    
     movies = relationship("Movie", secondary="post_movie", back_populates="posts")    
     hashtags = relationship("Hashtag", secondary="post_hashtag", back_populates="posts")    

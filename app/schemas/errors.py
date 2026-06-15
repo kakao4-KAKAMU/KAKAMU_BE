@@ -143,8 +143,8 @@ ERROR_TARGET_NOT_FOUND = create_error_schema("대상 없음", "TARGET_NOT_FOUND"
 # ==========================================
 # 6. Relation (팔로우 및 차단 관련)
 # ==========================================
-ERROR_CANNOT_FOLLOW_SELF = create_error_schema("본인 팔로우 불가", "CANNOT_FOLLOW_SELF", "본인의 페르소나를 팔로우 대상으로 지정")
-ERROR_CANNOT_BLOCK_SELF = create_error_schema("본인 차단 불가", "CANNOT_BLOCK_SELF", "본인의 페르소나를 차단 대상으로 지정")
+ERROR_CANNOT_FOLLOW_SELF = create_error_schema("본인 팔로우 불가", "CANNOT_FOLLOW_SELF", "본인을 팔로우 대상으로 지정")
+ERROR_CANNOT_BLOCK_SELF = create_error_schema("본인 차단 불가", "CANNOT_BLOCK_SELF", "본인을 차단 대상으로 지정")
 
 # ==========================================
 # 7. System (시스템 공통)

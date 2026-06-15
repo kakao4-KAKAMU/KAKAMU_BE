@@ -40,7 +40,7 @@ def check_rate_limit(client_identifier: str):
     requests.append(current_time)
     _rate_limit_store[client_identifier] = requests
 
-def insert_search_log_background(persona_id: Optional[str], keyword: str):
+def insert_search_log_background(user_id: Optional[str], keyword: str):
     """API 응답 후 백그라운드에서 실행될 RDB Insert 전용 워커"""
     # 주의: API 응답 시점에 기존 get_db 세션이 닫히므로, 백그라운드용 새 세션을 엽니다.
     db = SessionLocal()
@@ -50,7 +50,7 @@ def insert_search_log_background(persona_id: Optional[str], keyword: str):
         if not safe_keyword:
             return
             
-        new_log = SearchLog(persona_id=persona_id, keyword=safe_keyword)
+        new_log = SearchLog(user_id=user_id, keyword=safe_keyword)
         db.add(new_log)
         db.commit()
     except Exception as e:
@@ -59,14 +59,14 @@ def insert_search_log_background(persona_id: Optional[str], keyword: str):
     finally:
         db.close()
 
-def handle_search_request(request: Request, background_tasks: BackgroundTasks, active_persona_id: Optional[str], q: str):
+def handle_search_request(request: Request, background_tasks: BackgroundTasks, user_id: Optional[str], q: str):
     """통합 검색 공통 전처리 (비동기 데이터 적재 및 방어 로직)"""
     client_ip = request.client.host if request.client else "unknown"
-    client_id = str(active_persona_id) if active_persona_id else f"IP:{client_ip}"
+    client_id = str(user_id) if user_id else f"IP:{client_ip}"
     check_rate_limit(client_id)
 
     # API 속도에 전혀 영향을 주지 않고 백그라운드 큐에 작업을 위임
-    background_tasks.add_task(insert_search_log_background, active_persona_id, q)
+    background_tasks.add_task(insert_search_log_background, user_id, q)
 
 def get_search_pattern(q: str) -> str:
     """검색어 패턴 생성 (양방향 부분 일치)"""

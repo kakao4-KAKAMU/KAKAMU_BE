@@ -25,8 +25,15 @@ class LikeService:
         if like_log:
             like_log.is_active = 0 if like_log.is_active == 1 else 1
             is_liked = like_log.is_active == 1
+            
+            # 취소할 때는 좋아요를 눌렀던 원래 페르소나의 ML 점수를 롤백해야 하므로 원래 페르소나 ID를 사용합니다.
+            # 다시 좋아요를 누를 때는 현재 활성화된 페르소나 ID로 업데이트합니다.
+            if is_liked:
+                like_log.persona_id = persona_id
+            else:
+                persona_id = like_log.persona_id or persona_id
         else:
-            like_log = LikeLog(user_id=user_id, target_type=req.target_type, target_id=req.target_id, is_active=1)
+            like_log = LikeLog(user_id=user_id, persona_id=persona_id, target_type=req.target_type, target_id=req.target_id, is_active=1)
             db.add(like_log)
             is_liked = True
             

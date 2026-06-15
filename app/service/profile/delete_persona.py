@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
-from app.models import Persona, Post, Comment
+from app.models import Persona
 from uuid import UUID
 
 class PersonaDeleteService:
@@ -42,12 +42,7 @@ class PersonaDeleteService:
             )
 
         try:
-            # 1. 페르소나가 작성한 게시물 및 댓글 비활성화 (INACTIVE)
-            # (Persona 삭제 시 DB 레벨에서 ondelete="SET NULL"이 발생하므로 삭제 전 상태 업데이트 필요)
-            db.query(Post).filter(Post.persona_id == persona_id).update({"status": "INACTIVE"}, synchronize_session=False)
-            db.query(Comment).filter(Comment.persona_id == persona_id).update({"status": "INACTIVE"}, synchronize_session=False)
-
-            # 2. 페르소나 영구 삭제 (Hard Delete)
+            # 1. 페르소나 영구 삭제 (Hard Delete)
             db.delete(persona)
             db.commit()
 

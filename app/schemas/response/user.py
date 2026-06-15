@@ -26,4 +26,9 @@ class UserPublicResponse(BaseModel):
     profile_msg: Optional[str] = None
     created_at: datetime
     
+    is_following: Optional[bool] = False
+    follower_count: Optional[int] = 0
+    following_count: Optional[int] = 0
+    post_count: Optional[int] = 0
+    
     model_config = ConfigDict(from_attributes=True)

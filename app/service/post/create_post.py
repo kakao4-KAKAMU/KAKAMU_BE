@@ -11,7 +11,7 @@ from app.schemas.request.post import PostCreate
 
 class PostCreateService:
     async def create_post(self, db: Session, post_in: PostCreate, user_id: UUID, persona_id: UUID) -> int:
-        """게시물 생성 및 해시태그/멘션/추천 가중치 연동 로직"""
+        """게시물 생성 및 해시태그/멘션 연동 로직"""
         try:
             new_post = Post(
                 user_id=user_id,
@@ -26,6 +26,9 @@ class PostCreateService:
 
             for m_id in post_in.movie_ids:
                 db.add(PostMovie(post_id=new_post.id, movie_id=m_id))
+                await recommendation_service.record_ml_relationship_log(
+                    db, persona_id, "MOVIE", m_id, "create_post"
+                )
 
             hashtags, mentions = parse_content(post_in.content)
 
@@ -58,12 +61,6 @@ class PostCreateService:
 
             db.commit()
             
-            # 추천 알고리즘 로깅: 게시물 작성 기록 (가중치는 ML에서 판별)
-            for m_id in post_in.movie_ids:
-                await recommendation_service.record_ml_relationship_log(
-                    db, persona_id, "MOVIE", m_id, "create_post"
-                )
-                
             return new_post.id
             
         except IntegrityError:
