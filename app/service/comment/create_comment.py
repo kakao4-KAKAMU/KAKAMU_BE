@@ -1,3 +1,4 @@
+from typing import cast
 from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
@@ -18,7 +19,7 @@ class CommentCreateService:
             parent_comment = db.query(Comment).filter(Comment.id == comment_in.parent_id, Comment.status == "ACTIVE").first()
             if not parent_comment:
                 raise HTTPException(status_code=404, detail={"code": "PARENT_COMMENT_NOT_FOUND", "message": "답글을 작성할 원본 댓글을 찾을 수 없습니다."})
-            if parent_comment.post_id != post_id:
+            if cast(int, parent_comment.post_id) != post_id:
                 raise HTTPException(status_code=400, detail={"code": "COMMENT_POST_MISMATCH", "message": "댓글과 게시물이 일치하지 않습니다."})
 
         # 3. 댓글 객체 생성 (persona_id 포함)
@@ -44,6 +45,6 @@ class CommentCreateService:
                 db.add(CommentMention(comment_id=new_comment.id, user_id=target_user.id))
 
         db.commit()
-        return new_comment.id
+        return cast(int, new_comment.id)
 
 comment_create_service = CommentCreateService()
