@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from app.db.session import get_db
 from app.models import LocalAuth
 from app.schemas.request.auth import LocalLoginRequest
@@ -16,7 +17,7 @@ router = APIRouter()
     response_model=Token,
     responses={401: ERROR_LOGIN_FAILED}
 )
-def login_local(request: LocalLoginRequest, db: Session = Depends(get_db)):
+def login_local(request: LocalLoginRequest, db: Session = Depends(get_db)) -> dict:
     """JSON 형식(LocalLoginRequest)으로 이메일과 비밀번호를 받아 일반 로그인을 처리합니다."""
 
     with tracer.start_as_current_span("auth.login.local") as span:
@@ -28,7 +29,8 @@ def login_local(request: LocalLoginRequest, db: Session = Depends(get_db)):
     
         # 1. 이메일로 계정 조회
         with tracer.start_as_current_span("auth.login.find_user"):
-            local_auth = db.query(LocalAuth).filter(LocalAuth.email == request.email).first()
+            stmt = select(LocalAuth).where(LocalAuth.email == request.email)
+            local_auth = db.scalar(stmt)
 
         if not local_auth:
             span.set_attribute("auth.result", "failed")

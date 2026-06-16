@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 from urllib.parse import urlparse
 from app.core.config import settings
 
-def create_database_if_not_exists():
+def create_database_if_not_exists() -> None:
     """데이터베이스가 존재하지 않으면 생성합니다."""
     db_url = settings.DATABASE_URL
     parsed = urlparse(db_url)
@@ -27,7 +27,7 @@ def create_database_if_not_exists():
     except Exception as e:
         print(f"Failed to create database: {e}")
 
-def run_migrations():
+def run_migrations() -> None:
     """애플리케이션 시작 시 Alembic 마이그레이션을 자동으로 실행합니다."""
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

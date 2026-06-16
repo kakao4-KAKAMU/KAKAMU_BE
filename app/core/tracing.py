@@ -13,8 +13,9 @@ from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter # 로컬 전용
 from app.db.session import engine
+from fastapi import FastAPI
 
-def setup_tracing(app):
+def setup_tracing(app: FastAPI) -> None:
     service_name = os.getenv("OTEL_SERVICE_NAME", "filma-back")
     environment = os.getenv("APP_ENV", "local")
     otlp_endpoint = os.getenv(
