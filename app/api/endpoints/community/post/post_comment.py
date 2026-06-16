@@ -42,4 +42,4 @@ def get_comments(
 ):
     """게시물의 댓글 목록을 페이징 처리하여 조회합니다. 스포일러 댓글은 내용이 마스킹 처리됩니다."""
     comments_data = comment_service.get_comments(db, post_id, current_user.id, page=page, size=size)
-    return {"status": "success", **comments_data}
+    return comments_data

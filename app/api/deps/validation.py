@@ -32,7 +32,7 @@ async def validate_social_registration(request: SocialRegisterRequest, db: Sessi
     """소셜 회원가입 시 토큰을 검증하고, 이메일 중복 체크 및 CI 값을 생성하는 미들웨어 의존성"""
     if request.provider == "kakao":
         user_info = await get_kakao_user_info(request.provided_token)
-        provider_user_id = str(user_info.get("id"))
+        provider_user_id = str(user_info.id)
         if not provider_user_id or provider_user_id == "None":
             raise HTTPException(status_code=401, detail={"code": "INVALID_SOCIAL_TOKEN", "message": "유효하지 않은 소셜 토큰입니다."})
     else:
