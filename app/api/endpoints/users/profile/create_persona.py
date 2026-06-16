@@ -20,7 +20,8 @@ router = APIRouter()
     responses={
         400: ERROR_CREATE_PERSONA_FAILURES,
         500: ERROR_DATABASE_SAVE_FAILED
-    }
+    },
+    summary="새로운 페르소나 생성"
 )
 async def create_persona(
     request: PersonaCreate,

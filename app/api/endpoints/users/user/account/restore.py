@@ -8,11 +8,16 @@ from app.service.user.restore_service import account_restore_service
 
 router = APIRouter()
 
-@router.post("/me/restore", status_code=status.HTTP_200_OK, response_model=SuccessMessageResponse)
+@router.post(
+    "/me/restore",
+    status_code=status.HTTP_200_OK,
+    response_model=SuccessMessageResponse,
+    summary="내 계정 복구"
+)
 async def restore_my_account(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-):
+) -> dict:
     """
     탈퇴 유예 기간(7일) 내에 로그인하여 회원 탈퇴를 철회하고 계정을 복구합니다.
     (로그인 JWT 토큰 필요)

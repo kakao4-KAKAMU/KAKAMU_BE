@@ -4,7 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 class MovieSimple(BaseModel):
-    id: int
+    id: UUID
     title: str
 
 class MentionSimple(BaseModel):

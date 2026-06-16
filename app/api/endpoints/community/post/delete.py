@@ -21,7 +21,8 @@ router = APIRouter()
     responses={
         403: ERROR_FORBIDDEN_POST_DELETE,
         404: ERROR_POST_NOT_FOUND
-    }
+    },
+    summary="게시물 삭제 (소프트 삭제)"
 )
 async def delete_post(
     post_id: int,

@@ -4,3 +4,4 @@ from .relation import Follow, Block, BlockLevel
 from .post import Post, Hashtag, PostHashtag, PostMention, PostMovie
 from .movie import Movie, Genre, People, MovieGenre, MovieStaff
 from .activity import Comment, CommentMention, LikeLog, SemanticAnalysis
+from .search_log import SearchLog, SearchDailyStat

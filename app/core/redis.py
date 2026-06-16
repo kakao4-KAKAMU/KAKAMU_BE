@@ -1,5 +1,6 @@
 import redis.asyncio as redis
 from app.core.config import settings
+from typing import AsyncGenerator
 
 # Redis URL 설정 (이미 노출된 암호는 settings.REDIS_URL 등에 넣어서 관리하세요)
 redis_client = redis.from_url(
@@ -8,6 +9,6 @@ redis_client = redis.from_url(
     encoding="utf-8"
 )
 # Redis 서버 관리
-async def get_redis():
+async def get_redis() -> AsyncGenerator[redis.Redis, None]:
     async with redis_client as client:
         yield client

@@ -1,12 +1,13 @@
 from pydantic import BaseModel, Field, field_validator
 from app.schemas.request.common import NotEmptyStr, OptionalNotEmptyStr
 from typing import List, Optional, Literal
+from uuid import UUID
 
 class PostCreate(BaseModel):
     title: NotEmptyStr = Field(..., max_length=255, description="게시물 제목")
     content: NotEmptyStr = Field(..., description="게시물 본문")
     # 영화 태깅 최소 1개 필수 정책 적용
-    movie_ids: List[int] = Field(..., min_length=1, description="태깅된 공식 영화 ID 목록 (최소 1개)")
+    movie_ids: List[UUID] = Field(..., min_length=1, description="태깅된 공식 영화 ID 목록 (최소 1개)")
     # 최대 5장 이미지 제한 정책 적용
     image_urls: Optional[List[str]] = Field(default=[], max_length=5, description="첨부 이미지 URL 목록 (최대 5장)")
     is_spoiler: int = Field(default=0, ge=0, le=1, description="스포일러 여부 (0: 일반, 1: 스포일러)")
@@ -25,7 +26,7 @@ class PostUpdate(BaseModel):
     """게시물 수정 시 전달받는 데이터 (수정할 필드만 선택적 포함 가능)"""
     title: OptionalNotEmptyStr = Field(None, max_length=255, description="수정할 게시물 제목")
     content: OptionalNotEmptyStr = Field(None, description="수정할 게시물 본문")
-    movie_ids: Optional[List[int]] = Field(None, min_length=1, description="수정할 공식 영화 ID 목록")
+    movie_ids: Optional[List[UUID]] = Field(None, min_length=1, description="수정할 공식 영화 ID 목록")
     image_urls: Optional[List[str]] = Field(None, max_length=5, description="수정할 첨부 이미지 URL 목록")
     is_spoiler: Optional[int] = Field(None, ge=0, le=1, description="스포일러 여부 (0: 일반, 1: 스포일러)")
 

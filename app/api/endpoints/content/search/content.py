@@ -16,7 +16,11 @@ from app.schemas.response.search import GenreListResponse, PaginatedSearchRespon
 router = APIRouter()
 
 # 1. 콘텐츠(영화) 메인 탭 검색
-@router.get("/v1/search/content", tags=["Search - Tabs"])
+@router.get(
+    "/v1/search/content",
+    tags=["Search - Tabs"],
+    summary="콘텐츠(영화) 탭 통합 검색"
+)
 def search_content(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -62,13 +66,22 @@ def search_content(
     return {"status": "success", "items": items, "next_cursor": next_cursor}
 
 # 2. 장르 목록 조회 API
-@router.get("/v1/genre/list", tags=["Search - Metadata"], response_model=GenreListResponse)
+@router.get(
+    "/v1/genre/list",
+    tags=["Search - Metadata"],
+    response_model=GenreListResponse,
+    summary="장르 목록 전체 조회"
+)
 def get_genre_list(db: Session = Depends(get_db)):
     genres = db.query(Genre).order_by(Genre.genre_name.asc()).all()
     return {"status": "success", "genres": [{"id": str(g.id), "name": g.genre_name} for g in genres]}
 
 # 3. 기존 영화 상세 필터 검색 API
-@router.get("/v1/search/movie", tags=["Search - Metadata"])
+@router.get(
+    "/v1/search/movie",
+    tags=["Search - Metadata"],
+    summary="영화 상세 필터 검색"
+)
 def search_movies(
     name: Optional[str] = Query(None),
     genre: Optional[List[UUID]] = Query(None),
@@ -114,7 +127,12 @@ def search_movies(
     return {"status": "success", "items": items, "skip": skip, "limit": limit, "total_count": total_count}
 
 # 4. 기존 인물 검색 API
-@router.get("/v1/search/person", tags=["Search - Metadata"], response_model=PaginatedSearchResponse)
+@router.get(
+    "/v1/search/person",
+    tags=["Search - Metadata"],
+    response_model=PaginatedSearchResponse,
+    summary="영화인 상세 검색"
+)
 def search_people(
     name: Optional[str] = Query(None),
     job: Optional[List[str]] = Query(None),
@@ -141,7 +159,12 @@ def search_people(
     return {"status": "success", "items": items, "skip": skip, "limit": limit, "total_count": total_count}
 
 # 5. 일간 인기 검색어(트렌드) Top 10 조회 API
-@router.get("/v1/search/trend", tags=["Search - Metadata"], response_model=TrendSearchResponse)
+@router.get(
+    "/v1/search/trend",
+    tags=["Search - Metadata"],
+    response_model=TrendSearchResponse,
+    summary="인기 검색어(트렌드) Top 10 조회"
+)
 def get_top_search_keywords(
     limit: int = Query(10, le=50, description="가져올 인기 검색어 개수"),
     db: Session = Depends(get_db)

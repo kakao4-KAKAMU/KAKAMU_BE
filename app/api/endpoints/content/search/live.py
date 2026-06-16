@@ -12,7 +12,12 @@ from app.schemas.response.search import CursorSearchResponse
 
 router = APIRouter()
 
-@router.get("/v1/search/live", tags=["Search - Tabs"], response_model=CursorSearchResponse)
+@router.get(
+    "/v1/search/live",
+    tags=["Search - Tabs"],
+    response_model=CursorSearchResponse,
+    summary="실시간 게시물 검색"
+)
 def search_live(
     request: Request,
     background_tasks: BackgroundTasks,

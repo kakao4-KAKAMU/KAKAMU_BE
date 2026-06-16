@@ -20,7 +20,8 @@ router = APIRouter()
     response_model=PostIdResponse,
     responses={
         400: ERROR_HASHTAG_LIMIT_EXCEEDED
-    }
+    },
+    summary="새 게시물 작성"
 )
 async def create_post(
     post_in: PostCreate,
