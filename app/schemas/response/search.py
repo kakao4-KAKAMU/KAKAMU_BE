@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 from datetime import date
 from uuid import UUID
 
@@ -14,13 +14,13 @@ class GenreListResponse(SearchBaseResponse):
     genres: List[GenreItem]
 
 class ContentSearchItem(BaseModel):
-    id: int
+    id: Union[int, UUID]
     title: str
     poster_url: Optional[str] = None
 
 class ContentSearchResponse(SearchBaseResponse):
     items: List[ContentSearchItem]
-    next_cursor: Optional[int] = None
+    next_cursor: Union[int, str, UUID, None] = None
 
 class PaginatedSearchResponse(SearchBaseResponse):
     items: List[Any]
