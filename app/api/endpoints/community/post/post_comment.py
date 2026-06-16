@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, Query
+from typing import Optional
 from sqlalchemy.orm import Session
 from uuid import UUID
 from app.db.session import get_db
-from app.api.deps.auth import get_active_user
+from app.api.deps.auth import get_active_user, get_optional_user
 from app.api.deps import get_current_persona
 from app.models.user import User
 from app.schemas.request.post import CommentCreate
@@ -43,8 +44,9 @@ def get_comments(
     page: int = Query(1, ge=1, description="페이지 번호 (1부터 시작)"),
     size: int = Query(20, ge=1, le=100, description="페이지당 반환할 댓글 수"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_active_user)
+    current_user: Optional[User] = Depends(get_optional_user)
 ):
-    """게시물의 댓글 목록을 페이징 처리하여 조회합니다. 스포일러 댓글은 내용이 마스킹 처리됩니다."""
-    comments_data = comment_service.get_comments(db, post_id, current_user.id, page=page, size=size)
-    return {"status": "success", **comments_data}
+    """게시물의 댓글 목록을 페이징 처리하여 조회합니다. (비회원 접근 가능) 스포일러 댓글은 내용이 마스킹 처리됩니다."""
+    user_id = current_user.id if current_user else None
+    comments_data = comment_service.get_comments(db, post_id, user_id, page=page, size=size)
+    return {"status": "success", "is_member": current_user is not None, **comments_data}

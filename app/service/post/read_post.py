@@ -13,7 +13,9 @@ class PostReadService:
         self._block_cache = {}
         self._cache_ttl = 60  # 캐시 유지 시간 (60초)
 
-    def _get_cached_blocked_user_ids(self, db: Session, user_id: UUID) -> set:
+    def _get_cached_blocked_user_ids(self, db: Session, user_id: Optional[UUID]) -> set:
+        if not user_id:
+            return set()
         now = time.time()
         
         # 메모리 누수 방지: 캐시된 유저가 10,000명을 넘어가면 캐시 초기화
@@ -81,7 +83,7 @@ class PostReadService:
         ).all()
         return {f[0] for f in follows}
 
-    def get_posts(self, db: Session, current_user_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
+    def get_posts(self, db: Session, current_user_id: Optional[UUID], cursor: Optional[int], limit: int) -> Dict[str, Any]:
         """게시물 피드 조회 로직"""
         # 1. 차단 유저 목록 캐시에서 가져오기
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
@@ -108,16 +110,17 @@ class PostReadService:
         comment_counts_map = {}
         
         if post_ids:
-            liked_logs = db.query(LikeLog.target_id).filter(
-                LikeLog.user_id == current_user_id, # 좋아요는 user_id 기준 공유
-                LikeLog.target_type == "POST",
-                LikeLog.target_id.in_(post_ids),
-                LikeLog.is_active == 1
-            ).all()
-            liked_post_ids = {log[0] for log in liked_logs}
-            
-            author_user_ids = list({post.user_id for post, author in posts_with_author})
-            followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
+            if current_user_id:
+                liked_logs = db.query(LikeLog.target_id).filter(
+                    LikeLog.user_id == current_user_id,
+                    LikeLog.target_type == "POST",
+                    LikeLog.target_id.in_(post_ids),
+                    LikeLog.is_active == 1
+                ).all()
+                liked_post_ids = {log[0] for log in liked_logs}
+                
+                author_user_ids = list({post.user_id for post, author in posts_with_author})
+                followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
             
             mentions_map = self._get_mentions_for_posts(db, post_ids)
             hashtags_map = self._get_hashtags_for_posts(db, post_ids)
@@ -148,7 +151,8 @@ class PostReadService:
                 "like_count": post.like_count, # Use the model field instead of querying LikeLog
                 "comment_count": comment_counts_map.get(post.id, 0),
                 "is_liked": post.id in liked_post_ids,
-                "is_following": post.user_id in followed_user_ids if not is_deleted else False
+                "is_following": post.user_id in followed_user_ids if not is_deleted else False,
+                "is_member": current_user_id is not None
             })
         
         next_cursor = result[-1]["id"] if result else None
@@ -224,7 +228,7 @@ class PostReadService:
         next_cursor = result[-1]["id"] if result else None
         return {"items": result, "next_cursor": next_cursor, "has_next": len(result) == limit}
 
-    def get_user_posts(self, db: Session, target_user_id: UUID, current_user_id: UUID, cursor: Optional[int], limit: int) -> Dict[str, Any]:
+    def get_user_posts(self, db: Session, target_user_id: UUID, current_user_id: Optional[UUID], cursor: Optional[int], limit: int) -> Dict[str, Any]:
         """특정 유저가 작성한 게시물 조회 로직"""
 
         # 프로필 주인이 나와 차단 관계인지 캐시에서 확인 (user_id 기준)
@@ -251,16 +255,17 @@ class PostReadService:
         comment_counts_map = {}
         
         if post_ids:
-            liked_logs = db.query(LikeLog.target_id).filter(
-                LikeLog.user_id == current_user_id,
-                LikeLog.target_type == "POST",
-                LikeLog.target_id.in_(post_ids),
-                LikeLog.is_active == 1
-            ).all()
-            liked_post_ids = {log[0] for log in liked_logs}
-            
-            author_user_ids = list({post.user_id for post, author in posts_with_author})
-            followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
+            if current_user_id:
+                liked_logs = db.query(LikeLog.target_id).filter(
+                    LikeLog.user_id == current_user_id,
+                    LikeLog.target_type == "POST",
+                    LikeLog.target_id.in_(post_ids),
+                    LikeLog.is_active == 1
+                ).all()
+                liked_post_ids = {log[0] for log in liked_logs}
+                
+                author_user_ids = list({post.user_id for post, author in posts_with_author})
+                followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
             
             mentions_map = self._get_mentions_for_posts(db, post_ids)
             hashtags_map = self._get_hashtags_for_posts(db, post_ids)
@@ -289,13 +294,14 @@ class PostReadService:
                 "like_count": post.like_count, 
                 "comment_count": comment_counts_map.get(post.id, 0),
                 "is_liked": post.id in liked_post_ids,
-                "is_following": post.user_id in followed_user_ids if not is_deleted else False
+                "is_following": post.user_id in followed_user_ids if not is_deleted else False,
+                "is_member": current_user_id is not None
             })
         
         next_cursor = result[-1]["id"] if result else None
         return {"items": result, "next_cursor": next_cursor, "has_next": len(result) == limit}
 
-    def get_post_detail(self, db: Session, post_id: int, current_user_id: UUID) -> Dict[str, Any]:
+    def get_post_detail(self, db: Session, post_id: int, current_user_id: Optional[UUID]) -> Dict[str, Any]:
         """게시물 상세 조회 로직"""
         db_result = db.query(Post, User).join(User, Post.user_id == User.id)\
             .options(selectinload(Post.movies).selectinload(Movie.titles))\
@@ -346,7 +352,8 @@ class PostReadService:
             "comment_count": comment_counts_map.get(post.id, 0),
             "created_at": post.created_at, "updated_at": post.updated_at,
             "is_liked": is_liked,
-            "is_following": is_following
+            "is_following": is_following,
+            "is_member": current_user_id is not None
         }
 
 post_read_service = PostReadService()

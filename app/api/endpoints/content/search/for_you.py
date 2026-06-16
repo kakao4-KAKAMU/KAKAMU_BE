@@ -9,7 +9,7 @@ from uuid import UUID
 from app.db.session import get_db
 from app.core.config import settings
 from app.models import Post, User
-from app.api.deps import get_active_user, get_current_persona
+from app.api.deps.auth import get_optional_user
 from .utils import handle_search_request, get_search_pattern
 from app.schemas.response.search import CursorSearchResponse
 
@@ -29,12 +29,19 @@ async def search_for_you(
     q: str = Query(..., min_length=1, description="검색어"),
     cursor: Optional[str] = Query(None, description="페이징 커서 (score_id)"),
     limit: int = Query(20, le=50),
-    current_user: User = Depends(get_active_user),
-    active_persona_id: UUID = Depends(get_current_persona),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db)
 ):
-    handle_search_request(request, background_tasks, str(current_user.id), q)
+    user_id = str(current_user.id) if current_user else "anonymous"
+    handle_search_request(request, background_tasks, user_id, q)
     search_pattern = get_search_pattern(q)
+
+    # 비회원이거나 페르소나 컨텍스트가 없으면 ML 추천을 호출하지 않고 바로 Fallback 실행
+    if not current_user:
+        logger.info(f"[ForYou Search] 비회원 사용자, 기본 정렬로 Fallback을 실행합니다.")
+        # 비회원용 Fallback 로직을 바로 실행
+        # (이 부분은 아래의 V2 Fallback 로직과 중복되므로 함수로 분리하는 것을 고려해볼 수 있습니다.)
+        return await _fallback_search(db, search_pattern, cursor, limit)
 
     # -------------------------------------------------------------------------
     # [V2: ML 서버 추천 결과 호출] 
@@ -42,7 +49,7 @@ async def search_for_you(
     # 계산된 맞춤 검색 결과를 그대로 반환하는 API Gateway 역할을 수행합니다.
     # -------------------------------------------------------------------------
     ML_API_URL = f"{settings.ML_API_BASE_URL}/api/recommendation/search/posts"
-    params = {"persona_id": str(active_persona_id), "q": q, "limit": limit}
+    params = {"user_id": str(current_user.id), "q": q, "limit": limit} # ML서버가 user_id를 받는다고 가정
     if cursor:
         params["cursor"] = cursor
         
@@ -53,6 +60,7 @@ async def search_for_you(
             return response.json()
     except Exception as e:
         logger.warning(f"[ForYou Search] ML 서버 통신 실패, 기본 정렬로 Fallback을 실행합니다: {e}")
+        return await _fallback_search(db, search_pattern, cursor, limit)
 
     # -------------------------------------------------------------------------
     # [V1: 기존 규칙 기반(Heuristic) 추천 로직 주석 처리]
@@ -102,8 +110,8 @@ async def search_for_you(
     items = [{"id": p["post"].id, "title": p["post"].title, "content": p["post"].content} for p in paginated_results]
     return {"status": "success", "items": items, "next_cursor": next_cursor}
     """
-
-    # [V2 Fallback 로직]
+async def _fallback_search(db: Session, search_pattern: str, cursor: Optional[str], limit: int):
+    """ML 서버 실패 또는 비회원 접근 시 사용될 대체 검색 로직"""
     query = db.query(Post).filter(
         Post.status == "ACTIVE",
         or_(Post.title.ilike(search_pattern), Post.content.ilike(search_pattern))
@@ -118,9 +126,9 @@ async def search_for_you(
     paginated_results = query.order_by(Post.like_count.desc(), Post.id.desc()).limit(limit).all()
     
     if not paginated_results:
-        return {"status": "success", "items": [], "fallback": True, "message": "결과가 없어 추천 항목을 제공합니다."}
+        return {"status": "success", "items": [], "fallback": True, "message": "검색 결과가 없습니다."}
         
     next_cursor = str(paginated_results[-1].id) if len(paginated_results) == limit else None
     items = [{"id": p.id, "title": p.title, "content": p.content} for p in paginated_results]
     
-    return {"status": "success", "items": items, "next_cursor": next_cursor}
+    return {"status": "success", "items": items, "next_cursor": next_cursor, "fallback": True}

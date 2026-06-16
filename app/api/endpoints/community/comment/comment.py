@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
+from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.api.deps import get_active_user
+from app.api.deps.auth import get_active_user, get_optional_user
 from app.models.user import User
 from app.schemas.response.post import CommentDetailResponse
 from app.schemas.response.common import SuccessResponse
@@ -38,6 +39,7 @@ def delete_comment(comment_id: int, db: Session = Depends(get_db), current_user:
     },
     summary="단일 댓글 상세(스포일러 원본) 조회"
 )
-def get_comment_detail(comment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_active_user)):
-    """사용자가 댓글의 '스포일러 보기'를 클릭했을 때 원본 내용을 반환합니다."""
-    return comment_service.get_comment_detail(db, comment_id, current_user.id)
+def get_comment_detail(comment_id: int, db: Session = Depends(get_db), current_user: Optional[User] = Depends(get_optional_user)):
+    """사용자가 댓글의 '스포일러 보기'를 클릭했을 때 원본 내용을 반환합니다. (비회원 접근 가능)"""
+    user_id = current_user.id if current_user else None
+    return comment_service.get_comment_detail(db, comment_id, user_id)
