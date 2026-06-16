@@ -24,7 +24,8 @@ router = APIRouter()
         400: ERROR_HASHTAG_LIMIT_EXCEEDED,
         403: ERROR_FORBIDDEN_POST_UPDATE,
         404: ERROR_POST_NOT_FOUND
-    }
+    },
+    summary="게시물 수정"
 )
 async def update_post(
     post_id: int,

@@ -19,7 +19,8 @@ router = APIRouter()
     response_model=CommentIdResponse,
     responses={
         404: ERROR_POST_NOT_FOUND_FOR_COMMENT
-    }
+    },
+    summary="댓글(또는 대댓글) 작성"
 )
 def create_comment(
     post_id: int, 
@@ -32,7 +33,11 @@ def create_comment(
     comment_id = comment_service.create_comment(db, post_id, comment_in, current_user.id, current_persona_id)
     return {"status": "success", "comment_id": comment_id}
 
-@router.get("/", response_model=CommentListResponse)
+@router.get(
+    "/",
+    response_model=CommentListResponse,
+    summary="게시물의 댓글 목록 페이징 조회"
+)
 def get_comments(
     post_id: int,
     page: int = Query(1, ge=1, description="페이지 번호 (1부터 시작)"),

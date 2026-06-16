@@ -9,7 +9,11 @@ from app.schemas.errors import ERROR_ML_SERVER_UNAVAILABLE
 
 router = APIRouter()
 
-@router.post("/{movie_id}/watch", response_model=WatchMovieResponse)
+@router.post(
+    "/{movie_id}/watch",
+    response_model=WatchMovieResponse,
+    summary="영화 시청 기록 추가"
+)
 async def watch_movie(movie_id: int, current_user: User = Depends(get_active_user)):
     # 이 엔드포인트는 프론트엔드의 /api/logs/activity 호출로 대체될 수 있습니다.
     # 현재는 아무 동작도 하지 않습니다.
@@ -18,7 +22,8 @@ async def watch_movie(movie_id: int, current_user: User = Depends(get_active_use
 @router.get(
     "/recommend",
     response_model=MovieRecommendationResponse,
-    responses={503: ERROR_ML_SERVER_UNAVAILABLE}
+    responses={503: ERROR_ML_SERVER_UNAVAILABLE},
+    summary="맞춤 영화 추천"
 )
 async def get_movies(active_persona_id: UUID = Depends(get_current_persona)):
     """

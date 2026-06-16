@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import select, and_
 from app.db.session import get_db
 from app.schemas.request.auth import SocialRegisterRequest, SocialLinkRequest
 from app.schemas.response.auth import TokenResponse
@@ -19,23 +20,24 @@ router = APIRouter()
 @router.post(
     "/social",
     response_model=TokenResponse,
-    responses={400: ERROR_SOCIAL_AUTH_ALREADY_LINKED, 500: ERROR_REGISTRATION_FAILED}
+    responses={400: ERROR_SOCIAL_AUTH_ALREADY_LINKED, 500: ERROR_REGISTRATION_FAILED},
+    summary="소셜 회원가입"
 )
-def register_social_user(db: Session = Depends(get_db), val_data: dict = Depends(validate_social_registration)):
+def register_social_user(db: Session = Depends(get_db), val_data: dict = Depends(validate_social_registration)) -> TokenResponse:
     """추가 정보를 받아 User와 SocialAuth를 생성하고 JWT를 발급합니다."""
     request: SocialRegisterRequest = val_data["request"]
     try:
-        db_user = db.query(User).filter(User.ci_value == val_data["ci_value"]).first()
+        db_user = db.scalar(select(User).where(User.ci_value == val_data["ci_value"]))
         if not db_user:
             db_user = User(username=request.username, nickname=request.nickname, phone=val_data["formatted_phone"], ci_value=val_data["ci_value"])
             db.add(db_user)
             db.flush()
         else:
             # 중복 차단: 이미 동일한 Provider가 연결된 상태라면 진행 차단
-            existing_social = db.query(SocialAuth).filter(
+            existing_social = db.scalar(select(SocialAuth).where(
                 SocialAuth.user_id == db_user.id,
                 SocialAuth.provider == request.provider
-            ).first()
+            ))
             if existing_social:
                 raise HTTPException(status_code=400, detail={"code": "SOCIAL_AUTH_ALREADY_LINKED", "message": "이미 연결된 계정입니다"})
         
@@ -54,13 +56,14 @@ def register_social_user(db: Session = Depends(get_db), val_data: dict = Depends
     responses={
         400: ERROR_SOCIAL_LINK_FAILURES,
         401: ERROR_INVALID_SOCIAL_TOKEN
-    }
+    },
+    summary="소셜 계정 추가 연동"
 )
 async def link_social_user(
     request: SocialLinkRequest,
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
-):
+) -> TokenResponse:
     """로그인된 상태에서 소셜 계정을 추가 연동합니다. (본인인증 생략)"""
     
     # 1. 소셜 토큰 검증 및 provider_user_id 추출
@@ -73,12 +76,12 @@ async def link_social_user(
         raise HTTPException(status_code=400, detail={"code": "UNSUPPORTED_PROVIDER", "message": "지원하지 않는 소셜 플랫폼입니다."})
 
     # 2. 이미 같은 소셜 플랫폼이 연동되어 있는지 확인
-    existing_social = db.query(SocialAuth).filter(SocialAuth.user_id == current_user.id, SocialAuth.provider == request.provider).first()
+    existing_social = db.scalar(select(SocialAuth).where(SocialAuth.user_id == current_user.id, SocialAuth.provider == request.provider))
     if existing_social:
         raise HTTPException(status_code=400, detail={"code": "SOCIAL_AUTH_ALREADY_LINKED", "message": "이미 연동된 소셜 계정입니다."})
         
     # 3. 해당 소셜 계정이 이미 다른 사용자와 연동되어 있는지 확인
-    duplicate_social = db.query(SocialAuth).filter(SocialAuth.provider == request.provider, SocialAuth.provider_user_id == provider_user_id).first()
+    duplicate_social = db.scalar(select(SocialAuth).where(SocialAuth.provider == request.provider, SocialAuth.provider_user_id == provider_user_id))
     if duplicate_social:
         raise HTTPException(status_code=400, detail={"code": "SOCIAL_ACCOUNT_ALREADY_USED", "message": "이 소셜 계정은 이미 다른 사용자와 연동되어 있습니다."})
         

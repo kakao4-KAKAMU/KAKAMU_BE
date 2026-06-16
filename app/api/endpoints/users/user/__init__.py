@@ -1,9 +1,8 @@
 from fastapi import APIRouter
-from . import register, login, reset_password, info
+from . import register, login, account
 
 router = APIRouter()
 
-router.include_router(register.router, prefix="/register")
-router.include_router(login.router, prefix="/login")
-router.include_router(reset_password.router)
-router.include_router(info.router, tags=["Users"])
+router.include_router(register.router, prefix="/register", tags=["Register"])
+router.include_router(login.router, prefix="/login", tags=["Login"])
+router.include_router(account.router, tags=["Account"])

@@ -20,7 +20,8 @@ router = APIRouter()
     responses={
         400: ERROR_UNSUPPORTED_TARGET_TYPE,
         404: ERROR_TARGET_NOT_FOUND
-    }
+    },
+    summary="게시물/댓글 좋아요 토글"
 )
 async def toggle_like(
     req: LikeToggleRequest, 

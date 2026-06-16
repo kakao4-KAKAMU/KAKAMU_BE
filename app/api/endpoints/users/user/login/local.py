@@ -15,7 +15,8 @@ router = APIRouter()
 @router.post(
     "/local",
     response_model=Token,
-    responses={401: ERROR_LOGIN_FAILED}
+    responses={401: ERROR_LOGIN_FAILED},
+    summary="일반 로그인"
 )
 def login_local(request: LocalLoginRequest, db: Session = Depends(get_db)) -> dict:
     """JSON 형식(LocalLoginRequest)으로 이메일과 비밀번호를 받아 일반 로그인을 처리합니다."""

@@ -11,7 +11,8 @@ router = APIRouter()
 @router.post(
     "/refresh",
     response_model=Token,
-    responses={401: ERROR_REFRESH_TOKEN_FAILURES}
+    responses={401: ERROR_REFRESH_TOKEN_FAILURES},
+    summary="액세스 토큰 갱신"
 )
 def refresh_access_token(request: RefreshRequest) -> dict:
     """리프레시 토큰을 검증하고 새로운 액세스 토큰을 발급합니다."""

@@ -9,7 +9,7 @@ from app.schemas.request.user import UserUpdate
 
 class UserUpdateService:
     async def update_user(self, db: Session, user_id: UUID, user_in: UserUpdate) -> User:
-        user = db.query(User).filter(User.id == user_id, User.status == "ACTIVE").first()
+        user = db.scalar(select(User).where(User.id == user_id, User.status == "ACTIVE"))
         if not user:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "사용자를 찾을 수 없습니다."})
 

@@ -22,7 +22,8 @@ router = APIRouter()
         400: ERROR_SAME_NICKNAME,
         403: ERROR_FORBIDDEN_PERSONA_UPDATE,
         404: ERROR_PERSONA_NOT_FOUND
-    }
+    },
+    summary="페르소나 정보 수정"
 )
 async def update_persona(
     persona_id: UUID,

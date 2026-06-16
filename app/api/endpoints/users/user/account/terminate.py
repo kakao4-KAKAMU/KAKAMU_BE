@@ -9,11 +9,16 @@ from app.service.user.terminate_service import account_termination_service
 
 router = APIRouter()
 
-@router.post("/v1/account/terminate", tags=["Account"], response_model=SuccessResponse)
+@router.post(
+    "/v1/account/terminate",
+    tags=["Account"],
+    response_model=SuccessResponse,
+    summary="회원 탈퇴 및 데이터 파기"
+)
 async def terminate_account(
     db: Session = Depends(get_db),
     user: User = Depends(get_active_user)
-):
+) -> dict:
     """단일 트랜잭션 기반 회원 탈퇴 및 데이터 영구 파기"""
     await account_termination_service.terminate_account(db, user.id)
     

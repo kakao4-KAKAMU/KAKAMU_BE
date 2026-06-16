@@ -20,7 +20,8 @@ router = APIRouter()
         400: ERROR_MINIMUM_PERSONA_REQUIRED,
         404: ERROR_PERSONA_NOT_FOUND,
         500: ERROR_PERSONA_DELETE_FAILED
-    }
+    },
+    summary="페르소나 즉시 삭제"
 )
 async def delete_persona(
     persona_id: UUID,

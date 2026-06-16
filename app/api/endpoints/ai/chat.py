@@ -11,7 +11,11 @@ from app.schemas.request.chat import ChatRequest
 router = APIRouter()
 
 # 스트리밍 방식에서는 response_model을 사용하지 않고 StreamingResponse를 직접 반환합니다.
-@router.post("/completions", responses={503: ERROR_ML_SERVER_UNAVAILABLE})
+@router.post(
+    "/completions",
+    responses={503: ERROR_ML_SERVER_UNAVAILABLE},
+    summary="챗봇 텍스트 스트리밍 생성"
+)
 async def chat_with_vllm(
     req: ChatRequest,
     current_user: User = Depends(get_active_user),

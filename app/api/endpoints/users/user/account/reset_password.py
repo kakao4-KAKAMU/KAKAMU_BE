@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from app.db.session import get_db
 from app.models import User, LocalAuth
 from app.core.security import get_password_hash
@@ -23,12 +24,13 @@ router = APIRouter()
         404: ERROR_USER_NOT_FOUND,
         422: ERROR_VALIDATION_ERROR,
         500: ERROR_DB_COMMIT_ERROR
-    }
+    },
+    summary="비밀번호 재설정"
 )
 def reset_local_password(
     request: PasswordResetRequest,
     db: Session = Depends(get_db)
-):
+) -> dict:
     """
     Firebase 본인 인증(전화번호)을 통해 이메일 계정의 비밀번호를 재설정합니다.
     """
@@ -43,7 +45,7 @@ def reset_local_password(
     formatted_phone = phone_number.replace("+82", "0") if phone_number.startswith("+82") else phone_number
 
     # 2. 인증된 전화번호를 기반으로 User 조회
-    user = db.query(User).filter(User.phone == formatted_phone).first()
+    user = db.scalar(select(User).where(User.phone == formatted_phone))
     
     if not user:
         raise HTTPException(
@@ -52,7 +54,7 @@ def reset_local_password(
         )
 
     # 3. 로컬 계정(이메일 가입자) 여부 확인
-    local_auth = db.query(LocalAuth).filter(LocalAuth.user_id == user.id).first()
+    local_auth = db.scalar(select(LocalAuth).where(LocalAuth.user_id == user.id))
     if not local_auth:
         raise HTTPException(
             status_code=400,

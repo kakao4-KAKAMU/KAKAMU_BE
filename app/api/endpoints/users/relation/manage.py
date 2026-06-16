@@ -18,7 +18,8 @@ router = APIRouter()
 @router.post(
     "/follows/{following_user_id}",
     response_model=RelationResponse,
-    responses={400: ERROR_CANNOT_FOLLOW_SELF}
+    responses={400: ERROR_CANNOT_FOLLOW_SELF},
+    summary="유저 팔로우"
 )
 async def follow_user(
     following_user_id: UUID,
@@ -30,7 +31,11 @@ async def follow_user(
         raise HTTPException(status_code=400, detail={"code": "CANNOT_FOLLOW_SELF", "message": "자기 자신을 팔로우할 수 없습니다."})
     return await relation_service.follow(db, follower_id=current_user.id, following_id=following_user_id)
 
-@router.delete("/follows/{following_user_id}", response_model=RelationResponse)
+@router.delete(
+    "/follows/{following_user_id}",
+    response_model=RelationResponse,
+    summary="유저 팔로우 해제"
+)
 async def unfollow_user(
     following_user_id: UUID,
     db: Session = Depends(get_db),
@@ -42,7 +47,8 @@ async def unfollow_user(
 @router.post(
     "/blocks/{blocked_user_id}",
     response_model=RelationResponse,
-    responses={400: ERROR_CANNOT_BLOCK_SELF}
+    responses={400: ERROR_CANNOT_BLOCK_SELF},
+    summary="유저 차단"
 )
 async def block_user(
     blocked_user_id: UUID,
@@ -58,7 +64,11 @@ async def block_user(
         db, blocker_id=current_user.id, blocked_id=blocked_user_id, level="USER"
     )
 
-@router.delete("/blocks/{blocked_user_id}", response_model=RelationResponse)
+@router.delete(
+    "/blocks/{blocked_user_id}",
+    response_model=RelationResponse,
+    summary="유저 차단 해제"
+)
 async def unblock_user(
     blocked_user_id: UUID,
     db: Session = Depends(get_db),
@@ -67,7 +77,11 @@ async def unblock_user(
     """특정 유저에 대한 차단을 해제합니다."""
     return await relation_service.unblock(db, blocker_id=current_user.id, blocked_id=blocked_user_id)
 
-@router.get("/users/{target_user_id}/followers", response_model=FollowListResponse)
+@router.get(
+    "/users/{target_user_id}/followers",
+    response_model=FollowListResponse,
+    summary="유저의 팔로워 목록 조회"
+)
 def get_followers(
     target_user_id: UUID,
     cursor: Optional[UUID] = Query(None, description="마지막으로 조회한 팔로워의 유저 ID"),
@@ -106,7 +120,11 @@ def get_followers(
         "has_next": len(items) == limit
     }
 
-@router.get("/users/{target_user_id}/followings", response_model=FollowListResponse)
+@router.get(
+    "/users/{target_user_id}/followings",
+    response_model=FollowListResponse,
+    summary="유저의 팔로잉 목록 조회"
+)
 def get_followings(
     target_user_id: UUID,
     cursor: Optional[UUID] = Query(None, description="마지막으로 조회한 팔로잉 유저 ID"),

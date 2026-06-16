@@ -15,7 +15,11 @@ router = APIRouter()
 
 
 # 모든 페르소나 조회
-@router.get("/personas", response_model=List[PersonaResponse])
+@router.get(
+    "/personas",
+    response_model=List[PersonaResponse],
+    summary="내 페르소나 목록 전체 조회"
+)
 async def get_my_personas(
     user: User = Depends(get_active_user),
     db: Session = Depends(get_db)
@@ -31,7 +35,8 @@ async def get_my_personas(
     response_model=PersonaResponse,
     responses={
         404: ERROR_PERSONA_NOT_FOUND
-    }
+    },
+    summary="단일 페르소나 상세 조회"
 )
 async def get_persona_detail(
     persona_id: UUID,
