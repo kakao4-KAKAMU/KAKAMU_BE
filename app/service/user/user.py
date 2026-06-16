@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func, and_
 from uuid import UUID
 from app.models import User, Follow, Post
 from typing import Optional
@@ -10,7 +11,7 @@ class UserService:
     @staticmethod
     def get_user(db: Session, user_id: UUID) -> User:
         """특정 유저의 정보를 데이터베이스에서 조회합니다."""
-        user = db.query(User).filter(User.id == user_id, User.status == "ACTIVE").first()
+        user = db.scalar(select(User).where(User.id == user_id, User.status == "ACTIVE"))
         
         if not user:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "요청한 사용자를 찾을 수 없습니다."})
@@ -24,21 +25,20 @@ class UserService:
         viewer_user_id: Optional[UUID] = None,
     ) -> UserPublicResponse:
         """특정 유저의 공개 프로필 정보(팔로워, 팔로잉, 게시물 수 등 포함)를 반환합니다."""
-        user = db.query(User).filter(User.id == target_user_id, User.status == "ACTIVE").first()
+        user = db.scalar(select(User).where(User.id == target_user_id, User.status == "ACTIVE"))
         
         if not user:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "요청한 사용자를 찾을 수 없습니다."})
             
-        follower_count = db.query(Follow).filter(Follow.following_id == target_user_id).count()
-        following_count = db.query(Follow).filter(Follow.follower_id == target_user_id).count()
-        post_count = db.query(Post).filter(Post.user_id == target_user_id, Post.status == "ACTIVE").count()
+        follower_count = db.scalar(select(func.count(Follow.follower_id)).where(Follow.following_id == target_user_id))
+        following_count = db.scalar(select(func.count(Follow.following_id)).where(Follow.follower_id == target_user_id))
+        post_count = db.scalar(select(func.count(Post.id)).where(Post.user_id == target_user_id, Post.status == "ACTIVE"))
         
         is_following = False
         if viewer_user_id:
-            is_following = db.query(Follow).filter(
-                Follow.follower_id == viewer_user_id,
-                Follow.following_id == target_user_id
-            ).first() is not None
+            is_following = db.scalar(select(Follow).where(
+                and_(Follow.follower_id == viewer_user_id, Follow.following_id == target_user_id)
+            )) is not None
             
         return UserPublicResponse(
             id=user.id,

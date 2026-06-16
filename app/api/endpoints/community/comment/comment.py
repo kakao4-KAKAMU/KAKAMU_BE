@@ -21,7 +21,8 @@ router = APIRouter()
     responses={
         403: ERROR_FORBIDDEN_COMMENT_DELETE,
         404: ERROR_COMMENT_NOT_FOUND
-    }
+    },
+    summary="댓글 삭제 (소프트 삭제)"
 )
 def delete_comment(comment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_active_user)):
     """댓글을 소프트 삭제합니다. 삭제 시 하위 대댓글도 모두 함께 비활성화(INACTIVE) 처리됩니다."""
@@ -34,7 +35,8 @@ def delete_comment(comment_id: int, db: Session = Depends(get_db), current_user:
     responses={
         403: ERROR_FORBIDDEN_BLOCKED_COMMENT,
         404: ERROR_COMMENT_NOT_FOUND
-    }
+    },
+    summary="단일 댓글 상세(스포일러 원본) 조회"
 )
 def get_comment_detail(comment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_active_user)):
     """사용자가 댓글의 '스포일러 보기'를 클릭했을 때 원본 내용을 반환합니다."""

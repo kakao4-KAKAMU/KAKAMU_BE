@@ -1,6 +1,7 @@
 import logging
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from uuid import UUID
 
 from app.models import User
@@ -15,7 +16,7 @@ class AccountTerminationService:
         회원 탈퇴 및 데이터 파기 (Atomic Transaction 보장)
         """
         # 1. 유저 및 종속 페르소나 조회
-        user = db.query(User).filter(User.id == user_id).first()
+        user = db.scalar(select(User).where(User.id == user_id))
         if not user:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "유저를 찾을 수 없습니다."})
             

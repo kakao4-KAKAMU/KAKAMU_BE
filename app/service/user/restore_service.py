@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import select, update
 from uuid import UUID
 from app.models import User, Persona
 
@@ -10,7 +11,7 @@ class AccountRestoreService:
         """
         회원 탈퇴(Soft Delete) 취소 및 계정 복구
         """
-        user = db.query(User).filter(User.id == user_id).first()
+        user = db.scalar(select(User).where(User.id == user_id))
         
         if not user:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "유저를 찾을 수 없습니다."})
@@ -28,14 +29,11 @@ class AccountRestoreService:
             # 2. 회원 탈퇴 시 함께 삭제(Soft Delete)되었던 페르소나 일괄 복원
             # (deleted_at 값이 유저의 탈퇴 시점과 정확히 일치하는 데이터만 복구하여 그 전에 따로 지웠던 페르소나 방어)
             if user_deleted_at:
-                db.query(Persona).filter(
+                db.execute(update(Persona).where(
                     Persona.user_id == user_id,
                     Persona.status == "DELETED",
                     Persona.deleted_at == user_deleted_at
-                ).update({
-                    "status": "ACTIVE",
-                    "deleted_at": None
-                }, synchronize_session=False)
+                ).values(status="ACTIVE", deleted_at=None))
 
             db.commit()
             return True

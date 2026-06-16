@@ -15,7 +15,11 @@ from app.schemas.errors import (
 
 router = APIRouter()
 
-@router.get("/", response_model=PostListResponse)
+@router.get(
+    "/",
+    response_model=PostListResponse,
+    summary="피드(게시물) 무한 스크롤 조회"
+)
 def get_posts(
     cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"), 
     limit: int = Query(20, le=100), 
@@ -26,7 +30,11 @@ def get_posts(
     """게시물 피드를 무한 스크롤(Cursor-based) 방식으로 조회합니다."""
     return post_read_service.get_posts(db, current_user.id, cursor, limit)
 
-@router.get("/liked", response_model=PostListResponse)
+@router.get(
+    "/liked",
+    response_model=PostListResponse,
+    summary="내가 좋아요한 게시물 목록 조회"
+)
 def get_my_liked_posts(
     cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"), 
     limit: int = Query(20, le=100), 
@@ -40,7 +48,11 @@ def get_my_liked_posts(
     """
     return post_read_service.get_my_liked_posts(db, current_user.id, cursor, limit)
 
-@router.get("/user/{target_user_id}", response_model=PostListResponse)
+@router.get(
+    "/user/{target_user_id}",
+    response_model=PostListResponse,
+    summary="특정 유저의 게시물 목록 조회"
+)
 def get_user_posts(
     target_user_id: UUID,
     cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"), 
@@ -60,7 +72,8 @@ def get_user_posts(
     responses={
         403: ERROR_FORBIDDEN_BLOCKED_POST,
         404: ERROR_POST_NOT_FOUND
-    }
+    },
+    summary="게시물 상세 조회"
 )
 def get_post_detail(
     post_id: int, 

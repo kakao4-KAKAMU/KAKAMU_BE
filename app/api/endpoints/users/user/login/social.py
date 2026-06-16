@@ -17,7 +17,8 @@ router = APIRouter()
 @router.post(
     "/social",
     response_model=TokenResponse,
-    responses={400: ERROR_UNSUPPORTED_SOCIAL_PROVIDER, 500: ERROR_LOGIN_UNEXPECTED_ERROR}
+    responses={400: ERROR_UNSUPPORTED_SOCIAL_PROVIDER, 500: ERROR_LOGIN_UNEXPECTED_ERROR},
+    summary="소셜 로그인"
 )
 async def social_login(request: SocialLoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     """소셜 토큰을 검증하고, 기존 회원이면 JWT 발급, 신규 회원이면 회원가입 유도 응답을 보냅니다."""

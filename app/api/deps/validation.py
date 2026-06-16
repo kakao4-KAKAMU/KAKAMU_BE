@@ -1,6 +1,7 @@
 import hashlib
 from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.db.session import get_db
 from app.models import LocalAuth, SocialAuth
@@ -19,7 +20,7 @@ def validate_local_registration(user_in: UserRegister, db: Session = Depends(get
     ci_string = f"{user_in.username}{formatted_phone}"
     ci_value = hashlib.sha256(ci_string.encode('utf-8')).hexdigest()
     
-    if db.query(LocalAuth).filter(LocalAuth.email == user_in.email).first():
+    if db.scalar(select(LocalAuth).where(LocalAuth.email == user_in.email)):
         raise HTTPException(status_code=400, detail={"code": "DUPLICATE_EMAIL", "message": "Email already registered"})
         
     return {
@@ -47,7 +48,7 @@ async def validate_social_registration(request: SocialRegisterRequest, db: Sessi
     ci_string = f"{request.username}{formatted_phone}"
     ci_value = hashlib.sha256(ci_string.encode('utf-8')).hexdigest()
     
-    if request.email and db.query(SocialAuth).filter(SocialAuth.provider == request.provider, SocialAuth.email == request.email).first():
+    if request.email and db.scalar(select(SocialAuth).where(SocialAuth.provider == request.provider, SocialAuth.email == request.email)):
         raise HTTPException(status_code=400, detail={"code": "DUPLICATE_EMAIL", "message": "이미 등록된 이메일입니다."})
         
     return {"request": request, "provider_user_id": provider_user_id, "ci_value": ci_value, "formatted_phone": formatted_phone}
