@@ -20,7 +20,7 @@ router = APIRouter()
 )
 def get_user_info_api(
     user_id: UUID,
-    db: Session = Depends(get_db),
+    db: Session  = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user)
 ) -> dict:
     """특정 유저의 상세 정보를 조회합니다. (비회원 접근 가능)"""

@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.encoders import jsonable_encoder
 
 def setup_exception_handlers(app: FastAPI) -> None:
     """FastAPI 애플리케이션에 전역 예외 처리기를 등록합니다."""
@@ -24,5 +25,5 @@ def setup_exception_handlers(app: FastAPI) -> None:
     async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=422,
-            content={"detail": {"code": "VALIDATION_ERROR", "message": "요청 데이터 형식이 올바르지 않습니다.", "errors": exc.errors()}}
+            content={"detail": {"code": "VALIDATION_ERROR", "message": "요청 데이터 형식이 올바르지 않습니다.", "errors": jsonable_encoder(exc.errors())}}
         )
