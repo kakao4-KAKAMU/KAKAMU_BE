@@ -11,8 +11,7 @@ router = APIRouter(prefix="/test/batch", tags=["Test - Batch"])
     summary="[테스트용] 검색어 통계 배치 수동 실행"
 )
 def trigger_search_batch(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_active_user)
+    background_tasks: BackgroundTasks
 ):
     """수동으로 검색어 통계 배치를 백그라운드에서 즉시 실행합니다."""
     background_tasks.add_task(run_daily_search_aggregation)
@@ -23,8 +22,7 @@ def trigger_search_batch(
     summary="[테스트용] 탈퇴 유저 영구 삭제 배치 수동 실행"
 )
 def trigger_user_delete_batch(
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_active_user)
+    background_tasks: BackgroundTasks
 ):
     """수동으로 7일 경과 탈퇴 유저 영구 삭제 배치를 백그라운드에서 즉시 실행합니다."""
     background_tasks.add_task(hard_delete_old_users)

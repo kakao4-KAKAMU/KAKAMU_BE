@@ -1,13 +1,12 @@
-import re
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from pydantic import BaseModel, validator, EmailStr
 
 from app.db.session import get_db
 from app.models import User, LocalAuth
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
 from app.schemas.response.common import SuccessResponse
+from app.schemas.request.auth import PasswordResetRequest
 from app.core.firebase import verify_firebase_token
 from app.schemas.errors import (
     ERROR_USER_NOT_FOUND,
@@ -17,26 +16,6 @@ from app.schemas.errors import (
 )
 
 router = APIRouter()
-
-class PasswordResetRequest(BaseModel):
-    email: EmailStr
-    firebase_id_token: str
-    new_password: str
-
-    @validator("new_password")
-    def validate_password_complexity(cls, v: str) -> str:
-        """비밀번호 복잡도 검증: 8자 이상, 영문, 숫자 포함"""
-        errors = []
-        if len(v) < 8:
-            errors.append("8자 이상")
-        if not re.search(r"[a-zA-Z]", v):
-            errors.append("영문")
-        if not re.search(r"\d", v):
-            errors.append("숫자")
-        
-        if errors:
-            raise ValueError(f"비밀번호는 다음 조건을 만족해야 합니다: {', '.join(errors)} 포함")
-        return v
 
 @router.post(
     "/local/reset-password",
@@ -77,6 +56,13 @@ def reset_local_password(
         raise HTTPException(
             status_code=404, 
             detail={"code": "USER_NOT_FOUND", "message": "입력하신 이메일과 인증된 전화번호가 일치하는 계정을 찾을 수 없습니다."}
+        )
+
+    # 3. 새 비밀번호가 기존 비밀번호와 동일한지 검사
+    if verify_password(request.new_password, local_auth.password_hash):
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "SAME_PASSWORD", "message": "새 비밀번호는 기존 비밀번호와 다르게 설정해야 합니다."}
         )
 
     # 4. 비밀번호 업데이트 (해싱 처리)
