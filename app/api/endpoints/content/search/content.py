@@ -9,7 +9,7 @@ from app.db.session import get_db
 from app.models.movie import Movie, Genre, People, MovieTitle, MovieStaff
 from app.models.search_log import SearchDailyStat
 from app.models.user import User
-from app.api.deps import get_active_user
+from app.api.deps.auth import get_optional_user
 from .utils import handle_search_request, get_search_pattern
 from app.schemas.response.search import GenreListResponse, PaginatedSearchResponse, TrendSearchResponse
 
@@ -28,10 +28,11 @@ def search_content(
     cursor: Optional[str] = Query(None, description="페이징 커서(ID)"),
     limit: int = Query(20, le=50),
     sort: str = Query("accuracy", description="정렬 기준 (accuracy: 정확도순, popularity: 인기순, latest: 최신순, name_asc: 이름 오름차순, name_desc: 이름 내림차순)"),
-    current_user: User = Depends(get_active_user),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db)
 ):
-    handle_search_request(request, background_tasks, str(current_user.id), q)
+    user_id = str(current_user.id) if current_user else "anonymous"
+    handle_search_request(request, background_tasks, user_id, q)
     search_pattern = get_search_pattern(q)
 
     # 서브쿼리(EXISTS)를 사용해 중복 조회 방지

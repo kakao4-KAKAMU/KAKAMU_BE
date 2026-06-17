@@ -22,7 +22,7 @@ class UserRegister(BaseModel):
 
 class LocalLinkRequest(BaseModel):
     email: Optional[EmailStr] = Field(default=None, description="연동할 이메일 (미입력 시 소셜 계정의 이메일 자동 사용)")
-    password: str = Field(..., min_length=8, description="연동할 비밀번호")
+    password: PasswordStr = Field(..., min_length=8, description="연동할 비밀번호")
 
 class SocialRegisterRequest(BaseModel):
     provider: str = Field(..., description="소셜 플랫폼 이름 (예: kakao)")

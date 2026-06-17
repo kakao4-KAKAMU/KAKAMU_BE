@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 import jwt
 from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
+from typing import Optional
 
 from app.core.config import settings
 from app.db.session import get_db
@@ -54,3 +55,19 @@ def get_active_user(current_user: User = Depends(get_current_user)) -> User:
         )
         
     return current_user
+
+def get_optional_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> Optional[User]:
+    """
+    비회원(로그인하지 않은 유저)도 접근 가능한 API를 위한 선택적 인증 의존성입니다.
+    토큰이 없거나 유효하지 않으면 에러를 띄우지 않고 None을 반환합니다.
+    """
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") == "refresh":
+            return None
+        user = db.scalar(select(User).where(User.id == payload.get("sub"), User.status == "ACTIVE"))
+        return user
+    except Exception:
+        return None

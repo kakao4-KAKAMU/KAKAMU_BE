@@ -6,7 +6,7 @@ from uuid import UUID
 
 from app.db.session import get_db
 from app.models import User, Block
-from app.api.deps import get_active_user
+from app.api.deps.auth import get_optional_user
 from .utils import handle_search_request, get_search_pattern
 from app.schemas.response.search import CursorSearchResponse
 
@@ -24,27 +24,28 @@ def search_user(
     q: str = Query(..., min_length=1, description="검색어"),
     cursor: Optional[str] = Query(None, description="페이징 커서 (nickname,id)"),
     limit: int = Query(20, le=50),
-    current_user: User = Depends(get_active_user),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db)
 ):
-    handle_search_request(request, background_tasks, str(current_user.id), q)
+    user_id = str(current_user.id) if current_user else "anonymous"
+    handle_search_request(request, background_tasks, user_id, q)
     search_pattern = get_search_pattern(q)
-
-    # 💡 차단 유저 필터링: 내가 차단했거나 나를 차단한 유저의 ID 목록 추출
-    blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_user.id)
-    blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_user.id)
 
     # 닉네임/유저네임 단독 검색 및 '닉네임#태그' 형태의 복합 검색 지원
     query = db.query(User).filter(
         User.status == "ACTIVE",
-        User.id.notin_(blocked_by_me),
-        User.id.notin_(blocking_me),
         or_(
             User.username.ilike(search_pattern),
             User.nickname.ilike(search_pattern),
             func.concat(User.nickname, "#", User.tag).ilike(search_pattern)
         )
     )
+
+    # 💡 로그인한 경우에만 차단 유저 필터링 적용
+    if current_user:
+        blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_user.id)
+        blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_user.id)
+        query = query.filter(User.id.notin_(blocked_by_me), User.id.notin_(blocking_me))
     
     # 커서 기반 페이징 적용
     if cursor:

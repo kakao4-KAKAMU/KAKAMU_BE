@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import Any
+from typing import Any, Optional
 from uuid import UUID
 
 from app.db.session import get_db
@@ -28,7 +28,7 @@ async def create_post(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_active_user),
     # 💡 페르소나별 취향/알고리즘 수집을 위해 현재 활성화된 페르소나 정보를 받아옵니다.
-    current_persona_id: UUID = Depends(get_current_persona)
+    current_persona_id: Optional[UUID] = Depends(get_current_persona)
 ) -> Any:
     """새로운 게시물을 작성하고 해시태그 및 멘션을 파싱하여 연결합니다."""
     # 💡 서비스 레이어에도 persona_id를 함께 전달하여 DB 저장 시 관계를 맺도록 합니다.

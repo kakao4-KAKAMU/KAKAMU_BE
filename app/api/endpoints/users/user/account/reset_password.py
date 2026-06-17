@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+
 from app.db.session import get_db
 from app.models import User, LocalAuth
-from app.core.security import get_password_hash
-from app.schemas.request.auth import PasswordResetRequest
+from app.core.security import get_password_hash, verify_password
 from app.schemas.response.common import SuccessResponse
+from app.schemas.request.auth import PasswordResetRequest
 from app.core.firebase import verify_firebase_token
 from app.schemas.errors import (
     ERROR_USER_NOT_FOUND,
@@ -44,21 +45,24 @@ def reset_local_password(
         
     formatted_phone = phone_number.replace("+82", "0") if phone_number.startswith("+82") else phone_number
 
-    # 2. 인증된 전화번호를 기반으로 User 조회
-    user = db.scalar(select(User).where(User.phone == formatted_phone))
-    
-    if not user:
-        raise HTTPException(
-            status_code=404, 
-            detail={"code": "USER_NOT_FOUND", "message": "해당 전화번호로 가입된 계정이 없습니다."}
-        )
-
-    # 3. 로컬 계정(이메일 가입자) 여부 확인
-    local_auth = db.scalar(select(LocalAuth).where(LocalAuth.user_id == user.id))
+    # 2. 이메일(LocalAuth)과 전화번호(User)를 동시에(JOIN) 검증하여 안전하게 계정 찾기
+    local_auth = db.scalar(
+        select(LocalAuth)
+        .join(User, LocalAuth.user_id == User.id)
+        .where(LocalAuth.email == request.email)
+        .where(User.phone == formatted_phone)
+    )
     if not local_auth:
         raise HTTPException(
+            status_code=404, 
+            detail={"code": "USER_NOT_FOUND", "message": "입력하신 이메일과 인증된 전화번호가 일치하는 계정을 찾을 수 없습니다."}
+        )
+
+    # 3. 새 비밀번호가 기존 비밀번호와 동일한지 검사
+    if verify_password(request.new_password, local_auth.password_hash):
+        raise HTTPException(
             status_code=400,
-            detail={"code": "SOCIAL_USER", "message": "소셜 로그인으로 가입된 계정입니다. 해당 소셜 서비스를 통해 로그인해주세요."}
+            detail={"code": "SAME_PASSWORD", "message": "새 비밀번호는 기존 비밀번호와 다르게 설정해야 합니다."}
         )
 
     # 4. 비밀번호 업데이트 (해싱 처리)
