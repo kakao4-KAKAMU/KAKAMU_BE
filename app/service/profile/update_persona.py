@@ -1,6 +1,7 @@
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import select, and_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Persona, FavMovie, FavGenre, FavPeople
@@ -45,6 +46,14 @@ class PersonaUpdateService:
                         status_code=400,
                         detail={"code": "SAME_NICKNAME", "message": "기존과 동일한 닉네임입니다."}
                     )
+                    
+                # 변경하려는 닉네임이 다른 본인의 페르소나 닉네임과 중복되는지 검사
+                duplicate_stmt = select(Persona).where(Persona.user_id == user_id, Persona.nickname == persona_data.nickname, Persona.id != persona_id, Persona.status != "DELETED")
+                if db.scalar(duplicate_stmt):
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"code": "DUPLICATE_PERSONA_NICKNAME", "message": "이미 사용 중인 페르소나 닉네임입니다."}
+                    )
                 
                 persona.nickname = persona_data.nickname
 
@@ -75,6 +84,14 @@ class PersonaUpdateService:
                     db.refresh(persona)
                     
                     return persona
+                    
+            except IntegrityError as e:
+                db.rollback()
+                span.record_exception(e)
+                raise HTTPException(
+                    status_code=400,
+                    detail={"code": "INVALID_REFERENCE_DATA", "message": "존재하지 않는 영화, 장르 또는 인물 ID가 포함되어 있습니다."}
+                )
                     
             except Exception as e:
                 db.rollback()

@@ -16,8 +16,16 @@ def check_optional_not_empty_str(v: Optional[str]) -> Optional[str]:
     return v
 
 def check_password_complexity(v: str) -> str:
-    if not re.match(r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*#?&]{8,}$', v):
-        raise ValueError("비밀번호는 영문, 숫자를 포함해야 합니다.")
+    errors = []
+    if len(v) < 8:
+        errors.append("8자 이상")
+    if not re.search(r"[a-zA-Z]", v):
+        errors.append("영문")
+    if not re.search(r"\d", v):
+        errors.append("숫자")
+    
+    if errors:
+        raise ValueError(f"비밀번호는 다음 조건을 만족해야 합니다: {', '.join(errors)} 포함")
     return v
 
 NotEmptyStr = Annotated[str, AfterValidator(check_not_empty_str)]

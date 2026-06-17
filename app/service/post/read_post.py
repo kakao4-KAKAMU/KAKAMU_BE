@@ -14,7 +14,10 @@ class PostReadService:
         self._block_cache: Dict[UUID, Tuple[float, Set[UUID]]] = {}
         self._cache_ttl = 60  # 캐시 유지 시간 (60초)
 
-    def _get_cached_blocked_user_ids(self, db: Session, user_id: UUID) -> Set[UUID]:
+    def _get_cached_blocked_user_ids(self, db: Session, user_id: Optional[UUID]) -> Set[UUID]:
+        if not user_id:
+            return set()
+
         now = time.time()
 
         # 메모리 누수 방지: 캐시된 유저가 10,000명을 넘어가면 캐시 초기화
@@ -142,7 +145,7 @@ class PostReadService:
         next_cursor = result[-1].id if result else None
         return PostListResponse(items=result, next_cursor=next_cursor, has_next=len(result) == limit)
 
-    def get_posts(self, db: Session, current_user_id: UUID, cursor: Optional[int], limit: int) -> PostListResponse:
+    def get_posts(self, db: Session, current_user_id: Optional[UUID], cursor: Optional[int], limit: int) -> PostListResponse:
         """게시물 피드 조회 로직"""
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
 
@@ -167,16 +170,17 @@ class PostReadService:
         comment_counts_map: Dict[int, int] = {}
 
         if post_ids:
-            liked_logs = db.query(LikeLog.target_id).filter(
-                LikeLog.user_id == current_user_id,
-                LikeLog.target_type == "POST",
-                LikeLog.target_id.in_(post_ids),
-                LikeLog.is_active == 1
-            ).all()
-            liked_post_ids = {log[0] for log in liked_logs}
+            if current_user_id:
+                liked_logs = db.query(LikeLog.target_id).filter(
+                    LikeLog.user_id == current_user_id,
+                    LikeLog.target_type == "POST",
+                    LikeLog.target_id.in_(post_ids),
+                    LikeLog.is_active == 1
+                ).all()
+                liked_post_ids = {log[0] for log in liked_logs}
 
-            author_user_ids = list({post.user_id for post, _ in posts_with_author})
-            followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
+                author_user_ids = list({post.user_id for post, _ in posts_with_author})
+                followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
 
             mentions_map = self._get_mentions_for_posts(db, post_ids)
             hashtags_map = self._get_hashtags_for_posts(db, post_ids)
@@ -244,7 +248,7 @@ class PostReadService:
         self,
         db: Session,
         target_user_id: UUID,
-        current_user_id: UUID,
+        current_user_id: Optional[UUID],
         cursor: Optional[int],
         limit: int,
     ) -> PostListResponse:
@@ -272,16 +276,18 @@ class PostReadService:
         comment_counts_map: Dict[int, int] = {}
 
         if post_ids:
-            liked_logs = db.query(LikeLog.target_id).filter(
-                LikeLog.user_id == current_user_id,
-                LikeLog.target_type == "POST",
-                LikeLog.target_id.in_(post_ids),
-                LikeLog.is_active == 1
-            ).all()
-            liked_post_ids = {log[0] for log in liked_logs}
+            if current_user_id:
+                liked_logs = db.query(LikeLog.target_id).filter(
+                    LikeLog.user_id == current_user_id,
+                    LikeLog.target_type == "POST",
+                    LikeLog.target_id.in_(post_ids),
+                    LikeLog.is_active == 1
+                ).all()
+                liked_post_ids = {log[0] for log in liked_logs}
 
-            author_user_ids = list({post.user_id for post, _ in posts_with_author})
-            followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
+                author_user_ids = list({post.user_id for post, _ in posts_with_author})
+                followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
+
             mentions_map = self._get_mentions_for_posts(db, post_ids)
             hashtags_map = self._get_hashtags_for_posts(db, post_ids)
             comment_counts_map = self._get_comment_counts_for_posts(db, post_ids)
@@ -296,7 +302,7 @@ class PostReadService:
             limit=limit,
         )
 
-    def get_post_detail(self, db: Session, post_id: int, current_user_id: UUID) -> PostResponse:
+    def get_post_detail(self, db: Session, post_id: int, current_user_id: Optional[UUID]) -> PostResponse:
         """게시물 상세 조회 로직"""
         db_result = db.query(Post, User).join(User, Post.user_id == User.id)\
             .options(selectinload(Post.movies).selectinload(Movie.titles))\
@@ -314,15 +320,17 @@ class PostReadService:
         mentions_map = self._get_mentions_for_posts(db, [post.id])
         comment_counts_map = self._get_comment_counts_for_posts(db, [post.id])
 
-        is_liked = db.query(LikeLog).filter(
-            LikeLog.user_id == current_user_id,
-            LikeLog.target_type == "POST",
-            LikeLog.target_id == post.id,
-            LikeLog.is_active == 1
-        ).first() is not None
+        is_liked = False
+        if current_user_id:
+            is_liked = db.query(LikeLog).filter(
+                LikeLog.user_id == current_user_id,
+                LikeLog.target_type == "POST",
+                LikeLog.target_id == post.id,
+                LikeLog.is_active == 1
+            ).first() is not None
 
         is_following = False
-        if author and author.status != "DELETED":
+        if current_user_id and author and author.status != "DELETED":
             is_following = db.query(Follow).filter(
                 Follow.follower_id == current_user_id,
                 Follow.following_id == post.user_id

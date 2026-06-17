@@ -8,8 +8,8 @@ from contextlib import asynccontextmanager
 import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 
-from apscheduler.schedulers.background import BackgroundScheduler
 from app.core.tracing import setup_tracing
 from fastapi.staticfiles import StaticFiles
 
@@ -17,12 +17,13 @@ from app.core.config import settings
 from app.core.redis import redis_client
 from app.service.system.sync_task import stat_sync_worker
 from app.api.api import api_router
-from app.worker.search_batch import run_daily_search_aggregation
-from app.worker.user_batch import hard_delete_old_users
+from app.worker.scheduler import start_scheduler
 
 from app.middleware.logging_middleware import LoggingMiddleware
 from app.core.exceptions import setup_exception_handlers
 from app.core.db_startup import create_database_if_not_exists, run_migrations
+
+logger = logging.getLogger(__name__)
 
 # --- 앱 시작 시 자동으로 마이그레이션 실행 ---
 @asynccontextmanager
@@ -33,28 +34,24 @@ async def lifespan(app: FastAPI):
 
     try:
         await redis_client.ping()
-        print("Successfully connected to Redis!")
+        logger.info("Successfully connected to Redis!")
     except Exception as e:
-        print(f"Redis connection failed: {e}")
+        logger.error(f"Redis connection failed: {e}")
         
     # 백그라운드 워커 실행 (Redis -> DB 주기적 동기화 시작)
     sync_task = asyncio.create_task(stat_sync_worker())
 
-    # 매일 새벽 3시에 검색어 일일 통계 배치 실행
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(run_daily_search_aggregation, 'cron', hour=3, minute=0)
-    # 매일 새벽 4시 30분에 7일 경과된 탈퇴 유저(User) 영구 삭제 배치 실행
-    scheduler.add_job(hard_delete_old_users, 'cron', hour=4, minute=30)
-    scheduler.start()
+    # 분산 락이 적용된 스케줄러를 외부 모듈에서 가져와 실행
+    scheduler = start_scheduler()
 
     yield
     
     sync_task.cancel() # 서버 종료 시 워커 중지
+    scheduler.shutdown() # 스케줄러 종료
     await redis_client.close()
-    scheduler.shutdown()
     
     # 앱 종료 시 실행될 로직 (Shutdown)이 필요하다면 여기에 작성
-    print("Shutting down...")
+    logger.info("Shutting down...")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

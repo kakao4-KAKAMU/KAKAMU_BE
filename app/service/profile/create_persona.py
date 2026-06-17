@@ -1,6 +1,7 @@
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.models import Persona
 from app.models import FavMovie, FavGenre, FavPeople
@@ -32,6 +33,16 @@ class PersonaCreateService:
                     status_code=400,
                     detail={"code": "MISSING_NICKNAME", "message": "닉네임을 입력해주세요"}
                 )
+                
+            with tracer.start_as_current_span("persona.check_duplicate_nickname"):
+                # 본인이 이미 같은 닉네임의 페르소나를 가지고 있는지 검사
+                duplicate_stmt = select(Persona).where(Persona.user_id == user_id, Persona.nickname == name, Persona.status != "DELETED")
+                if db.scalar(duplicate_stmt):
+                    span.set_attribute("error.reason", "duplicate_persona_nickname")
+                    raise HTTPException(
+                        status_code=400,
+                        detail={"code": "DUPLICATE_PERSONA_NICKNAME", "message": "이미 사용 중인 페르소나 닉네임입니다."}
+                    )
 
             with tracer.start_as_current_span("persona.count_user_personas") as count_span:
                 # 페르소나 계정이 있는 지 검사
@@ -94,10 +105,16 @@ class PersonaCreateService:
                     db.refresh(new_profile)
 
                 return new_profile  # schemas/profile.py에 정의한
+            except IntegrityError as e:
+                db.rollback()
+                span.record_exception(e)
+                span.set_attribute("error.reason", "invalid_reference_data")
+                raise HTTPException(
+                    status_code=400,
+                    detail={"code": "INVALID_REFERENCE_DATA", "message": "존재하지 않는 영화, 장르 또는 인물 ID가 포함되어 있습니다."}
+                )
             except Exception as e:
                 db.rollback()
-
                 span.record_exception(e)
                 span.set_attribute("error.reason", "database_save_failed")
-
                 raise HTTPException(status_code=500, detail={"code": "DATABASE_SAVE_FAILED", "message": f"데이터베이스 저장 중 오류 발생 {str(e)}"})
