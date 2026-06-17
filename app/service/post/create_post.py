@@ -25,9 +25,9 @@ class PostCreateService:
             db.flush()
 
             for m_id in post_in.movie_ids:
-                db.add(PostMovie(post_id=new_post.id, movie_id=m_id))
+                db.add(PostMovie(post_id=new_post.id, movie_id=str(m_id)))
                 await recommendation_service.record_ml_relationship_log(
-                    db, persona_id, "MOVIE", m_id, "create_post"
+                    db, persona_id, "MOVIE", str(m_id), "create_post"
                 )
 
             hashtags, mentions = parse_content(post_in.content)
@@ -60,16 +60,17 @@ class PostCreateService:
                     db.add(PostMention(post_id=new_post.id, user_id=target_user.id))
 
             db.commit()
-            
+
             return new_post.id
-            
+
         except IntegrityError:
             db.rollback()
             raise HTTPException(status_code=400, detail={"code": "INVALID_REFERENCE_DATA", "message": "잘못된 참조 데이터가 포함되어 있습니다. (예: 존재하지 않는 영화 ID)"})
         except HTTPException:
             raise
-        except Exception:
+        except Exception as e:
             db.rollback()
+            print(e)
             raise HTTPException(status_code=500, detail={"code": "POST_CREATION_FAILED", "message": "게시물 작성 중 서버 오류가 발생했습니다."})
 
 post_create_service = PostCreateService()
