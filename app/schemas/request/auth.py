@@ -37,6 +37,10 @@ class SocialLinkRequest(BaseModel):
     provided_token: str = Field(..., description="소셜 로그인 성공 시 발급받은 액세스 토큰")
     email: Optional[EmailStr] = Field(default=None, description="소셜 계정에 연동된 이메일 (선택 동의 시)")
 
+class PhoneVerificationRequest(BaseModel):
+    email: EmailStr = Field(..., description="가입 시 사용한 이메일")
+    firebase_id_token: str = Field(..., description="Firebase 번호 인증 완료 시 발급된 ID 토큰")
+
 class PasswordResetRequest(BaseModel):
     email: EmailStr = Field(..., description="가입 시 사용한 이메일")
     firebase_id_token: str = Field(..., description="Firebase 번호 인증 완료 시 발급된 ID 토큰")
