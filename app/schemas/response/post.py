@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 class MovieSimple(BaseModel):
     id: UUID
     title: str
+    poster_url: Optional[str] = None
+    release_date: Optional[str] = None
 
 class MentionSimple(BaseModel):
     id: UUID

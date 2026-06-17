@@ -107,7 +107,7 @@ class PostReadService:
             created_at=post.created_at,
             updated_at=post.updated_at,
             movies=[
-                MovieSimple(id=m.id, title=m.titles[0].title_name if m.titles else "제목 없음")
+                MovieSimple(id=m.id, title=m.titles[0].title_name if m.titles else "제목 없음", poster_url=m.poster_url, release_date=m.release_date)
                 for m in post.movies
             ],
             hashtags=hashtags,
