@@ -24,7 +24,7 @@ class PostResponse(BaseModel):
     image_urls: List[str]
     is_spoiler: bool
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
     movies: List[MovieSimple]
     hashtags: List[str]
     mentions: List[MentionSimple]
