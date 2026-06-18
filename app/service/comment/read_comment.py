@@ -46,8 +46,10 @@ class CommentReadService:
                 id=c.id,
                 parent_id=c.parent_id,
                 author_id=None if not author or author.status == "DELETED" else author.id,
+                author_image=None if not author or author.status == "DELETED" else author.profile_image_url,
+                author_tag=None if not author or author.status == "DELETED" else author.tag,
                 author=author_name,
-                content="*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else c.content,
+                content=c.content,
                 is_spoiler=is_spoiler,
                 created_at=c.created_at,
             ))

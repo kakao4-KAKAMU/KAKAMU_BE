@@ -45,6 +45,8 @@ class CommentItem(BaseModel):
     parent_id: Optional[int]
     author_id: Optional[UUID]
     author: str
+    author_image: Optional[str] = None
+    author_tag: Optional[str] = None
     content: str
     is_spoiler: bool
     created_at: datetime
