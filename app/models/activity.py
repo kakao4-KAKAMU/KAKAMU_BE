@@ -25,11 +25,17 @@ class Comment(Base):
     replies = relationship("Comment", back_populates="parent", cascade="all, delete-orphan")    
     parent = relationship("Comment", back_populates="replies", remote_side=[id])    
     mentions = relationship("User", secondary="comment_mention", backref="mentioned_in_comments")    
+    hashtags = relationship("Hashtag", secondary="comment_hashtag", backref="comments")
 
 class CommentMention(Base):
     __tablename__ = "comment_mention"
     comment_id = Column(Integer, ForeignKey("comment.id", ondelete="CASCADE"), primary_key=True)    
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)    
+
+class CommentHashtag(Base):
+    __tablename__ = "comment_hashtag"
+    comment_id = Column(Integer, ForeignKey("comment.id", ondelete="CASCADE"), primary_key=True)
+    hashtag_id = Column(Integer, ForeignKey("hashtag.id", ondelete="CASCADE"), primary_key=True)
 
 class LikeLog(Base):
     __tablename__ = "like_log"

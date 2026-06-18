@@ -2,11 +2,41 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from sqlalchemy import func, select, or_
 from uuid import UUID
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
-from app.models import Comment, User, Block, LikeLog
+from app.models import Comment, User, Block, LikeLog, CommentMention, CommentHashtag, Hashtag
 
 class CommentReadService:
+    def _get_mentions_for_comments(self, db: Session, comment_ids: List[int]) -> Dict[int, List[Dict[str, Any]]]:
+        if not comment_ids:
+            return {}
+        
+        mentions_query = db.query(CommentMention.comment_id, User.id, User.nickname, User.tag)\
+            .join(User, User.id == CommentMention.user_id)\
+            .filter(CommentMention.comment_id.in_(comment_ids), User.status == "ACTIVE").all()
+            
+        mentions_map = {cid: [] for cid in comment_ids}
+        for m in mentions_query:
+            mentions_map[m.comment_id].append({
+                "id": m.id,
+                "nickname": m.nickname,
+                "tag": m.tag
+            })
+        return mentions_map
+
+    def _get_hashtags_for_comments(self, db: Session, comment_ids: List[int]) -> Dict[int, List[str]]:
+        if not comment_ids:
+            return {}
+            
+        hashtags_query = db.query(CommentHashtag.comment_id, Hashtag.normalized_keyword)\
+            .join(Hashtag, Hashtag.id == CommentHashtag.hashtag_id)\
+            .filter(CommentHashtag.comment_id.in_(comment_ids)).all()
+            
+        hashtags_map = {cid: [] for cid in comment_ids}
+        for h in hashtags_query:
+            hashtags_map[h.comment_id].append(h.normalized_keyword)
+        return hashtags_map
+
     def get_comments(self, db: Session, post_id: int, current_user_id: Optional[UUID], page: int = 1, size: int = 20) -> Dict[str, Any]:
         offset = (page - 1) * size
         
@@ -30,10 +60,13 @@ class CommentReadService:
         
         comments = base_query.order_by(Comment.created_at.asc()).offset(offset).limit(size).all()
 
+        comment_ids = [c.id for c, _ in comments]
+        mentions_map = self._get_mentions_for_comments(db, comment_ids)
+        hashtags_map = self._get_hashtags_for_comments(db, comment_ids)
+
         # 4. 내가 좋아요한 댓글 ID 목록 조회
         liked_comment_ids = set()
-        if current_user_id and comments:
-            comment_ids = [c.id for c, _ in comments]
+        if current_user_id and comment_ids:
             liked_logs = db.query(LikeLog.target_id).filter(
                 LikeLog.user_id == current_user_id,
                 LikeLog.target_type == "COMMENT",
@@ -49,8 +82,11 @@ class CommentReadService:
             result.append({
                 "id": c.id, "parent_id": c.parent_id, "author_id": None if not author or author.status == "DELETED" else author.id,
                 "author": author_name, "content": "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else c.content,
+                "author_image": None if not author or author.status == "DELETED" else author.profile_image_url,
                 "is_spoiler": is_spoiler, "created_at": c.created_at,
-                "like_count": c.like_count, "is_liked": c.id in liked_comment_ids
+                "like_count": c.like_count, "is_liked": c.id in liked_comment_ids,
+                "hashtags": hashtags_map.get(c.id, []),
+                "mentions": mentions_map.get(c.id, [])
             })
             
         return {
@@ -79,6 +115,9 @@ class CommentReadService:
             if is_blocked:
                 raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_BLOCKED_COMMENT", "message": "차단된 사용자의 댓글입니다."})
             
+        mentions_map = self._get_mentions_for_comments(db, [comment.id])
+        hashtags_map = self._get_hashtags_for_comments(db, [comment.id])
+
         is_liked = False
         if current_user_id:
             is_liked = db.query(LikeLog).filter(
@@ -88,6 +127,10 @@ class CommentReadService:
                 LikeLog.is_active == 1
             ).first() is not None
             
-        return {"id": comment.id, "content": comment.content, "like_count": comment.like_count, "is_liked": is_liked}
+        return {
+            "id": comment.id, "content": comment.content, "like_count": comment.like_count, "is_liked": is_liked,
+            "hashtags": hashtags_map.get(comment.id, []),
+            "mentions": mentions_map.get(comment.id, [])
+        }
 
 comment_read_service = CommentReadService()

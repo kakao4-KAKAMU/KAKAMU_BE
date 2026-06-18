@@ -43,11 +43,14 @@ class CommentItem(BaseModel):
     parent_id: Optional[int]
     author_id: Optional[UUID]
     author: str
+    author_image: Optional[str] = None
     content: str
     is_spoiler: bool
     created_at: datetime
     like_count: int
     is_liked: bool
+    hashtags: List[str] = []
+    mentions: List[MentionSimple] = []
 
 class PaginationMeta(BaseModel):
     total_count: int
@@ -65,6 +68,8 @@ class CommentDetailResponse(BaseModel):
     content: str
     like_count: int
     is_liked: bool
+    hashtags: List[str] = []
+    mentions: List[MentionSimple] = []
 
 class LikeToggleResponse(BaseModel):
     status: str = Field(default="success")
