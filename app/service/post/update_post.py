@@ -35,13 +35,13 @@ class PostUpdateService:
             existing_movies = db.query(PostMovie).filter(PostMovie.post_id == post.id).all()
             for em in existing_movies:
                 await recommendation_service.record_ml_relationship_log(
-                    db, persona_id, "MOVIE", str(em.movie_id), "create_post", is_undo=True
+                    db, persona_id, "MOVIE", em.movie_id, "create_post", is_undo=True
                 )
             db.query(PostMovie).filter(PostMovie.post_id == post.id).delete()
             for m_id in post_in.movie_ids:
                 db.add(PostMovie(post_id=post.id, movie_id=m_id))
                 await recommendation_service.record_ml_relationship_log(
-                    db, persona_id, "MOVIE", str(m_id), "create_post"
+                    db, persona_id, "MOVIE", m_id, "create_post"
                 )
 
         # 본문(content) 수정 시 해시태그/멘션 재추출

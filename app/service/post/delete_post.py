@@ -27,7 +27,7 @@ class PostDeleteService:
         post_movies = db.query(PostMovie).filter(PostMovie.post_id == post.id).all()
         for pm in post_movies:
             await recommendation_service.record_ml_relationship_log(
-                db, persona_id, "MOVIE", str(pm.movie_id), "create_post", is_undo=True
+                db, persona_id, "MOVIE", pm.movie_id, "create_post", is_undo=True
             )
 
         db.commit()

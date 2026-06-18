@@ -27,7 +27,7 @@ class PostCreateService:
             for m_id in post_in.movie_ids:
                 db.add(PostMovie(post_id=new_post.id, movie_id=str(m_id)))
                 await recommendation_service.record_ml_relationship_log(
-                    db, persona_id, "MOVIE", str(m_id), "create_post"
+                    db, persona_id, "MOVIE", m_id, "create_post"
                 )
 
             hashtags, mentions = parse_content(post_in.content)

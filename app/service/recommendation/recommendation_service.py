@@ -19,7 +19,7 @@ class RecommendationService:
         db: Session, 
         persona_id: UUID, 
         target_type: str, 
-        target_id: int, 
+        target_id: int | str | UUID, 
         action: str, 
         is_undo: bool = False
     ):
@@ -37,7 +37,7 @@ class RecommendationService:
         payload = {
             "persona_id": str(persona_id),
             "target_type": target_type,
-            "target_id": target_id,
+            "target_id": str(target_id) if isinstance(target_id, UUID) else target_id,
             "action": log_action
         }
         
