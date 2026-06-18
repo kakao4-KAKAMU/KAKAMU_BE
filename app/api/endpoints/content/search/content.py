@@ -11,13 +11,21 @@ from app.models.search_log import SearchDailyStat
 from app.models.user import User
 from app.api.deps.auth import get_optional_user
 from .utils import handle_search_request, get_search_pattern
-from app.schemas.response.search import GenreListResponse, PaginatedSearchResponse, TrendSearchResponse
+from app.schemas.response.search import (
+    GenreListResponse, 
+    PaginatedSearchResponse, 
+    TrendSearchResponse,
+    ContentSearchResponse,
+    MovieSearchResponse,
+    PersonSearchResponse
+)
 
 router = APIRouter()
 
 # 1. 콘텐츠(영화) 메인 탭 검색
 @router.get(
     "/v1/search/content",
+    response_model=ContentSearchResponse,
     tags=["Search - Tabs"],
     summary="콘텐츠(영화) 탭 통합 검색"
 )
@@ -58,7 +66,13 @@ def search_content(
     movies = query.options(selectinload(Movie.titles)).limit(limit).all()
     
     items = [
-        {"id": str(m.id), "title": m.titles[0].title_name if m.titles else "제목 없음", "poster_url": m.poster_url} 
+        {
+            "id": m.id, 
+            "type": "MOVIE",
+            "title": m.titles[0].title_name if m.titles else "제목 없음", 
+            "poster_url": m.poster_url,
+            "subtitle": str(m.producing_year) if m.producing_year else None
+        } 
         for m in movies
     ]
     
@@ -80,6 +94,7 @@ def get_genre_list(db: Session = Depends(get_db)):
 # 3. 기존 영화 상세 필터 검색 API
 @router.get(
     "/v1/search/movie",
+    response_model=MovieSearchResponse,
     tags=["Search - Metadata"],
     summary="영화 상세 필터 검색"
 )
@@ -92,7 +107,7 @@ def search_movies(
     limit: int = Query(20, le=100),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Movie).options(selectinload(Movie.titles))
+    query = db.query(Movie).options(selectinload(Movie.titles), selectinload(Movie.genres))
     if name: 
         query = query.filter(Movie.titles.any(MovieTitle.title_name.ilike(get_search_pattern(name))))
     if year: 
@@ -115,23 +130,29 @@ def search_movies(
     total_count = query.count()
     movies = query.offset(skip).limit(limit).all()
     
+    page = (skip // limit) + 1
     items = [
         {
-            "id": str(m.id), 
+            "id": m.id, 
             "title": m.titles[0].title_name if m.titles else "제목 없음", 
-            "release_date": m.release_date, 
-            "poster_url": m.poster_url, 
-            "avg_rating": 0.0 # avg_rating 컬럼이 삭제되었으므로 응답 호환성을 위해 0.0 처리
+            "poster_url": m.poster_url,
+            "producing_year": m.producing_year,
+            "nation": m.nation,
+            "genres": [g.genre_name for g in m.genres]
         } 
         for m in movies
     ]
-    return {"status": "success", "items": items, "skip": skip, "limit": limit, "total_count": total_count}
+    return {
+        "status": "success", 
+        "items": items, 
+        "meta": {"total_count": total_count, "current_page": page, "page_size": limit, "total_pages": (total_count + limit - 1) // limit if total_count > 0 else 1}
+    }
 
 # 4. 기존 인물 검색 API
 @router.get(
     "/v1/search/person",
+    response_model=PersonSearchResponse,
     tags=["Search - Metadata"],
-    response_model=PaginatedSearchResponse,
     summary="영화인 상세 검색"
 )
 def search_people(
@@ -156,8 +177,13 @@ def search_people(
     total_count = query.count()
     people = query.offset(skip).limit(limit).all()
     # 응답 호환성을 위해 삭제된 profile_image와 분리된 job은 일단 None으로 처리합니다.
-    items = [{"id": str(p.id), "name": p.person_name, "profile_image": None, "job": None} for p in people]
-    return {"status": "success", "items": items, "skip": skip, "limit": limit, "total_count": total_count}
+    page = (skip // limit) + 1
+    items = [{"id": p.id, "name": p.person_name, "profile_image": None, "role": None} for p in people]
+    return {
+        "status": "success", 
+        "items": items, 
+        "meta": {"total_count": total_count, "current_page": page, "page_size": limit, "total_pages": (total_count + limit - 1) // limit if total_count > 0 else 1}
+    }
 
 # 5. 일간 인기 검색어(트렌드) Top 10 조회 API
 @router.get(

@@ -58,6 +58,19 @@ class PersonSearchResponse(SearchBaseResponse):
     items: List[PersonSearchItem]
     meta: PaginationMeta
 
+class UserSearchItem(BaseModel):
+    id: UUID
+    nickname: str
+    tag: str
+    profile_image_url: Optional[str] = None
+    follower_count: int = 0
+    is_following: bool = False
+
+class UserSearchResponse(SearchBaseResponse):
+    items: List[UserSearchItem]
+    next_cursor: Optional[str] = None
+    has_next: bool = False
+
 class TrendSearchItem(BaseModel):
     rank: int
     keyword: str

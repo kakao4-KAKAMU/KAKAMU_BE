@@ -2,12 +2,42 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from sqlalchemy import func, select, or_
 from uuid import UUID
-from typing import Optional
 
-from app.models import Comment, User, Block, LikeLog
+from typing import Dict, Any, Optional, List
+
+from app.models import Comment, User, Block, LikeLog, CommentMention, CommentHashtag, Hashtag
 from app.schemas.response.post import CommentListResponse, CommentDetailResponse, CommentItem, PaginationMeta
 
 class CommentReadService:
+    def _get_mentions_for_comments(self, db: Session, comment_ids: List[int]) -> Dict[int, List[Dict[str, Any]]]:
+        if not comment_ids:
+            return {}
+        
+        mentions_query = db.query(CommentMention.comment_id, User.id, User.nickname, User.tag)\
+            .join(User, User.id == CommentMention.user_id)\
+            .filter(CommentMention.comment_id.in_(comment_ids), User.status == "ACTIVE").all()
+            
+        mentions_map = {cid: [] for cid in comment_ids}
+        for m in mentions_query:
+            mentions_map[m.comment_id].append({
+                "id": m.id,
+                "nickname": m.nickname,
+                "tag": m.tag
+            })
+        return mentions_map
+
+    def _get_hashtags_for_comments(self, db: Session, comment_ids: List[int]) -> Dict[int, List[str]]:
+        if not comment_ids:
+            return {}
+            
+        hashtags_query = db.query(CommentHashtag.comment_id, Hashtag.normalized_keyword)\
+            .join(Hashtag, Hashtag.id == CommentHashtag.hashtag_id)\
+            .filter(CommentHashtag.comment_id.in_(comment_ids)).all()
+            
+        hashtags_map = {cid: [] for cid in comment_ids}
+        for h in hashtags_query:
+            hashtags_map[h.comment_id].append(h.normalized_keyword)
+        return hashtags_map
     def get_comments(
         self,
         db: Session,
@@ -38,9 +68,13 @@ class CommentReadService:
 
         comments = base_query.order_by(Comment.created_at.asc()).offset(offset).limit(size).all()
 
+        comment_ids = [c.id for c, _ in comments]
+        mentions_map = self._get_mentions_for_comments(db, comment_ids)
+        hashtags_map = self._get_hashtags_for_comments(db, comment_ids)
+
+        # 4. 내가 좋아요한 댓글 ID 목록 조회
         liked_comment_ids = set()
-        if current_user_id and comments:
-            comment_ids = [c.id for c, _ in comments]
+        if current_user_id and comment_ids:
             liked_logs = db.query(LikeLog.target_id).filter(
                 LikeLog.user_id == current_user_id,
                 LikeLog.target_type == "COMMENT",
@@ -53,6 +87,9 @@ class CommentReadService:
         for c, author in comments:
             author_name = "알 수 없음" if not author or author.status == "DELETED" else f"{author.nickname}#{author.tag}"
             is_spoiler = c.is_spoiler == 1
+
+            display_content = "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else c.content
+  
             items.append(CommentItem(
                 id=c.id,
                 parent_id=c.parent_id,
@@ -60,7 +97,7 @@ class CommentReadService:
                 author_image=None if not author or author.status == "DELETED" else author.profile_image_url,
                 author_tag=None if not author or author.status == "DELETED" else author.tag,
                 author=author_name,
-                content=c.content,
+                content=display_content,
                 is_spoiler=is_spoiler,
                 created_at=c.created_at,
                 like_count=c.like_count,
@@ -77,6 +114,7 @@ class CommentReadService:
             ),
         )
 
+
     def get_comment_detail(self, db: Session, comment_id: int, current_user_id: Optional[UUID]) -> CommentDetailResponse:
         comment = db.query(Comment).filter(Comment.id == comment_id, Comment.status == "ACTIVE").first()
         if not comment:
@@ -92,6 +130,9 @@ class CommentReadService:
             ).first()
             if is_blocked:
                 raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_BLOCKED_COMMENT", "message": "차단된 사용자의 댓글입니다."})
+            
+        mentions_map = self._get_mentions_for_comments(db, [comment.id])
+        hashtags_map = self._get_hashtags_for_comments(db, [comment.id])
 
         is_liked = False
         if current_user_id:
@@ -101,6 +142,12 @@ class CommentReadService:
                 LikeLog.target_id == comment.id,
                 LikeLog.is_active == 1
             ).first() is not None
+            
+        return {
+            "id": comment.id, "content": comment.content, "like_count": comment.like_count, "is_liked": is_liked,
+            "hashtags": hashtags_map.get(comment.id, []),
+            "mentions": mentions_map.get(comment.id, [])
+        }
 
         return CommentDetailResponse(
             id=comment.id,
