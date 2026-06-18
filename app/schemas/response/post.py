@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 class MovieSimple(BaseModel):
     id: UUID
     title: str
+    poster_url: Optional[str] = None
+    release_date: Optional[str] = None
 
 class MentionSimple(BaseModel):
     id: UUID
@@ -24,7 +26,7 @@ class PostResponse(BaseModel):
     image_urls: List[str]
     is_spoiler: bool
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
     movies: List[MovieSimple]
     hashtags: List[str]
     mentions: List[MentionSimple]
@@ -43,9 +45,13 @@ class CommentItem(BaseModel):
     parent_id: Optional[int]
     author_id: Optional[UUID]
     author: str
+    author_image: Optional[str] = None
+    author_tag: Optional[str] = None
     content: str
     is_spoiler: bool
     created_at: datetime
+    like_count: int
+    is_liked: bool
 
 class PaginationMeta(BaseModel):
     total_count: int
@@ -61,6 +67,8 @@ class CommentListResponse(BaseModel):
 class CommentDetailResponse(BaseModel):
     id: int
     content: str
+    like_count: int
+    is_liked: bool
 
 class LikeToggleResponse(BaseModel):
     status: str = Field(default="success")

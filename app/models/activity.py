@@ -18,6 +18,7 @@ class Comment(Base):
     updated_at = Column(DateTime, onupdate=func.now())    
     is_pinned = Column(SmallInteger, default=0)    
     is_analyzed = Column(SmallInteger, default=0)    
+    like_count = Column(Integer, default=0, nullable=False, index=True)
 
     post = relationship("Post", back_populates="comments")    
     user = relationship("User", back_populates="comments")    

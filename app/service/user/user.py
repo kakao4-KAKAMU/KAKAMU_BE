@@ -4,6 +4,7 @@ from sqlalchemy import select, func, and_
 from uuid import UUID
 from app.models import User, Follow, Post
 from typing import Optional
+from app.schemas.response.user import UserPublicResponse
 
 class UserService:
     
@@ -18,7 +19,11 @@ class UserService:
         return user
 
     @staticmethod
-    def get_public_user(db: Session, target_user_id: UUID, viewer_user_id: Optional[UUID] = None) -> dict:
+    def get_public_user(
+        db: Session,
+        target_user_id: UUID,
+        viewer_user_id: Optional[UUID] = None,
+    ) -> UserPublicResponse:
         """특정 유저의 공개 프로필 정보(팔로워, 팔로잉, 게시물 수 등 포함)를 반환합니다."""
         user = db.scalar(select(User).where(User.id == target_user_id, User.status == "ACTIVE"))
         
@@ -35,17 +40,17 @@ class UserService:
                 and_(Follow.follower_id == viewer_user_id, Follow.following_id == target_user_id)
             )) is not None
             
-        return {
-            "id": user.id,
-            "nickname": user.nickname,
-            "tag": user.tag,
-            "profile_image_url": user.profile_image_url,
-            "profile_msg": user.profile_msg,
-            "created_at": user.created_at,
-            "is_following": is_following,
-            "follower_count": follower_count,
-            "following_count": following_count,
-            "post_count": post_count
-        }
+        return UserPublicResponse(
+            id=user.id,
+            nickname=user.nickname,
+            tag=user.tag,
+            profile_image_url=user.profile_image_url,
+            profile_msg=user.profile_msg,
+            created_at=user.created_at,
+            is_following=is_following,
+            follower_count=follower_count,
+            following_count=following_count,
+            post_count=post_count,
+        )
 
 user_service = UserService()

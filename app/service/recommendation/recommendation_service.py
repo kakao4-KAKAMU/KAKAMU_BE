@@ -38,8 +38,7 @@ class RecommendationService:
         payload = {
             "persona_id": str(persona_id),
             "target_type": target_type,
-            # movie_id가 UUID 타입이므로 반드시 문자열 변환
-            "target_id": str(target_id),
+            "target_id": str(target_id) if isinstance(target_id, UUID) else target_id,
             "action": log_action
         }
         

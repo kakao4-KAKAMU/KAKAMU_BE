@@ -1,10 +1,11 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models import User, Follow, Block
+from app.schemas.response.relation import RelationResponse
 from uuid import UUID
 
 class RelationService:
-    async def follow(self, db: Session, follower_id: UUID, following_id: UUID):
+    async def follow(self, db: Session, follower_id: UUID, following_id: UUID) -> RelationResponse:
         target = db.query(User).filter(User.id == following_id).first()
         if not target:
             raise HTTPException(status_code=404, detail="팔로우 대상 유저를 찾을 수 없습니다.")
@@ -20,23 +21,23 @@ class RelationService:
         
         existing = db.query(Follow).filter_by(follower_id=follower_id, following_id=following_id).first()
         if existing:
-            return {"status": "success", "message": "이미 팔로우 중입니다."}
+            return RelationResponse(status="success", message="이미 팔로우 중입니다.")
 
         new_follow = Follow(follower_id=follower_id, following_id=following_id)
         db.add(new_follow)
         db.commit()
-        return {"status": "success", "message": "팔로우가 완료되었습니다."}
+        return RelationResponse(status="success", message="팔로우가 완료되었습니다.")
 
-    async def unfollow(self, db: Session, follower_id: UUID, following_id: UUID):
+    async def unfollow(self, db: Session, follower_id: UUID, following_id: UUID) -> RelationResponse:
         existing = db.query(Follow).filter_by(follower_id=follower_id, following_id=following_id).first()
         if not existing:
-            return {"status": "success", "message": "팔로우 상태가 아닙니다."}
-        
+            return RelationResponse(status="success", message="팔로우 상태가 아닙니다.")
+
         db.delete(existing)
         db.commit()
-        return {"status": "success", "message": "언팔로우 되었습니다."}
+        return RelationResponse(status="success", message="언팔로우 되었습니다.")
 
-    async def block(self, db: Session, blocker_id: UUID, blocked_id: UUID, level: str):
+    async def block(self, db: Session, blocker_id: UUID, blocked_id: UUID, level: str) -> RelationResponse:
         target = db.query(User).filter(User.id == blocked_id).first()
         if not target:
             raise HTTPException(status_code=404, detail="차단 대상 유저를 찾을 수 없습니다.")
@@ -55,15 +56,15 @@ class RelationService:
             db.add(new_block)
         
         db.commit()
-        return {"status": "success", "message": "차단이 완료되었습니다."}
+        return RelationResponse(status="success", message="차단이 완료되었습니다.")
 
-    async def unblock(self, db: Session, blocker_id: UUID, blocked_id: UUID):
+    async def unblock(self, db: Session, blocker_id: UUID, blocked_id: UUID) -> RelationResponse:
         existing = db.query(Block).filter_by(blocker_id=blocker_id, blocked_id=blocked_id).first()
         if not existing:
-            return {"status": "success", "message": "차단된 상태가 아닙니다."}
-        
+            return RelationResponse(status="success", message="차단된 상태가 아닙니다.")
+
         db.delete(existing)
         db.commit()
-        return {"status": "success", "message": "차단이 해제되었습니다."}
+        return RelationResponse(status="success", message="차단이 해제되었습니다.")
 
 relation_service = RelationService()

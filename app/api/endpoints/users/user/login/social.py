@@ -25,8 +25,8 @@ async def social_login(request: SocialLoginRequest, db: Session = Depends(get_db
     try:
         if request.provider == "kakao":
             user_info = await get_kakao_user_info(request.provided_token)
-            provider_user_id = str(user_info.get("id"))
-            email = user_info.get("kakao_account", {}).get("email")
+            provider_user_id = str(user_info.id)
+            email = user_info.kakao_account.email if user_info.kakao_account else None
         else:
             raise HTTPException(status_code=400, detail={"code": "UNSUPPORTED_SOCIAL_PROVIDER", "message": "지원하지 않는 소셜 플랫폼입니다."})
             

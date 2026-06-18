@@ -15,8 +15,10 @@ class GenreListResponse(SearchBaseResponse):
 
 class ContentSearchItem(BaseModel):
     id: Union[int, UUID]
+    type: str = Field(..., description="데이터 유형 (예: MOVIE, PERSON)")
     title: str
     poster_url: Optional[str] = None
+    subtitle: Optional[str] = None
 
 class ContentSearchResponse(SearchBaseResponse):
     items: List[ContentSearchItem]
@@ -27,6 +29,34 @@ class PaginatedSearchResponse(SearchBaseResponse):
     skip: int
     limit: int
     total_count: int
+
+class PaginationMeta(BaseModel):
+    total_count: int
+    current_page: int
+    page_size: int
+    total_pages: int
+
+class MovieSearchItem(BaseModel):
+    id: UUID
+    title: str
+    poster_url: Optional[str] = None
+    producing_year: Optional[int] = None
+    nation: Optional[str] = None
+    genres: List[str] = []
+
+class MovieSearchResponse(SearchBaseResponse):
+    items: List[MovieSearchItem]
+    meta: PaginationMeta
+
+class PersonSearchItem(BaseModel):
+    id: UUID
+    name: str
+    profile_image: Optional[str] = None
+    role: Optional[str] = None
+
+class PersonSearchResponse(SearchBaseResponse):
+    items: List[PersonSearchItem]
+    meta: PaginationMeta
 
 class TrendSearchItem(BaseModel):
     rank: int

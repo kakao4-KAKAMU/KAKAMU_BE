@@ -46,7 +46,6 @@ def get_comments(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user)
 ):
-    """게시물의 댓글 목록을 페이징 처리하여 조회합니다. (비회원 접근 가능) 스포일러 댓글은 내용이 마스킹 처리됩니다."""
-    user_id = current_user.id if current_user else None
-    comments_data = comment_service.get_comments(db, post_id, user_id, page=page, size=size)
-    return {"status": "success", "is_member": current_user is not None, **comments_data}
+    """게시물의 댓글 목록을 페이징 처리하여 조회합니다. 스포일러 댓글은 내용이 마스킹 처리됩니다."""
+    comments_data = comment_service.get_comments(db, post_id, current_user.id if current_user else None, page=page, size=size)
+    return comments_data
