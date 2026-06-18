@@ -1,17 +1,22 @@
 from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request
-from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import extract, and_
+from sqlalchemy.orm import Session
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime, timedelta
 
 from app.db.session import get_db
-from app.models.movie import Movie, Genre, People, MovieTitle, MovieStaff
+from app.models.movie import Genre, People, MovieStaff
 from app.models.search_log import SearchDailyStat
 from app.models.user import User
 from app.api.deps.auth import get_optional_user
+from app.service.movie.get_movie import movie_read_service
 from .utils import handle_search_request, get_search_pattern
-from app.schemas.response.search import GenreListResponse, PaginatedSearchResponse, TrendSearchResponse
+from app.schemas.response.search import (
+    GenreListResponse,
+    MovieTabSearchResponse,
+    PaginatedSearchResponse,
+    TrendSearchResponse,
+)
 
 router = APIRouter()
 
@@ -19,6 +24,7 @@ router = APIRouter()
 @router.get(
     "/v1/search/content",
     tags=["Search - Tabs"],
+    response_model=MovieTabSearchResponse,
     summary="콘텐츠(영화) 탭 통합 검색"
 )
 def search_content(
@@ -35,30 +41,16 @@ def search_content(
     handle_search_request(request, background_tasks, user_id, q)
     search_pattern = get_search_pattern(q)
 
-    # 서브쿼리(EXISTS)를 사용해 중복 조회 방지
-    query = db.query(Movie).filter(Movie.titles.any(MovieTitle.title_name.ilike(search_pattern)))
-
-    # 정렬 기준 적용
-    if sort == "popularity":
-        # avg_rating 삭제됨에 따라 제작연도를 인기순의 대체 기준으로 활용
-        query = query.order_by(Movie.producing_year.desc().nullslast(), Movie.id.desc())
-    elif sort == "latest":
-        query = query.order_by(Movie.release_date.desc().nullslast(), Movie.id.desc())
-    elif sort in ("name_asc", "name_desc"):
-        query = query.outerjoin(MovieTitle, and_(Movie.id == MovieTitle.movie_id, MovieTitle.is_original))
-        if sort == "name_asc":
-            query = query.order_by(MovieTitle.title_name.asc(), Movie.id.desc())
-        else:
-            query = query.order_by(MovieTitle.title_name.desc(), Movie.id.desc())
-    else: # accuracy (정확도순) - 현재는 기본값으로 최신순을 사용
-        if cursor: 
-            query = query.filter(Movie.id < cursor)
-        query = query.order_by(Movie.id.desc())
-        
-    movies = query.options(selectinload(Movie.titles)).limit(limit).all()
+    movies = movie_read_service.search_content_tab(
+        db,
+        search_pattern,
+        sort=sort,
+        cursor=cursor,
+        limit=limit,
+    )
     
     items = [
-        {"id": str(m.id), "title": m.titles[0].title_name if m.titles else "제목 없음", "poster_url": m.poster_url} 
+        {"id": m.id, "title": m.titles[0].title_name if m.titles else "제목 없음", "poster_url": m.poster_url}
         for m in movies
     ]
     
@@ -92,28 +84,16 @@ def search_movies(
     limit: int = Query(20, le=100),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Movie).options(selectinload(Movie.titles))
-    if name: 
-        query = query.filter(Movie.titles.any(MovieTitle.title_name.ilike(get_search_pattern(name))))
-    if year: 
-        query = query.filter(extract('year', Movie.release_date) == year)
-    if genre: 
-        query = query.join(Movie.genres).filter(Genre.id.in_(genre))
-    
-    # 모든 정렬에 결정적 정렬(Deterministic Sorting)을 위한 보조키 id.desc() 추가
-    if sort in ("name_asc", "name_desc"):
-        query = query.outerjoin(MovieTitle, and_(Movie.id == MovieTitle.movie_id, MovieTitle.is_original))
-        if sort == "name_asc": 
-            query = query.order_by(MovieTitle.title_name.asc(), Movie.id.desc())
-        else: 
-            query = query.order_by(MovieTitle.title_name.desc(), Movie.id.desc())
-    elif sort == "year_asc": 
-        query = query.order_by(Movie.release_date.asc().nullslast(), Movie.id.desc())
-    else: 
-        query = query.order_by(Movie.release_date.desc().nullslast(), Movie.id.desc())
-            
-    total_count = query.count()
-    movies = query.offset(skip).limit(limit).all()
+    search_pattern = get_search_pattern(name) if name else None
+    movies, total_count = movie_read_service.search_movies(
+        db,
+        search_pattern=search_pattern,
+        genre=genre,
+        year=year,
+        sort=sort,
+        skip=skip,
+        limit=limit,
+    )
     
     items = [
         {
