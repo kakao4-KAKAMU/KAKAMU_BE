@@ -6,6 +6,8 @@ from app.schemas.request.post import LikeToggleRequest
 from app.models import LikeLog, Post, Comment
 from app.service.recommendation.recommendation_service import recommendation_service
 from app.core.redis import redis_client
+from app.service.notification.notification_service import notification_service
+from app.models.notification import NotificationType
 
 class LikeService:
     async def toggle_like(self, db: Session, req: LikeToggleRequest, user_id: UUID, persona_id: UUID) -> tuple[bool, int]:
@@ -58,6 +60,19 @@ class LikeService:
         if target.user_id != user_id:
             await recommendation_service.record_ml_relationship_log(db, persona_id, req.target_type, req.target_id, "like", is_undo=not is_liked)
             
+            # 타인의 글에 좋아요를 누른 경우 알림 발송
+            if is_liked:
+                notification_service.create_notification(
+                    db=db,
+                    receiver_user_id=target.user_id,
+                    sender_user_id=user_id,
+                    sender_persona_id=persona_id,
+                    type=NotificationType.LIKE,
+                    target_type=req.target_type,
+                    target_id=str(req.target_id),
+                    message="님이 회원님의 콘텐츠를 좋아합니다."
+                )
+
         # DB(target.like_count)에 즉시 업데이트하지 않고 Redis(sync_task)의 Bulk Update에 맡김
 
         return is_liked, new_like_count

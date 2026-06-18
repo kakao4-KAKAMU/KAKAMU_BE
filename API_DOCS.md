@@ -70,6 +70,11 @@
 | `GET` | `/relations/users/{target_user_id}/followers` | 특정 유저의 팔로워 목록 조회 (무한 스크롤) |
 | `GET` | `/relations/users/{target_user_id}/followings` | 특정 유저의 팔로잉 목록 조회 (무한 스크롤) |
 
+## 7. Notifications (알림)
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/notifications` | 활성화된 페르소나의 알림 목록 조회 및 안읽은 알림 모두 읽음 처리 |
+
 ## 8. Search (통합 탐색 및 메타데이터)
 | Method | Path | Description |
 |---|---|---|
