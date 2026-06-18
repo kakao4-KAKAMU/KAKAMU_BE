@@ -24,7 +24,7 @@ class PostResponse(BaseModel):
     image_urls: List[str]
     is_spoiler: bool
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
     movies: List[MovieSimple]
     hashtags: List[str]
     mentions: List[MentionSimple]
@@ -46,6 +46,8 @@ class CommentItem(BaseModel):
     content: str
     is_spoiler: bool
     created_at: datetime
+    like_count: int
+    is_liked: bool
 
 class PaginationMeta(BaseModel):
     total_count: int
@@ -61,6 +63,8 @@ class CommentListResponse(BaseModel):
 class CommentDetailResponse(BaseModel):
     id: int
     content: str
+    like_count: int
+    is_liked: bool
 
 class LikeToggleResponse(BaseModel):
     status: str = Field(default="success")

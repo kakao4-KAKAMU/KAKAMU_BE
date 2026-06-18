@@ -4,7 +4,7 @@ from sqlalchemy import func, select, or_
 from uuid import UUID
 from typing import Dict, Any, Optional
 
-from app.models import Comment, User, Block
+from app.models import Comment, User, Block, LikeLog
 
 class CommentReadService:
     def get_comments(self, db: Session, post_id: int, current_user_id: Optional[UUID], page: int = 1, size: int = 20) -> Dict[str, Any]:
@@ -29,6 +29,18 @@ class CommentReadService:
         total_count = base_query.with_entities(func.count(Comment.id)).scalar() or 0
         
         comments = base_query.order_by(Comment.created_at.asc()).offset(offset).limit(size).all()
+
+        # 4. 내가 좋아요한 댓글 ID 목록 조회
+        liked_comment_ids = set()
+        if current_user_id and comments:
+            comment_ids = [c.id for c, _ in comments]
+            liked_logs = db.query(LikeLog.target_id).filter(
+                LikeLog.user_id == current_user_id,
+                LikeLog.target_type == "COMMENT",
+                LikeLog.target_id.in_(comment_ids),
+                LikeLog.is_active == 1
+            ).all()
+            liked_comment_ids = {log[0] for log in liked_logs}
         
         result = []
         for c, author in comments:
@@ -37,7 +49,8 @@ class CommentReadService:
             result.append({
                 "id": c.id, "parent_id": c.parent_id, "author_id": None if not author or author.status == "DELETED" else author.id,
                 "author": author_name, "content": "*** 스포일러로 인해 블라인드 처리되었습니다. 보기 버튼을 눌러 확인하세요. ***" if is_spoiler else c.content,
-                "is_spoiler": is_spoiler, "created_at": c.created_at
+                "is_spoiler": is_spoiler, "created_at": c.created_at,
+                "like_count": c.like_count, "is_liked": c.id in liked_comment_ids
             })
             
         return {
@@ -66,6 +79,15 @@ class CommentReadService:
             if is_blocked:
                 raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_BLOCKED_COMMENT", "message": "차단된 사용자의 댓글입니다."})
             
-        return {"id": comment.id, "content": comment.content}
+        is_liked = False
+        if current_user_id:
+            is_liked = db.query(LikeLog).filter(
+                LikeLog.user_id == current_user_id,
+                LikeLog.target_type == "COMMENT",
+                LikeLog.target_id == comment.id,
+                LikeLog.is_active == 1
+            ).first() is not None
+            
+        return {"id": comment.id, "content": comment.content, "like_count": comment.like_count, "is_liked": is_liked}
 
 comment_read_service = CommentReadService()

@@ -13,9 +13,12 @@ class CommentCreateService:
         if not post:
             raise HTTPException(status_code=404, detail={"code": "POST_NOT_FOUND", "message": "게시물을 찾을 수 없거나 삭제되었습니다."})
 
+        # 클라이언트(Swagger 등)가 비어있는 값을 0으로 보낼 경우를 대비해 None으로 정제
+        parent_id = comment_in.parent_id if comment_in.parent_id else None
+
         # 2. 대댓글인 경우, 부모 댓글 존재 여부 확인
-        if comment_in.parent_id:
-            parent_comment = db.query(Comment).filter(Comment.id == comment_in.parent_id, Comment.status == "ACTIVE").first()
+        if parent_id:
+            parent_comment = db.query(Comment).filter(Comment.id == parent_id, Comment.status == "ACTIVE").first()
             if not parent_comment:
                 raise HTTPException(status_code=404, detail={"code": "PARENT_COMMENT_NOT_FOUND", "message": "답글을 작성할 원본 댓글을 찾을 수 없습니다."})
             if parent_comment.post_id != post_id:
@@ -26,7 +29,7 @@ class CommentCreateService:
             post_id=post_id,
             user_id=user_id,
             persona_id=persona_id, # 💡 ML 컨텍스트를 위한 페르소나 ID 저장
-            parent_id=comment_in.parent_id,
+            parent_id=parent_id,
             content=comment_in.content,
             is_spoiler=comment_in.is_spoiler
         )
