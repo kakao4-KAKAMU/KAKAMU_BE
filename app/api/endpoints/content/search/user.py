@@ -8,14 +8,14 @@ from app.db.session import get_db
 from app.models import User, Block
 from app.api.deps.auth import get_optional_user
 from .utils import handle_search_request, get_search_pattern
-from app.schemas.response.search import CursorSearchResponse
+from app.schemas.response.search import UserCursorSearchResponse
 
 router = APIRouter()
 
 @router.get(
     "/v1/search/user",
     tags=["Search - Tabs"],
-    response_model=CursorSearchResponse,
+    response_model=UserCursorSearchResponse,
     summary="유저 검색"
 )
 def search_user(
@@ -66,7 +66,16 @@ def search_user(
     query = query.order_by(User.nickname.asc(), User.id.desc())
     
     results = query.limit(limit).all()
-    items = [{"id": str(p.id), "username": p.username, "nickname": p.nickname, "tag": p.tag, "profile_image_url": p.profile_image_url} for p in results]
+    items = [
+        {
+            "id": p.id,
+            "username": p.username,
+            "nickname": p.nickname,
+            "tag": p.tag,
+            "profile_image_url": p.profile_image_url,
+        }
+        for p in results
+    ]
 
     next_cursor = None
     if len(results) == limit:

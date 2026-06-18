@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.models import Post, User
 from app.api.deps.auth import get_optional_user
 from .utils import handle_search_request, get_search_pattern
-from app.schemas.response.search import CursorSearchResponse
+from app.schemas.response.search import PostCursorSearchResponse
 
 router = APIRouter()
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 @router.get(
     "/v1/search/for-you",
     tags=["Search - Tabs"],
-    response_model=CursorSearchResponse,
+    response_model=PostCursorSearchResponse,
     summary="맞춤형 추천 검색"
 )
 async def search_for_you(

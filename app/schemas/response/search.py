@@ -74,7 +74,33 @@ class CustomSearchResponse(BaseModel):
     message: Optional[str] = None
 
 class CursorSearchResponse(SearchBaseResponse):
-    items: List[Any]
-    next_cursor: Optional[str] = None
+    next_cursor: Optional[Union[int, str]] = None
     fallback: Optional[bool] = False
     message: Optional[str] = None
+
+class UserSearchItem(BaseModel):
+    id: UUID
+    username: str
+    nickname: str
+    tag: str
+    profile_image_url: Optional[str] = None
+
+class UserCursorSearchResponse(CursorSearchResponse):
+    items: List[UserSearchItem]
+
+class PostSearchItem(BaseModel):
+    id: int
+    title: str
+    content: Optional[str] = None
+
+class PostCursorSearchResponse(CursorSearchResponse):
+    items: List[PostSearchItem]
+
+class MovieTabSearchItem(BaseModel):
+    id: UUID
+    title: str
+    poster_url: Optional[str] = None
+
+class MovieTabSearchResponse(SearchBaseResponse):
+    items: List[MovieTabSearchItem]
+    next_cursor: Optional[str] = None
