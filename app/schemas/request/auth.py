@@ -45,3 +45,7 @@ class PasswordResetRequest(BaseModel):
     email: EmailStr = Field(..., description="가입 시 사용한 이메일")
     firebase_id_token: str = Field(..., description="Firebase 번호 인증 완료 시 발급된 ID 토큰")
     new_password: PasswordStr = Field(..., min_length=8, description="새로운 비밀번호")
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(..., description="현재 비밀번호")
+    new_password: PasswordStr = Field(..., min_length=8, description="새로운 비밀번호")

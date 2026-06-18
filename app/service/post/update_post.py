@@ -18,34 +18,37 @@ class PostUpdateService:
         if post.user_id != user_id:
             raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_POST_UPDATE", "message": "본인이 작성한 게시물만 수정할 수 있습니다."})
 
-        # 업데이트할 필드 적용
-        if post_in.title is not None:
-            post.title = post_in.title
-        if post_in.content is not None:
-            post.content = post_in.content
-        if post_in.image_urls is not None:
-            post.image_urls = post_in.image_urls
-        if post_in.is_spoiler is not None:
-            post.is_spoiler = post_in.is_spoiler
+        # 1. 단순 필드(제목, 이미지, 스포일러)는 그대로 덮어쓰기
+        post.title = post_in.title
+        post.image_urls = post_in.image_urls
+        post.is_spoiler = post_in.is_spoiler
         
         # post.persona_id = persona_id  # 💡 만약 수정 시 현재 페르소나로 작성자를 갱신하고 싶다면 주석 해제
 
-        # 영화 태그 수정 로직
-        if post_in.movie_ids is not None:
-            existing_movies = db.query(PostMovie).filter(PostMovie.post_id == post.id).all()
-            for em in existing_movies:
-                await recommendation_service.record_ml_relationship_log(
-                    db, persona_id, "MOVIE", em.movie_id, "create_post", is_undo=True
-                )
-            db.query(PostMovie).filter(PostMovie.post_id == post.id).delete()
-            for m_id in post_in.movie_ids:
-                db.add(PostMovie(post_id=post.id, movie_id=m_id))
-                await recommendation_service.record_ml_relationship_log(
-                    db, persona_id, "MOVIE", m_id, "create_post"
-                )
+        # 2. 영화 태그 수정 로직 (기존 데이터와 비교하여 변경된 부분만 ML 로그 및 DB 반영)
+        existing_movies = db.query(PostMovie).filter(PostMovie.post_id == post.id).all()
+        current_movie_ids = {em.movie_id for em in existing_movies}
+        new_movie_ids = set(post_in.movie_ids)
 
-        # 본문(content) 수정 시 해시태그/멘션 재추출
-        if post_in.content is not None:
+        movies_to_remove = current_movie_ids - new_movie_ids
+        movies_to_add = new_movie_ids - current_movie_ids
+
+        # 원본 게시물을 작성했던 페르소나의 ML 데이터를 수정해야 하므로 원본 페르소나 ID 사용
+        target_persona_id = post.persona_id or persona_id
+
+        if movies_to_remove:
+            for m_id in movies_to_remove:
+                await recommendation_service.record_ml_relationship_log(db, target_persona_id, "MOVIE", m_id, "create_post", is_undo=True)
+            db.query(PostMovie).filter(PostMovie.post_id == post.id, PostMovie.movie_id.in_(list(movies_to_remove))).delete(synchronize_session=False)
+
+        if movies_to_add:
+            for m_id in movies_to_add:
+                db.add(PostMovie(post_id=post.id, movie_id=m_id))
+                await recommendation_service.record_ml_relationship_log(db, target_persona_id, "MOVIE", m_id, "create_post")
+
+        # 3. 본문(content)이 변경되었을 때만 해시태그/멘션 DB 삭제 및 재추출 로직 실행 (성능 최적화)
+        if post.content != post_in.content:
+            post.content = post_in.content
             db.query(PostHashtag).filter(PostHashtag.post_id == post.id).delete()
             db.query(PostMention).filter(PostMention.post_id == post.id).delete()
             

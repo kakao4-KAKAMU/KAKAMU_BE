@@ -2,9 +2,9 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from sqlalchemy import func, select, or_
 from uuid import UUID
-from typing import Dict, Any, Optional
+from typing import Optional
 
-from app.models import Comment, User, Block
+from app.models import Comment, User, Block, LikeLog
 from app.schemas.response.post import CommentListResponse, CommentDetailResponse, CommentItem, PaginationMeta
 
 class CommentReadService:
@@ -38,6 +38,17 @@ class CommentReadService:
 
         comments = base_query.order_by(Comment.created_at.asc()).offset(offset).limit(size).all()
 
+        liked_comment_ids = set()
+        if current_user_id and comments:
+            comment_ids = [c.id for c, _ in comments]
+            liked_logs = db.query(LikeLog.target_id).filter(
+                LikeLog.user_id == current_user_id,
+                LikeLog.target_type == "COMMENT",
+                LikeLog.target_id.in_(comment_ids),
+                LikeLog.is_active == 1
+            ).all()
+            liked_comment_ids = {log[0] for log in liked_logs}
+
         items: list[CommentItem] = []
         for c, author in comments:
             author_name = "알 수 없음" if not author or author.status == "DELETED" else f"{author.nickname}#{author.tag}"
@@ -52,6 +63,8 @@ class CommentReadService:
                 content=c.content,
                 is_spoiler=is_spoiler,
                 created_at=c.created_at,
+                like_count=c.like_count,
+                is_liked=c.id in liked_comment_ids,
             ))
 
         return CommentListResponse(
@@ -80,6 +93,20 @@ class CommentReadService:
             if is_blocked:
                 raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_BLOCKED_COMMENT", "message": "차단된 사용자의 댓글입니다."})
 
-        return CommentDetailResponse(id=comment.id, content=comment.content)
+        is_liked = False
+        if current_user_id:
+            is_liked = db.query(LikeLog).filter(
+                LikeLog.user_id == current_user_id,
+                LikeLog.target_type == "COMMENT",
+                LikeLog.target_id == comment.id,
+                LikeLog.is_active == 1
+            ).first() is not None
+
+        return CommentDetailResponse(
+            id=comment.id,
+            content=comment.content,
+            like_count=comment.like_count,
+            is_liked=is_liked,
+        )
 
 comment_read_service = CommentReadService()

@@ -25,9 +25,12 @@ class PostDeleteService:
 
         # 게시물 삭제 시 추천 엔진 로깅 (취소 기록)
         post_movies = db.query(PostMovie).filter(PostMovie.post_id == post.id).all()
+        
+        # 원본 게시물을 작성했던 페르소나의 ML 데이터를 롤백해야 하므로 원본 페르소나 ID 사용
+        target_persona_id = post.persona_id or persona_id
         for pm in post_movies:
             await recommendation_service.record_ml_relationship_log(
-                db, persona_id, "MOVIE", pm.movie_id, "create_post", is_undo=True
+                db, target_persona_id, "MOVIE", pm.movie_id, "create_post", is_undo=True
             )
 
         db.commit()
