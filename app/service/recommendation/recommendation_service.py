@@ -1,5 +1,6 @@
 import logging
 from uuid import UUID
+from typing import Union  # [수정] UUID도 받을 수 있도록 추가
 from sqlalchemy.orm import Session
 from enum import Enum
 import httpx
@@ -19,7 +20,7 @@ class RecommendationService:
         db: Session, 
         persona_id: UUID, 
         target_type: str, 
-        target_id: int | str | UUID, 
+        target_id: Union[int, UUID, str],  # [수정] int -> UUID도 허용
         action: str, 
         is_undo: bool = False
     ):
@@ -45,8 +46,8 @@ class RecommendationService:
             async with httpx.AsyncClient() as client:
                 response = await client.post(ML_API_URL, json=payload, timeout=3.0)
                 response.raise_for_status()
-        except httpx.RequestError as e:
-            logger.error(f"[RecommendationLog] ML 서버로 로그 전송 실패: {e}")
+        except Exception as e:
+            logger.exception(f"[RecommendationLog] ML 서버로 로그 전송 실패: {e}")
 
 # 싱글톤 인스턴스   
 recommendation_service = RecommendationService()
