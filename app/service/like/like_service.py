@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
+from typing import Optional
 
 from app.schemas.request.post import LikeToggleRequest
 from app.models import LikeLog, Post, Comment
@@ -10,7 +11,7 @@ from app.service.notification.notification_service import notification_service
 from app.models.notification import NotificationType
 
 class LikeService:
-    async def toggle_like(self, db: Session, req: LikeToggleRequest, user_id: UUID, persona_id: UUID) -> tuple[bool, int]:
+    async def toggle_like(self, db: Session, req: LikeToggleRequest, user_id: UUID, persona_id: Optional[UUID]) -> tuple[bool, int]:
         """게시물 또는 댓글의 좋아요를 토글(Like/Unlike)하고 취향 가중치에 반영합니다."""
         if req.target_type == "POST":
             target = db.query(Post).filter(Post.id == req.target_id).first()
