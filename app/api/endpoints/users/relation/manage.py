@@ -4,7 +4,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 from app.db.session import get_db
-from app.api.deps.auth import get_active_user
+from app.api.deps.auth import get_active_user, get_optional_user
 from app.schemas.mapper.user import UserMapper
 from app.schemas.response.relation import RelationResponse, FollowListResponse
 from app.service.relation.relation_service import relation_service
@@ -87,31 +87,20 @@ def get_followers(
     target_user_id: UUID,
     cursor: Optional[UUID] = Query(None, description="마지막으로 조회한 팔로워의 유저 ID"),
     limit: int = Query(20, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """
     특정 유저를 팔로우하는 사람(팔로워) 목록을 조회합니다.
     탈퇴(DELETED)한 유저는 목록에서 제외됩니다.
+    로그인한 경우 각 팔로워에 대한 내 팔로우 여부(`is_following`)가 함께 반환됩니다.
     """
-    query = db.query(Follow).join(
-        User, Follow.follower_id == User.id
-    ).filter(
-        Follow.following_id == target_user_id,
-        User.status == "ACTIVE"
-    )
-
-    if cursor:
-        query = query.filter(Follow.follower_id < cursor)
-
-    follows = query.order_by(Follow.follower_id.desc()).limit(limit).all()
-
-    items = [UserMapper.to_simple(f.follower) for f in follows]
-
-    next_cursor = items[-1].id if items else None
-    return FollowListResponse(
-        items=items,
-        next_cursor=next_cursor,
-        has_next=len(items) == limit,
+    return relation_service.get_followers(
+        db,
+        target_user_id,
+        current_user_id=current_user.id if current_user else None,
+        cursor=cursor,
+        limit=limit,
     )
 
 @router.get(

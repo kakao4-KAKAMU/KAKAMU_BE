@@ -119,7 +119,7 @@ class SearchService:
 
         return UserSearchResponse(
             items=[
-                UserMapper.to_simple(
+                UserMapper.to_simple_with_follow(
                     user,
                     is_following=user.id in followed_user_ids,
                 )
