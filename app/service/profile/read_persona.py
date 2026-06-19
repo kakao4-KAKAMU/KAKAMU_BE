@@ -5,27 +5,28 @@ from app.models import Persona
 from typing import List
 from uuid import UUID
 
+from app.schemas.base.persona import Persona as PersonaSchema
+from app.schemas.mapper.persona import PersonaMapper
+
+
 class PersonaReadService:
 
-    # 내 모든 페르소나 조회
     @staticmethod
-    async def get_my_personas(db: Session, user_id: UUID) -> List[Persona]:
+    async def get_my_personas(db: Session, user_id: UUID) -> List[PersonaSchema]:
         stmt = select(Persona).where(
             Persona.user_id == user_id,
             Persona.status != "DELETED"
         )
 
         personas = list(db.scalars(stmt).all())
-            
-        return personas
+        return [PersonaMapper.to_persona(persona) for persona in personas]
 
-    # 특정 페르소나 조회
     @staticmethod
     async def get_persona_detail(
         db: Session,
         user_id: UUID,
         persona_id: UUID
-    ) -> Persona:
+    ) -> PersonaSchema:
         stmt = select(Persona).where(
             Persona.id == persona_id,
             Persona.user_id == user_id,
@@ -40,4 +41,4 @@ class PersonaReadService:
                 detail={"code": "PERSONA_NOT_FOUND", "message": "페르소나를 찾을 수 없습니다."}
             )
 
-        return persona
+        return PersonaMapper.to_persona(persona)

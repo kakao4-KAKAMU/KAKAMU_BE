@@ -5,10 +5,12 @@ from sqlalchemy import select, and_
 from fastapi import HTTPException
 
 from app.models.user import User
+from app.schemas.mapper.user import UserMapper
 from app.schemas.request.user import UserUpdate
+from app.schemas.response.user import UserResponse
 
 class UserUpdateService:
-    async def update_user(self, db: Session, user_id: UUID, user_in: UserUpdate) -> User:
+    async def update_user(self, db: Session, user_id: UUID, user_in: UserUpdate) -> UserResponse:
         user = db.scalar(select(User).where(User.id == user_id, User.status == "ACTIVE"))
         if not user:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "사용자를 찾을 수 없습니다."})
@@ -45,7 +47,7 @@ class UserUpdateService:
         try:
             db.commit()
             db.refresh(user)
-            return user
+            return UserMapper.to_account(user)
         except Exception:
             db.rollback()
             raise HTTPException(status_code=500, detail={"code": "USER_UPDATE_FAILED", "message": "사용자 정보 수정 중 오류가 발생했습니다."})

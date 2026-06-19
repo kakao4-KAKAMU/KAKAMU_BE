@@ -1,22 +1,13 @@
+from typing import List
+
 from pydantic import BaseModel, Field
-from datetime import datetime
-from typing import List, Optional
-from uuid import UUID
 
-class NotificationItem(BaseModel):
-    id: int
-    receiver_user_id: UUID
-    sender_persona_id: Optional[UUID]
-    sender_nickname: Optional[str]
-    type: str
-    target_type: str
-    target_id: str
-    message: str
-    is_read: bool
-    created_at: datetime
+from app.schemas.base.notification import Notification
 
-    class Config:
-        from_attributes = True
+NotificationItem = Notification
+
+__all__ = ["NotificationItem", "NotificationListResponse"]
+
 
 class NotificationListResponse(BaseModel):
     items: List[NotificationItem]

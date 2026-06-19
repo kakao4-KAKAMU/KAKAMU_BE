@@ -2,6 +2,8 @@ from fastapi import HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models import Persona
+from app.schemas.base.persona import Persona as PersonaSchema
+from app.schemas.mapper.persona import PersonaMapper
 from uuid import UUID
 
 class PersonaRestoreService:
@@ -11,7 +13,7 @@ class PersonaRestoreService:
         db: Session,
         user_id: UUID,
         persona_id: UUID
-    ) -> Persona:
+    ) -> PersonaSchema:
         stmt = select(Persona).where(
             Persona.id == persona_id,
             Persona.user_id == user_id
@@ -49,7 +51,7 @@ class PersonaRestoreService:
             persona.deleted_at = None
             db.commit()
             db.refresh(persona)
-            return persona
+            return PersonaMapper.to_persona(persona)
             
         except Exception as e:
             db.rollback()

@@ -1,4 +1,5 @@
 import time
+from dataclasses import dataclass
 from uuid import UUID
 from typing import Optional, Dict, List, Set, Tuple
 from sqlalchemy.orm import Session, selectinload
@@ -6,7 +7,19 @@ from sqlalchemy import func, select
 from fastapi import HTTPException
 
 from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block, User, PostMention, Follow, Movie
-from app.schemas.response.post import PostResponse, PostListResponse, MentionSimple, MovieSimple
+from app.schemas.base.mention import Mention
+from app.schemas.mapper.post import PostMapper
+from app.schemas.response.post import PostResponse, PostListResponse
+
+
+@dataclass
+class PostListContext:
+    mentions_map: Dict[int, List[Mention]]
+    hashtags_map: Dict[int, List[str]]
+    comment_counts_map: Dict[int, int]
+    liked_post_ids: Set[int]
+    followed_user_ids: Set[UUID]
+
 
 class PostReadService:
     def __init__(self):
@@ -36,7 +49,7 @@ class PostReadService:
         self._block_cache[user_id] = (now, block_set)
         return block_set
 
-    def _get_mentions_for_posts(self, db: Session, post_ids: List[int]) -> Dict[int, List[MentionSimple]]:
+    def _get_mentions_for_posts(self, db: Session, post_ids: List[int]) -> Dict[int, List[Mention]]:
         if not post_ids:
             return {}
 
@@ -44,9 +57,9 @@ class PostReadService:
             .join(User, User.id == PostMention.user_id)\
             .filter(PostMention.post_id.in_(post_ids), User.status == "ACTIVE").all()
 
-        mentions_map: Dict[int, List[MentionSimple]] = {pid: [] for pid in post_ids}
+        mentions_map: Dict[int, List[Mention]] = {pid: [] for pid in post_ids}
         for m in mentions_query:
-            mentions_map[m.post_id].append(MentionSimple(id=m.id, nickname=m.nickname, tag=m.tag))
+            mentions_map[m.post_id].append(Mention(id=m.id, nickname=m.nickname, tag=m.tag))
         return mentions_map
 
     def _get_hashtags_for_posts(self, db: Session, post_ids: List[int]) -> Dict[int, List[str]]:
@@ -81,66 +94,63 @@ class PostReadService:
         ).all()
         return {f[0] for f in follows}
 
-    def _build_post_response(
+    def _build_post_infos(
         self,
-        post: Post,
-        author: User,
+        db: Session,
+        posts: List[Post],
+        current_user_id: Optional[UUID],
         *,
-        hashtags: List[str],
-        mentions: List[MentionSimple],
-        comment_count: int,
-        is_liked: bool,
-        is_following: bool,
-    ) -> PostResponse:
-        is_deleted = not author or author.status == "DELETED"
-        return PostResponse(
-            id=post.id,
-            author_id=None if is_deleted else author.id,
-            author="알 수 없음" if is_deleted else f"{author.nickname}#{author.tag}",
-            author_nickname="알 수 없음" if is_deleted else author.nickname,
-            author_tag=None if is_deleted else author.tag,
-            author_image=None if is_deleted else author.profile_image_url,
-            title=post.title,
-            content=post.content,
-            image_urls=post.image_urls or [],
-            is_spoiler=post.is_spoiler == 1,
-            created_at=post.created_at,
-            updated_at=post.updated_at,
-            movies=[
-                MovieSimple(id=m.id, title=m.titles[0].title_name if m.titles else "제목 없음", poster_url=m.poster_url, release_date=m.release_date)
-                for m in post.movies
-            ],
-            hashtags=hashtags,
-            mentions=mentions,
-            like_count=post.like_count,
-            comment_count=comment_count,
-            is_liked=is_liked,
-            is_following=is_following if not is_deleted else False,
+        force_liked: bool = False,
+    ) -> PostListContext:
+        post_ids = [post.id for post in posts]
+        if not post_ids:
+            return PostListContext({}, {}, {}, set(), set())
+
+        liked_post_ids: Set[int] = set()
+        followed_user_ids: Set[UUID] = set()
+
+        if current_user_id:
+            if not force_liked:
+                liked_logs = db.query(LikeLog.target_id).filter(
+                    LikeLog.user_id == current_user_id,
+                    LikeLog.target_type == "POST",
+                    LikeLog.target_id.in_(post_ids),
+                    LikeLog.is_active == 1,
+                ).all()
+                liked_post_ids = {log[0] for log in liked_logs}
+
+            author_user_ids = list({post.user_id for post in posts})
+            followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
+
+        return PostListContext(
+            mentions_map=self._get_mentions_for_posts(db, post_ids),
+            hashtags_map=self._get_hashtags_for_posts(db, post_ids),
+            comment_counts_map=self._get_comment_counts_for_posts(db, post_ids),
+            liked_post_ids=liked_post_ids,
+            followed_user_ids=followed_user_ids,
         )
 
     def _build_post_list(
         self,
         posts_with_author: List[Tuple[Post, User]],
         *,
-        liked_post_ids: Set[int],
-        followed_user_ids: Set[UUID],
-        mentions_map: Dict[int, List[MentionSimple]],
-        hashtags_map: Dict[int, List[str]],
-        comment_counts_map: Dict[int, int],
+        context: PostListContext,
         limit: int,
         force_liked: bool = False,
     ) -> PostListResponse:
         result: List[PostResponse] = []
         for post, author in posts_with_author:
-            result.append(self._build_post_response(
-                post,
-                author,
-                hashtags=hashtags_map.get(post.id, []),
-                mentions=mentions_map.get(post.id, []),
-                comment_count=comment_counts_map.get(post.id, 0),
-                is_liked=force_liked or post.id in liked_post_ids,
-                is_following=post.user_id in followed_user_ids,
-            ))
+            result.append(
+                PostMapper.to_post_response(
+                    post,
+                    author,
+                    hashtags=context.hashtags_map.get(post.id, []),
+                    mentions=context.mentions_map.get(post.id, []),
+                    comment_count=context.comment_counts_map.get(post.id, 0),
+                    is_liked=force_liked or post.id in context.liked_post_ids,
+                    is_following=post.user_id in context.followed_user_ids,
+                )
+            )
 
         next_cursor = result[-1].id if result else None
         return PostListResponse(items=result, next_cursor=next_cursor, has_next=len(result) == limit)
@@ -161,38 +171,12 @@ class PostReadService:
             query = query.filter(Post.id < cursor)
 
         posts_with_author = query.order_by(Post.id.desc()).limit(limit).all()
-
-        post_ids = [post.id for post, _ in posts_with_author]
-        liked_post_ids: Set[int] = set()
-        followed_user_ids: Set[UUID] = set()
-        mentions_map: Dict[int, List[MentionSimple]] = {}
-        hashtags_map: Dict[int, List[str]] = {}
-        comment_counts_map: Dict[int, int] = {}
-
-        if post_ids:
-            if current_user_id:
-                liked_logs = db.query(LikeLog.target_id).filter(
-                    LikeLog.user_id == current_user_id,
-                    LikeLog.target_type == "POST",
-                    LikeLog.target_id.in_(post_ids),
-                    LikeLog.is_active == 1
-                ).all()
-                liked_post_ids = {log[0] for log in liked_logs}
-
-                author_user_ids = list({post.user_id for post, _ in posts_with_author})
-                followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
-
-            mentions_map = self._get_mentions_for_posts(db, post_ids)
-            hashtags_map = self._get_hashtags_for_posts(db, post_ids)
-            comment_counts_map = self._get_comment_counts_for_posts(db, post_ids)
+        posts = [post for post, _ in posts_with_author]
+        context = self._build_post_infos(db, posts, current_user_id)
 
         return self._build_post_list(
             posts_with_author,
-            liked_post_ids=liked_post_ids,
-            followed_user_ids=followed_user_ids,
-            mentions_map=mentions_map,
-            hashtags_map=hashtags_map,
-            comment_counts_map=comment_counts_map,
+            context=context,
             limit=limit,
         )
 
@@ -219,27 +203,12 @@ class PostReadService:
             query = query.filter(Post.id < cursor)
 
         posts_with_author = query.order_by(Post.id.desc()).limit(limit).all()
-
-        post_ids = [post.id for post, _ in posts_with_author]
-        followed_user_ids: Set[UUID] = set()
-        mentions_map: Dict[int, List[MentionSimple]] = {}
-        hashtags_map: Dict[int, List[str]] = {}
-        comment_counts_map: Dict[int, int] = {}
-
-        if post_ids:
-            author_user_ids = list({post.user_id for post, _ in posts_with_author})
-            followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
-            mentions_map = self._get_mentions_for_posts(db, post_ids)
-            hashtags_map = self._get_hashtags_for_posts(db, post_ids)
-            comment_counts_map = self._get_comment_counts_for_posts(db, post_ids)
+        posts = [post for post, _ in posts_with_author]
+        context = self._build_post_infos(db, posts, current_user_id, force_liked=True)
 
         return self._build_post_list(
             posts_with_author,
-            liked_post_ids=set(),
-            followed_user_ids=followed_user_ids,
-            mentions_map=mentions_map,
-            hashtags_map=hashtags_map,
-            comment_counts_map=comment_counts_map,
+            context=context,
             limit=limit,
             force_liked=True,
         )
@@ -267,38 +236,12 @@ class PostReadService:
             query = query.filter(Post.id < cursor)
 
         posts_with_author = query.order_by(Post.id.desc()).limit(limit).all()
-
-        post_ids = [post.id for post, _ in posts_with_author]
-        liked_post_ids: Set[int] = set()
-        followed_user_ids: Set[UUID] = set()
-        mentions_map: Dict[int, List[MentionSimple]] = {}
-        hashtags_map: Dict[int, List[str]] = {}
-        comment_counts_map: Dict[int, int] = {}
-
-        if post_ids:
-            if current_user_id:
-                liked_logs = db.query(LikeLog.target_id).filter(
-                    LikeLog.user_id == current_user_id,
-                    LikeLog.target_type == "POST",
-                    LikeLog.target_id.in_(post_ids),
-                    LikeLog.is_active == 1
-                ).all()
-                liked_post_ids = {log[0] for log in liked_logs}
-
-                author_user_ids = list({post.user_id for post, _ in posts_with_author})
-                followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
-
-            mentions_map = self._get_mentions_for_posts(db, post_ids)
-            hashtags_map = self._get_hashtags_for_posts(db, post_ids)
-            comment_counts_map = self._get_comment_counts_for_posts(db, post_ids)
+        posts = [post for post, _ in posts_with_author]
+        context = self._build_post_infos(db, posts, current_user_id)
 
         return self._build_post_list(
             posts_with_author,
-            liked_post_ids=liked_post_ids,
-            followed_user_ids=followed_user_ids,
-            mentions_map=mentions_map,
-            hashtags_map=hashtags_map,
-            comment_counts_map=comment_counts_map,
+            context=context,
             limit=limit,
         )
 
@@ -316,33 +259,20 @@ class PostReadService:
         if post.user_id in blocked_user_ids:
             raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_BLOCKED_POST", "message": "차단된 사용자의 게시물입니다."})
 
-        hashtags_map = self._get_hashtags_for_posts(db, [post.id])
-        mentions_map = self._get_mentions_for_posts(db, [post.id])
-        comment_counts_map = self._get_comment_counts_for_posts(db, [post.id])
+        context = self._build_post_infos(db, [post], current_user_id)
+        is_following = (
+            post.user_id in context.followed_user_ids
+            if current_user_id and author and author.status != "DELETED"
+            else False
+        )
 
-        is_liked = False
-        if current_user_id:
-            is_liked = db.query(LikeLog).filter(
-                LikeLog.user_id == current_user_id,
-                LikeLog.target_type == "POST",
-                LikeLog.target_id == post.id,
-                LikeLog.is_active == 1
-            ).first() is not None
-
-        is_following = False
-        if current_user_id and author and author.status != "DELETED":
-            is_following = db.query(Follow).filter(
-                Follow.follower_id == current_user_id,
-                Follow.following_id == post.user_id
-            ).first() is not None
-
-        return self._build_post_response(
+        return PostMapper.to_post_response(
             post,
             author,
-            hashtags=hashtags_map.get(post.id, []),
-            mentions=mentions_map.get(post.id, []),
-            comment_count=comment_counts_map.get(post.id, 0),
-            is_liked=is_liked,
+            hashtags=context.hashtags_map.get(post.id, []),
+            mentions=context.mentions_map.get(post.id, []),
+            comment_count=context.comment_counts_map.get(post.id, 0),
+            is_liked=post.id in context.liked_post_ids,
             is_following=is_following,
         )
 

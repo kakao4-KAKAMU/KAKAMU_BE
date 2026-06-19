@@ -1,7 +1,7 @@
 import httpx
 from fastapi import HTTPException
 
-from app.schemas.response.auth import KakaoUserInfo
+from app.schemas.base.auth import KakaoUserInfo
 
 async def get_kakao_access_token(auth_code: str, rest_api_key: str, redirect_uri: str) -> str:
     """인가 코드(Authorization Code)를 사용해 카카오 서버에서 액세스 토큰을 발급받습니다."""

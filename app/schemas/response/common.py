@@ -1,18 +1,15 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from app.schemas.base.common import SuccessMessageResponse, SuccessResponse
 
-class SuccessResponse(BaseModel):
-    status: str = Field(default="success", description="응답 상태")
-    message: Optional[str] = Field(default=None, description="성공 메시지 (선택)")
+__all__ = ["SuccessResponse", "SuccessMessageResponse", "IdResponse", "PostIdResponse", "CommentIdResponse"]
 
-class SuccessMessageResponse(BaseModel):
-    message: str = Field(..., description="성공 메시지")
 
 class IdResponse(SuccessResponse):
-    id: int = Field(..., description="생성/수정된 리소스의 ID")
+    id: int
+
 
 class PostIdResponse(SuccessResponse):
-    post_id: int = Field(..., description="게시물 ID")
+    post_id: int
+
 
 class CommentIdResponse(SuccessResponse):
-    comment_id: int = Field(..., description="댓글 ID")
+    comment_id: int

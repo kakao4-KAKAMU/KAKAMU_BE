@@ -5,6 +5,7 @@ from uuid import UUID
 
 from app.db.session import get_db
 from app.api.deps.auth import get_active_user
+from app.schemas.mapper.user import UserMapper
 from app.schemas.response.relation import RelationResponse, FollowListResponse
 from app.service.relation.relation_service import relation_service
 from app.models import Follow, User
@@ -104,21 +105,14 @@ def get_followers(
 
     follows = query.order_by(Follow.follower_id.desc()).limit(limit).all()
 
-    items = []
-    for f in follows:
-        u = f.follower
-        items.append({
-            "id": u.id,
-            "nickname": u.nickname,
-            "username": u.username
-        })
+    items = [UserMapper.to_simple(f.follower) for f in follows]
 
-    next_cursor = items[-1]["id"] if items else None
-    return {
-        "items": items,
-        "next_cursor": next_cursor,
-        "has_next": len(items) == limit
-    }
+    next_cursor = items[-1].id if items else None
+    return FollowListResponse(
+        items=items,
+        next_cursor=next_cursor,
+        has_next=len(items) == limit,
+    )
 
 @router.get(
     "/users/{target_user_id}/followings",
@@ -147,18 +141,11 @@ def get_followings(
 
     follows = query.order_by(Follow.following_id.desc()).limit(limit).all()
 
-    items = []
-    for f in follows:
-        u = f.following_user
-        items.append({
-            "id": u.id,
-            "nickname": u.nickname,
-            "username": u.username
-        })
+    items = [UserMapper.to_simple(f.following_user) for f in follows]
 
-    next_cursor = items[-1]["id"] if items else None
-    return {
-        "items": items,
-        "next_cursor": next_cursor,
-        "has_next": len(items) == limit
-    }
+    next_cursor = items[-1].id if items else None
+    return FollowListResponse(
+        items=items,
+        next_cursor=next_cursor,
+        has_next=len(items) == limit,
+    )
