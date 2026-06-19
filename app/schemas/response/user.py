@@ -1,34 +1,6 @@
-from pydantic import BaseModel, ConfigDict, Field
-from datetime import datetime
-from uuid import UUID
-from typing import Optional
+from app.schemas.base.user import UserAccount, UserPublic
 
-class UserBase(BaseModel):
-    username: str = Field(..., max_length=50)
-    nickname: str = Field(..., max_length=50)
-    phone: str = Field(..., max_length=20)
+UserResponse = UserAccount
+UserPublicResponse = UserPublic
 
-class UserResponse(UserBase):
-    id: UUID
-    tag: str
-    profile_image_url: Optional[str] = None
-    profile_msg: Optional[str] = None
-    created_at: datetime
-    
-    model_config = ConfigDict(from_attributes=True)
-
-# 타인에게 노출되어도 안전한 공개용 유저 정보 스키마
-class UserPublicResponse(BaseModel):
-    id: UUID
-    nickname: str
-    tag: str
-    profile_image_url: Optional[str] = None
-    profile_msg: Optional[str] = None
-    created_at: datetime
-    
-    is_following: Optional[bool] = False
-    follower_count: Optional[int] = 0
-    following_count: Optional[int] = 0
-    post_count: Optional[int] = 0
-    
-    model_config = ConfigDict(from_attributes=True)
+__all__ = ["UserResponse", "UserPublicResponse"]
