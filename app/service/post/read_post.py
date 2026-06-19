@@ -10,6 +10,7 @@ from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block, User
 from app.schemas.base.mention import Mention
 from app.schemas.mapper.post import PostMapper
 from app.schemas.response.post import PostResponse, PostListResponse
+from app.service.relation.relation_service import RelationService
 
 
 @dataclass
@@ -85,15 +86,6 @@ class PostReadService:
 
         return {pid: count for pid, count in counts}
 
-    def _get_followed_user_ids(self, db: Session, current_user_id: UUID, target_user_ids: List[UUID]) -> Set[UUID]:
-        if not target_user_ids:
-            return set()
-        follows = db.query(Follow.following_id).filter(
-            Follow.follower_id == current_user_id,
-            Follow.following_id.in_(target_user_ids)
-        ).all()
-        return {f[0] for f in follows}
-
     def _build_post_infos(
         self,
         db: Session,
@@ -120,7 +112,9 @@ class PostReadService:
                 liked_post_ids = {log[0] for log in liked_logs}
 
             author_user_ids = list({post.user_id for post in posts})
-            followed_user_ids = self._get_followed_user_ids(db, current_user_id, author_user_ids)
+            followed_user_ids = RelationService.get_followed_user_ids(
+                db, current_user_id, author_user_ids
+            )
 
         return PostListContext(
             mentions_map=self._get_mentions_for_posts(db, post_ids),

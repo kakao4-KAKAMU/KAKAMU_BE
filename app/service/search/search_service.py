@@ -46,7 +46,12 @@ class SearchService:
     ) -> PersonFilterSearchResponse:
         query = db.query(People)
         if search_pattern:
-            query = query.filter(People.person_name.ilike(search_pattern))
+            query = query.filter(
+                or_(
+                    People.person_name.ilike(search_pattern),
+                    People.person_name_eng.ilike(search_pattern),
+                )
+            )
         if jobs:
             query = query.join(MovieStaff, People.id == MovieStaff.people_id).filter(MovieStaff.job.in_(jobs))
 
@@ -119,7 +124,7 @@ class SearchService:
 
         return UserSearchResponse(
             items=[
-                UserMapper.to_simple(
+                UserMapper.to_simple_with_follow(
                     user,
                     is_following=user.id in followed_user_ids,
                 )

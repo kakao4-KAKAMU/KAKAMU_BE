@@ -1,10 +1,78 @@
-from sqlalchemy.orm import Session
-from fastapi import HTTPException
-from app.models import User, Follow, Block
-from app.schemas.response.relation import RelationResponse
+from typing import Optional, Set
 from uuid import UUID
 
+from fastapi import HTTPException
+from sqlalchemy.orm import Session, joinedload
+
+from app.models import Block, Follow, User
+from app.schemas.mapper.user import UserMapper
+from app.schemas.response.relation import FollowListResponse, RelationResponse
+
+
 class RelationService:
+    @staticmethod
+    def get_followed_user_ids(
+        db: Session,
+        current_user_id: UUID,
+        target_user_ids: list[UUID],
+    ) -> Set[UUID]:
+        if not target_user_ids:
+            return set()
+
+        follows = db.query(Follow.following_id).filter(
+            Follow.follower_id == current_user_id,
+            Follow.following_id.in_(target_user_ids),
+        ).all()
+        return {row[0] for row in follows}
+
+    def get_followers(
+        self,
+        db: Session,
+        target_user_id: UUID,
+        *,
+        current_user_id: Optional[UUID] = None,
+        cursor: Optional[UUID] = None,
+        limit: int = 20,
+    ) -> FollowListResponse:
+        query = (
+            db.query(Follow)
+            .options(joinedload(Follow.follower))
+            .join(User, Follow.follower_id == User.id)
+            .filter(
+                Follow.following_id == target_user_id,
+                User.status == "ACTIVE",
+            )
+        )
+
+        if cursor:
+            query = query.filter(Follow.follower_id < cursor)
+
+        follows = query.order_by(Follow.follower_id.desc()).limit(limit).all()
+        followers = [follow.follower for follow in follows]
+
+        followed_user_ids: Set[UUID] = set()
+        if current_user_id and followers:
+            followed_user_ids = RelationService.get_followed_user_ids(
+                db,
+                current_user_id,
+                [follower.id for follower in followers],
+            )
+
+        items = [
+            UserMapper.to_simple_with_follow(
+                follower,
+                is_following=follower.id in followed_user_ids,
+            )
+            for follower in followers
+        ]
+
+        next_cursor = items[-1].id if items else None
+        return FollowListResponse(
+            items=items,
+            next_cursor=next_cursor,
+            has_next=len(items) == limit,
+        )
+
     async def follow(self, db: Session, follower_id: UUID, following_id: UUID) -> RelationResponse:
         target = db.query(User).filter(User.id == following_id).first()
         if not target:
@@ -15,10 +83,10 @@ class RelationService:
             ((Block.blocker_id == follower_id) & (Block.blocked_id == following_id)) |
             ((Block.blocker_id == following_id) & (Block.blocked_id == follower_id))
         ).first()
-        
+
         if is_blocked:
             raise HTTPException(status_code=403, detail="차단된 상태이므로 팔로우할 수 없습니다.")
-        
+
         existing = db.query(Follow).filter_by(follower_id=follower_id, following_id=following_id).first()
         if existing:
             return RelationResponse(status="success", message="이미 팔로우 중입니다.")
@@ -54,7 +122,7 @@ class RelationService:
         else:
             new_block = Block(blocker_id=blocker_id, blocked_id=blocked_id, level=level)
             db.add(new_block)
-        
+
         db.commit()
         return RelationResponse(status="success", message="차단이 완료되었습니다.")
 

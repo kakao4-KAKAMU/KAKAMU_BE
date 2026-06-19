@@ -54,7 +54,7 @@ class UserMapper:
         post_count: int = 0,
     ) -> UserPublic:
         return UserPublic(
-            **UserMapper.to_simple_with_follow(user).model_dump(),
+            **UserMapper.to_simple_with_follow(user, is_following=is_following).model_dump(),
             profile_msg=user.profile_msg,
             follower_count=follower_count,
             following_count=following_count,

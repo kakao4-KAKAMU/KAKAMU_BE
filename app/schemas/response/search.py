@@ -10,7 +10,7 @@ from app.schemas.base.pagination import CursorPaginationMeta
 from app.schemas.base.person import Person
 from app.schemas.base.post import PostItem
 from app.schemas.base.trend import TrendItem
-from app.schemas.base.user import UserSimple
+from app.schemas.base.user import UserSimpleWithFollow
 
 T = TypeVar("T")
 
@@ -75,8 +75,8 @@ class PersonFilterSearchResponse(OffsetSearchResponse[Person]):
     items: List[Person]
 
 
-class UserSearchResponse(CursorSearchResponse[UserSimple]):
-    items: List[UserSimple]
+class UserSearchResponse(CursorSearchResponse[UserSimpleWithFollow]):
+    items: List[UserSimpleWithFollow]
 
 
 class PostSearchResponse(CursorSearchResponse[SearchPost]):
