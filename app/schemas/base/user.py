@@ -21,7 +21,6 @@ class UserSimple(BaseModel):
     nickname: str
     tag: str
     profile_image: Optional[str] = None
-    profile_msg: Optional[str] = None
     created_at: datetime
 
 class UserSimpleWithFollow(UserSimple):
@@ -29,7 +28,7 @@ class UserSimpleWithFollow(UserSimple):
 
 
 class UserPublic(UserSimpleWithFollow):
+    profile_msg: Optional[str] = None
     follower_count: Optional[int] = 0
     following_count: Optional[int] = 0
     post_count: Optional[int] = 0
-

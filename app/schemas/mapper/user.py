@@ -13,7 +13,6 @@ class UserMapper:
             nickname=user.nickname,
             tag=user.tag,
             profile_image=user.profile_image_url,
-            profile_msg=user.profile_msg,
             created_at=user.created_at,
         )
 
@@ -25,7 +24,6 @@ class UserMapper:
                 nickname="알 수 없음",
                 tag="",
                 profile_image=None,
-                profile_msg=None,
                 created_at=user.created_at if user else datetime(1970, 1, 1),
             )
         return UserMapper.to_simple(user)
@@ -42,6 +40,7 @@ class UserMapper:
         return UserAccount(
             **UserMapper.to_simple(user).model_dump(),
             username=user.username,
+            profile_msg=user.profile_msg,
             phone=user.phone,
         )
 
@@ -55,8 +54,8 @@ class UserMapper:
         post_count: int = 0,
     ) -> UserPublic:
         return UserPublic(
-            **UserMapper.to_simple(user).model_dump(),
-            is_following=is_following,
+            **UserMapper.to_simple_with_follow(user).model_dump(),
+            profile_msg=user.profile_msg,
             follower_count=follower_count,
             following_count=following_count,
             post_count=post_count,
