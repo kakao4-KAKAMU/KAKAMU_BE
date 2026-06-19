@@ -1,21 +1,21 @@
 from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
 from typing import Optional
 from uuid import UUID
 
 from app.db.session import get_db
-from app.models import Post, User
+from app.models import User
 from app.api.deps.auth import get_optional_user
+from app.service.search import search_service
 from .utils import handle_search_request, get_search_pattern
-from app.schemas.response.search import PostCursorSearchResponse
+from app.schemas.response.search import PostSearchResponse
 
 router = APIRouter()
 
 @router.get(
     "/v1/search/live",
     tags=["Search - Tabs"],
-    response_model=PostCursorSearchResponse,
+    response_model=PostSearchResponse,
     summary="실시간 게시물 검색"
 )
 def search_live(
@@ -31,15 +31,11 @@ def search_live(
     handle_search_request(request, background_tasks, user_id, q)
     search_pattern = get_search_pattern(q)
 
-    query = db.query(Post).filter(
-        Post.status == "ACTIVE",
-        or_(Post.title.ilike(search_pattern), Post.content.ilike(search_pattern))
+    current_user_id = current_user.id if current_user else None
+    return search_service.search_posts(
+        db,
+        search_pattern,
+        cursor=cursor,
+        limit=limit,
+        current_user_id=current_user_id,
     )
-    if cursor:
-        query = query.filter(Post.id < cursor)
-        
-    posts = query.order_by(Post.id.desc()).limit(limit).all()
-    items = [{"id": p.id, "title": p.title, "content": p.content} for p in posts]
-    
-    next_cursor = posts[-1].id if len(posts) == limit else None
-    return {"status": "success", "items": items, "next_cursor": next_cursor}
