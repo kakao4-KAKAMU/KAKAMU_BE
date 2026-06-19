@@ -87,7 +87,6 @@ class CommentReadService:
                 hashtags=hashtags_map.get(c.id, []),
                 mentions=mentions_map.get(c.id, []),
                 is_liked=c.id in liked_comment_ids,
-                mask_spoiler=True,
             )
             for c, author in comments
         ]
@@ -136,7 +135,6 @@ class CommentReadService:
             hashtags=hashtags_map.get(comment.id, []),
             mentions=mentions_map.get(comment.id, []),
             is_liked=is_liked,
-            mask_spoiler=False,
         )
 
 
