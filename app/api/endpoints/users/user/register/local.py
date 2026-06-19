@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.db.session import get_db
+from app.schemas.mapper.user import UserMapper
 from app.schemas.response.user import UserResponse
 from app.schemas.request.auth import UserRegister, LocalLinkRequest
 from app.models import User, LocalAuth, SocialAuth
@@ -21,7 +22,7 @@ router = APIRouter()
     responses={400: ERROR_LOCAL_AUTH_ALREADY_LINKED, 500: ERROR_REGISTRATION_FAILED},
     summary="일반 회원가입"
 )
-def register_local_user(db: Session = Depends(get_db), val_data: dict = Depends(validate_local_registration)) -> User:
+def register_local_user(db: Session = Depends(get_db), val_data: dict = Depends(validate_local_registration)) -> UserResponse:
     """Firebase 토큰으로 본인/중복 확인 후, 이메일/비밀번호 기반 계정을 생성합니다."""
     user_in: UserRegister = val_data["user_in"]
     ci_value = val_data["ci_value"]
@@ -39,7 +40,7 @@ def register_local_user(db: Session = Depends(get_db), val_data: dict = Depends(
         db.add(LocalAuth(user_id=db_user.id, email=user_in.email, password_hash=get_password_hash(user_in.password)))
         db.commit()
         db.refresh(db_user)
-        return db_user
+        return UserMapper.to_account(db_user)
     except Exception as e:
         db.rollback()
         if isinstance(e, HTTPException):
@@ -56,7 +57,7 @@ def link_local_user(
     request: LocalLinkRequest,
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
-) -> User:
+) -> UserResponse:
     """로그인된 상태에서 이메일(로컬) 계정을 추가 연동합니다. (본인인증 생략)"""
     
     # 1. 사용할 이메일 결정 (입력값이 없으면 기존 소셜 계정에서 끌어오기)
@@ -79,4 +80,4 @@ def link_local_user(
     db.add(LocalAuth(user_id=current_user.id, email=link_email, password_hash=get_password_hash(request.password)))
     db.commit()
     db.refresh(current_user)
-    return current_user
+    return UserMapper.to_account(current_user)

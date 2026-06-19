@@ -5,6 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.models import Persona
 from app.models import FavMovie, FavGenre, FavPeople
+from app.schemas.base.persona import Persona as PersonaSchema
+from app.schemas.mapper.persona import PersonaMapper
 from app.schemas.request.profile import PersonaCreate
 from opentelemetry import trace
 
@@ -19,7 +21,7 @@ class PersonaCreateService:
             db: Session,
             persona_data: PersonaCreate,
             user_id: UUID
-    ) -> Persona:
+    ) -> PersonaSchema:
 
 
 
@@ -104,7 +106,7 @@ class PersonaCreateService:
                 with tracer.start_as_current_span("persona.db_refresh"):
                     db.refresh(new_profile)
 
-                return new_profile  # schemas/profile.py에 정의한
+                return PersonaMapper.to_persona(new_profile)
             except IntegrityError as e:
                 db.rollback()
                 span.record_exception(e)

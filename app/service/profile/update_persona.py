@@ -5,6 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Persona, FavMovie, FavGenre, FavPeople
+from app.schemas.base.persona import Persona as PersonaSchema
+from app.schemas.mapper.persona import PersonaMapper
 from app.schemas.request.profile import PersonaEdit
 from opentelemetry import trace
 
@@ -18,7 +20,7 @@ class PersonaUpdateService:
         user_id: UUID,
         persona_id: UUID,
         persona_data: PersonaEdit
-    ) -> Persona:
+    ) -> PersonaSchema:
         with tracer.start_as_current_span("persona.update") as span:
             span.set_attribute("user_id", str(user_id))
             span.set_attribute("persona_id", str(persona_id))
@@ -83,7 +85,7 @@ class PersonaUpdateService:
                     db.commit()
                     db.refresh(persona)
                     
-                    return persona
+                    return PersonaMapper.to_persona(persona)
                     
             except IntegrityError as e:
                 db.rollback()

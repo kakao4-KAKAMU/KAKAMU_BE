@@ -1,9 +1,15 @@
-from pydantic import BaseModel
 from uuid import UUID
-from app.schemas.response.common import SuccessResponse
+
+from pydantic import BaseModel
+
+from app.schemas.base.common import SuccessResponse
+
+__all__ = ["WatchMovieResponse", "MovieRecommendationResponse"]
+
 
 class WatchMovieResponse(SuccessResponse):
     message: str
+
 
 class MovieRecommendationResponse(BaseModel):
     recommendations: str
