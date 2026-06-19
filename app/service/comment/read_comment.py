@@ -1,16 +1,44 @@
-from sqlalchemy.orm import Session
-from fastapi import HTTPException
-from sqlalchemy import func, select, or_
+from typing import Dict, List, Optional
 from uuid import UUID
-from typing import Optional
 
-from app.models import Comment, User, Block, LikeLog
+from fastapi import HTTPException
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session
+
+from app.models import Block, Comment, CommentHashtag, CommentMention, Hashtag, LikeLog, User
+from app.schemas.base.mention import Mention
 from app.schemas.mapper.comment import CommentMapper
 from app.schemas.mapper.pagination import PaginationMapper
-from app.schemas.response.post import CommentListResponse, CommentDetailResponse
+from app.schemas.response.post import CommentDetailResponse, CommentListResponse
 
 
 class CommentReadService:
+    def _get_mentions_for_comments(self, db: Session, comment_ids: List[int]) -> Dict[int, List[Mention]]:
+        if not comment_ids:
+            return {}
+
+        mentions_query = db.query(CommentMention.comment_id, User.id, User.nickname, User.tag)\
+            .join(User, User.id == CommentMention.user_id)\
+            .filter(CommentMention.comment_id.in_(comment_ids), User.status == "ACTIVE").all()
+
+        mentions_map: Dict[int, List[Mention]] = {cid: [] for cid in comment_ids}
+        for m in mentions_query:
+            mentions_map[m.comment_id].append(Mention(id=m.id, nickname=m.nickname, tag=m.tag))
+        return mentions_map
+
+    def _get_hashtags_for_comments(self, db: Session, comment_ids: List[int]) -> Dict[int, List[str]]:
+        if not comment_ids:
+            return {}
+
+        hashtags_query = db.query(CommentHashtag.comment_id, Hashtag.normalized_keyword)\
+            .join(Hashtag, Hashtag.id == CommentHashtag.hashtag_id)\
+            .filter(CommentHashtag.comment_id.in_(comment_ids)).all()
+
+        hashtags_map: Dict[int, List[str]] = {cid: [] for cid in comment_ids}
+        for h in hashtags_query:
+            hashtags_map[h.comment_id].append(h.normalized_keyword)
+        return hashtags_map
+
     def get_comments(
         self,
         db: Session,
@@ -38,9 +66,12 @@ class CommentReadService:
 
         comments = base_query.order_by(Comment.created_at.asc()).offset(offset).limit(size).all()
 
+        comment_ids = [c.id for c, _ in comments]
+        mentions_map = self._get_mentions_for_comments(db, comment_ids)
+        hashtags_map = self._get_hashtags_for_comments(db, comment_ids)
+
         liked_comment_ids = set()
-        if current_user_id and comments:
-            comment_ids = [c.id for c, _ in comments]
+        if current_user_id and comment_ids:
             liked_logs = db.query(LikeLog.target_id).filter(
                 LikeLog.user_id == current_user_id,
                 LikeLog.target_type == "COMMENT",
@@ -53,7 +84,10 @@ class CommentReadService:
             CommentMapper.to_comment_item(
                 c,
                 author,
+                hashtags=hashtags_map.get(c.id, []),
+                mentions=mentions_map.get(c.id, []),
                 is_liked=c.id in liked_comment_ids,
+                mask_spoiler=True,
             )
             for c, author in comments
         ]
@@ -82,6 +116,9 @@ class CommentReadService:
             if is_blocked:
                 raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_BLOCKED_COMMENT", "message": "차단된 사용자의 댓글입니다."})
 
+        mentions_map = self._get_mentions_for_comments(db, [comment.id])
+        hashtags_map = self._get_hashtags_for_comments(db, [comment.id])
+
         author = db.query(User).filter(User.id == comment.user_id).first()
 
         is_liked = False
@@ -93,6 +130,14 @@ class CommentReadService:
                 LikeLog.is_active == 1
             ).first() is not None
 
-        return CommentMapper.to_comment_item(comment, author, is_liked=is_liked)
+        return CommentMapper.to_comment_item(
+            comment,
+            author,
+            hashtags=hashtags_map.get(comment.id, []),
+            mentions=mentions_map.get(comment.id, []),
+            is_liked=is_liked,
+            mask_spoiler=False,
+        )
+
 
 comment_read_service = CommentReadService()

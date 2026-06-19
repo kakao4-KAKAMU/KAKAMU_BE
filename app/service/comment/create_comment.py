@@ -1,8 +1,9 @@
+import re
 from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Comment, Post, User, CommentMention
+from app.models import Comment, Post, User, CommentMention, Hashtag, CommentHashtag
 from app.schemas.request.post import CommentCreate
 from app.utils.parser import parse_content
 
@@ -37,8 +38,26 @@ class CommentCreateService:
         db.flush()
         
 
-        # 4. 멘션 파싱 및 저장 (기존 로직과 동일)
-        _, mentions = parse_content(comment_in.content)
+        # 4. 해시태그 및 멘션 파싱 처리
+        hashtags, mentions = parse_content(comment_in.content)
+        
+        if len(hashtags) > 10:
+            raise HTTPException(status_code=400, detail={"code": "HASHTAG_LIMIT_EXCEEDED", "message": "해시태그는 최대 10개까지만 등록할 수 있습니다."})
+
+        normalized_set = set()
+        for tag_keyword in hashtags:
+            clean_keyword = re.sub(r'[^\w가-힣]', '', tag_keyword).lower()
+            if clean_keyword:
+                normalized_set.add(clean_keyword)
+
+        for clean_keyword in normalized_set:
+            hashtag_obj = db.query(Hashtag).filter(Hashtag.normalized_keyword == clean_keyword).first()
+            if not hashtag_obj:
+                hashtag_obj = Hashtag(normalized_keyword=clean_keyword)
+                db.add(hashtag_obj)
+                db.flush()
+            db.add(CommentHashtag(comment_id=new_comment.id, hashtag_id=hashtag_obj.id))
+
         for mention_str in mentions:
             if "#" not in mention_str: continue
             nickname, tag = mention_str.split("#", 1)

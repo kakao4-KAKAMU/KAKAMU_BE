@@ -16,7 +16,6 @@ class PostListResponse(BaseModel):
     next_cursor: Optional[int] = None
     has_next: bool
 
-
 CommentDetailResponse = CommentItem
 
 
@@ -24,7 +23,6 @@ class CommentListResponse(BaseModel):
     status: str = Field(default="success")
     items: List[CommentItem]
     meta: PaginationMeta
-
 
 class LikeToggleResponse(BaseModel):
     status: str = Field(default="success")

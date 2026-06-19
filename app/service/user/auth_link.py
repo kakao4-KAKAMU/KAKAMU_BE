@@ -1,14 +1,15 @@
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 
 from app.models.user import User, LocalAuth, SocialAuth
-from app.schemas.request.auth import SocialLinkRequest
+from app.schemas.request.auth import SocialLinkRequest, LocalLinkRequest
 from app.schemas.response.auth import AccountSettingsResponse, LocalAuthStatus, SocialAuthStatus
 from app.service.user.social_auth import get_kakao_user_info
+from app.core.security import get_password_hash
 
-SUPPORTED_PROVIDERS = ["kakao", "google", "naver"]
+SUPPORTED_PROVIDERS = ["kakao", "google"]
 
 class AuthLinkService:
     
@@ -91,6 +92,37 @@ class AuthLinkService:
             email=email
         )
         db.add(new_social_auth)
+        db.commit()
+
+    @staticmethod
+    def link_local_account(db: Session, user_id: UUID, request: LocalLinkRequest) -> None:
+        """이메일/비밀번호(LocalAuth) 로그인 수단을 추가 연동합니다."""
+        # 1. 이미 로컬 연동이 되어있는지 확인
+        existing_local = db.scalar(select(LocalAuth).where(LocalAuth.user_id == user_id))
+        if existing_local:
+            raise HTTPException(status_code=400, detail={"code": "LOCAL_AUTH_ALREADY_LINKED", "message": "이미 이메일 계정이 연동되어 있습니다."})
+        
+        # 2. 연동할 이메일 결정 (입력하지 않은 경우 소셜 계정의 이메일 사용)
+        email = request.email
+        if not email:
+            social_auth = db.scalar(select(SocialAuth).where(and_(SocialAuth.user_id == user_id, SocialAuth.email.isnot(None))))
+            if not social_auth:
+                raise HTTPException(status_code=400, detail={"code": "EMAIL_REQUIRED", "message": "소셜 계정에 이메일 정보가 없어 이메일을 직접 입력해야 합니다."})
+            email = social_auth.email
+            
+        # 3. 이메일 중복 사용 검증
+        email_conflict = db.scalar(select(LocalAuth).where(LocalAuth.email == email))
+        if email_conflict:
+            raise HTTPException(status_code=400, detail={"code": "EMAIL_ALREADY_USED", "message": "이미 다른 계정에서 사용 중인 이메일입니다."})
+            
+        # 4. 로컬 로그인 수단 추가
+        new_local_auth = LocalAuth(
+            user_id=user_id,
+            email=email,
+            password_hash=get_password_hash(request.password),
+            email_verified=1  # 소셜 로그인 또는 로그인 상태이므로 이메일 인증이 된 것으로 간주
+        )
+        db.add(new_local_auth)
         db.commit()
 
     @staticmethod
