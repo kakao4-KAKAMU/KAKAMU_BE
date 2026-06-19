@@ -5,6 +5,9 @@ from sqlalchemy import and_, extract
 from sqlalchemy.orm import Query, Session, selectinload
 
 from app.models.movie import Genre, Movie, MovieTitle
+from app.schemas.response.search import MovieFilterSearchResponse, MovieTabSearchResponse
+from app.schemas.mapper.movie import MovieMapper
+from app.schemas.mapper.pagination import PaginationMapper
 
 
 class MovieReadService:
@@ -60,6 +63,58 @@ class MovieReadService:
             query = query.order_by(Movie.id.desc())
 
         return query.options(selectinload(Movie.titles)).limit(limit).all()
+
+    def search_content_tab_response(
+        self,
+        db: Session,
+        search_pattern: str,
+        *,
+        sort: str = "accuracy",
+        cursor: Optional[str] = None,
+        limit: int = 20,
+    ) -> MovieTabSearchResponse:
+        movies = self.search_content_tab(
+            db,
+            search_pattern,
+            sort=sort,
+            cursor=cursor,
+            limit=limit,
+        )
+        next_cursor = movies[-1].id if len(movies) == limit and sort == "accuracy" else None
+        return MovieTabSearchResponse(
+            items=[MovieMapper.to_movie(movie) for movie in movies],
+            meta=PaginationMapper.build_cursor_meta(
+                next_cursor=next_cursor,
+                has_next=next_cursor is not None,
+            ),
+        )
+
+    def search_movies_response(
+        self,
+        db: Session,
+        *,
+        search_pattern: Optional[str] = None,
+        genre: Optional[List[UUID]] = None,
+        year: Optional[int] = None,
+        sort: str = "year_desc",
+        skip: int = 0,
+        limit: int = 20,
+    ) -> MovieFilterSearchResponse:
+        movies, total_count = self.search_movies(
+            db,
+            search_pattern=search_pattern,
+            genre=genre,
+            year=year,
+            sort=sort,
+            skip=skip,
+            limit=limit,
+        )
+        return MovieFilterSearchResponse(
+            items=[MovieMapper.to_movie(movie) for movie in movies],
+            skip=skip,
+            limit=limit,
+            total_count=total_count,
+        )
 
     def search_movies(
         self,

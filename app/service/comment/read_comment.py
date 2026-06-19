@@ -5,7 +5,10 @@ from uuid import UUID
 from typing import Optional
 
 from app.models import Comment, User, Block, LikeLog
-from app.schemas.response.post import CommentListResponse, CommentDetailResponse, CommentItem, PaginationMeta
+from app.schemas.mapper.comment import CommentMapper
+from app.schemas.mapper.pagination import PaginationMapper
+from app.schemas.response.post import CommentListResponse, CommentDetailResponse
+
 
 class CommentReadService:
     def get_comments(
@@ -17,14 +20,12 @@ class CommentReadService:
         size: int = 20,
     ) -> CommentListResponse:
         offset = (page - 1) * size
-        
-        # 1. 댓글(Comment)과 작성자(User) 조인 및 기본 필터링 적용 쿼리 생성
+
         base_query = db.query(Comment, User).join(User, Comment.user_id == User.id).filter(
             Comment.post_id == post_id,
             Comment.status == "ACTIVE"
         )
-        
-        # 2. 로그인한 사용자인 경우 차단 관계 필터링 추가
+
         if current_user_id:
             blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_user_id)
             blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_user_id)
@@ -32,8 +33,7 @@ class CommentReadService:
                 Comment.user_id.notin_(blocked_by_me),
                 Comment.user_id.notin_(blocking_me)
             )
-        
-        # 3. 전체 개수 산정 (필터링된 결과 기준)
+
         total_count = base_query.with_entities(func.count(Comment.id)).scalar() or 0
 
         comments = base_query.order_by(Comment.created_at.asc()).offset(offset).limit(size).all()
@@ -49,31 +49,21 @@ class CommentReadService:
             ).all()
             liked_comment_ids = {log[0] for log in liked_logs}
 
-        items: list[CommentItem] = []
-        for c, author in comments:
-            author_name = "알 수 없음" if not author or author.status == "DELETED" else f"{author.nickname}#{author.tag}"
-            is_spoiler = c.is_spoiler == 1
-            items.append(CommentItem(
-                id=c.id,
-                parent_id=c.parent_id,
-                author_id=None if not author or author.status == "DELETED" else author.id,
-                author_image=None if not author or author.status == "DELETED" else author.profile_image_url,
-                author_tag=None if not author or author.status == "DELETED" else author.tag,
-                author=author_name,
-                content=c.content,
-                is_spoiler=is_spoiler,
-                created_at=c.created_at,
-                like_count=c.like_count,
+        items = [
+            CommentMapper.to_comment_item(
+                c,
+                author,
                 is_liked=c.id in liked_comment_ids,
-            ))
+            )
+            for c, author in comments
+        ]
 
         return CommentListResponse(
             items=items,
-            meta=PaginationMeta(
+            meta=PaginationMapper.build_page_meta(
                 total_count=total_count,
                 current_page=page,
                 page_size=size,
-                total_pages=(total_count + size - 1) // size if total_count > 0 else 1,
             ),
         )
 
@@ -81,8 +71,7 @@ class CommentReadService:
         comment = db.query(Comment).filter(Comment.id == comment_id, Comment.status == "ACTIVE").first()
         if not comment:
             raise HTTPException(status_code=404, detail={"code": "COMMENT_NOT_FOUND", "message": "댓글을 찾을 수 없습니다."})
-            
-        # 비회원이 아니면, 차단 관계를 확인
+
         if current_user_id:
             is_blocked = db.query(Block).filter(
                 or_(
@@ -93,6 +82,8 @@ class CommentReadService:
             if is_blocked:
                 raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_BLOCKED_COMMENT", "message": "차단된 사용자의 댓글입니다."})
 
+        author = db.query(User).filter(User.id == comment.user_id).first()
+
         is_liked = False
         if current_user_id:
             is_liked = db.query(LikeLog).filter(
@@ -102,11 +93,6 @@ class CommentReadService:
                 LikeLog.is_active == 1
             ).first() is not None
 
-        return CommentDetailResponse(
-            id=comment.id,
-            content=comment.content,
-            like_count=comment.like_count,
-            is_liked=is_liked,
-        )
+        return CommentMapper.to_comment_item(comment, author, is_liked=is_liked)
 
 comment_read_service = CommentReadService()
