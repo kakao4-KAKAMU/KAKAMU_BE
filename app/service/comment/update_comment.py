@@ -1,4 +1,3 @@
-import re
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
@@ -32,13 +31,7 @@ class CommentUpdateService:
             if len(hashtags) > 10:
                 raise HTTPException(status_code=400, detail={"code": "HASHTAG_LIMIT_EXCEEDED", "message": "해시태그는 최대 10개까지만 등록할 수 있습니다."})
 
-            normalized_set = set()
-            for tag_keyword in hashtags:
-                clean_keyword = re.sub(r'[^\w가-힣]', '', tag_keyword).lower()
-                if clean_keyword:
-                    normalized_set.add(clean_keyword)
-
-            for clean_keyword in normalized_set:
+            for clean_keyword in hashtags:
                 hashtag_obj = db.query(Hashtag).filter(Hashtag.normalized_keyword == clean_keyword).first()
                 if not hashtag_obj:
                     hashtag_obj = Hashtag(normalized_keyword=clean_keyword)
