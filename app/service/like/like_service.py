@@ -5,7 +5,14 @@ from typing import Optional
 
 from app.schemas.request.post import LikeToggleRequest
 from app.models import LikeLog, Post, Comment
-from app.service.recommendation.recommendation_service import recommendation_service
+from app.schemas.request.ml.ingest import (
+    MlIngestCommentLikeEnvelope,
+    MlIngestCommentLikePayload,
+    MlIngestFeedLikeEnvelope,
+    MlIngestFeedLikePayload,
+)
+from app.service.ml import ml_ingest_service
+from app.service.ml.sync import safe_ml_call
 from app.core.redis import redis_client
 from app.service.notification.notification_service import notification_service
 from app.models.notification import NotificationType
@@ -59,7 +66,12 @@ class LikeService:
             new_like_count += 1 if is_liked else -1
             
         if target.user_id != user_id:
-            await recommendation_service.record_ml_relationship_log(db, persona_id, req.target_type, req.target_id, "like", is_undo=not is_liked)
+            await self._sync_like_to_ml(
+                req=req,
+                user_id=user_id,
+                persona_id=persona_id,
+                is_liked=is_liked,
+            )
             
             # 타인의 글에 좋아요를 누른 경우 알림 발송
             if is_liked:
@@ -77,5 +89,36 @@ class LikeService:
         # DB(target.like_count)에 즉시 업데이트하지 않고 Redis(sync_task)의 Bulk Update에 맡김
 
         return is_liked, new_like_count
+
+    async def _sync_like_to_ml(
+        self,
+        *,
+        req: LikeToggleRequest,
+        user_id: UUID,
+        persona_id: Optional[UUID],
+        is_liked: bool,
+    ) -> None:
+        if req.target_type == "POST":
+            envelope = MlIngestFeedLikeEnvelope(
+                payload=MlIngestFeedLikePayload(
+                    feed_id=str(req.target_id),
+                    user_id=str(user_id),
+                    persona_id=str(persona_id) if persona_id else None,
+                    is_like=is_liked,
+                )
+            )
+            await safe_ml_call("ingest feed like", lambda: ml_ingest_service.like_feed(envelope))
+            return
+
+        if req.target_type == "COMMENT":
+            envelope = MlIngestCommentLikeEnvelope(
+                payload=MlIngestCommentLikePayload(
+                    comment_id=str(req.target_id),
+                    user_id=str(user_id),
+                    persona_id=str(persona_id) if persona_id else None,
+                    is_like=is_liked,
+                )
+            )
+            await safe_ml_call("ingest comment like", lambda: ml_ingest_service.like_comment(envelope))
 
 like_service = LikeService()
