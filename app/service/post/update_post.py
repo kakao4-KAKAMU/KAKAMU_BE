@@ -4,7 +4,7 @@ from fastapi import HTTPException
 
 from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention
 from app.utils.parser import parse_content
-from app.service.recommendation.recommendation_service import recommendation_service
+from app.service.post.ml_sync import post_ml_sync_service
 from app.schemas.request.post import PostUpdate
 
 class PostUpdateService:
@@ -36,14 +36,11 @@ class PostUpdateService:
         target_persona_id = post.persona_id or persona_id
 
         if movies_to_remove:
-            for m_id in movies_to_remove:
-                await recommendation_service.record_ml_relationship_log(db, target_persona_id, "MOVIE", m_id, "create_post", is_undo=True)
             db.query(PostMovie).filter(PostMovie.post_id == post.id, PostMovie.movie_id.in_(list(movies_to_remove))).delete(synchronize_session=False)
 
         if movies_to_add:
             for m_id in movies_to_add:
                 db.add(PostMovie(post_id=post.id, movie_id=m_id))
-                await recommendation_service.record_ml_relationship_log(db, target_persona_id, "MOVIE", m_id, "create_post")
 
         # 3. 본문(content)이 변경되었을 때만 해시태그/멘션 DB 삭제 및 재추출 로직 실행 (성능 최적화)
         if post.content != post_in.content:
@@ -75,6 +72,14 @@ class PostUpdateService:
                     db.add(PostMention(post_id=post.id, user_id=target_user.id))
 
         db.commit()
+
+        await post_ml_sync_service.sync_update(
+            db,
+            post_id=post.id,
+            user_id=user_id,
+            persona_id=target_persona_id,
+            post_in=post_in,
+        )
         return post.id
 
 post_update_service = PostUpdateService()
