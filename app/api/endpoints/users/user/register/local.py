@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.db.session import get_db
@@ -8,6 +8,7 @@ from app.schemas.request.auth import UserRegister, LocalLinkRequest
 from app.models import User, LocalAuth, SocialAuth
 from app.core.security import get_password_hash
 from app.api.deps import validate_local_registration, get_current_user
+from app.service.user.ml_sync import user_ml_sync_service
 from app.schemas.errors import (
     ERROR_LOCAL_AUTH_ALREADY_LINKED,
     ERROR_REGISTRATION_FAILED,
@@ -22,13 +23,18 @@ router = APIRouter()
     responses={400: ERROR_LOCAL_AUTH_ALREADY_LINKED, 500: ERROR_REGISTRATION_FAILED},
     summary="일반 회원가입"
 )
-def register_local_user(db: Session = Depends(get_db), val_data: dict = Depends(validate_local_registration)) -> UserResponse:
+def register_local_user(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    val_data: dict = Depends(validate_local_registration),
+) -> UserResponse:
     """Firebase 토큰으로 본인/중복 확인 후, 이메일/비밀번호 기반 계정을 생성합니다."""
     user_in: UserRegister = val_data["user_in"]
     ci_value = val_data["ci_value"]
 
     try:
         db_user = db.scalar(select(User).where(User.ci_value == ci_value))
+        is_new_user = db_user is None
         if not db_user:
             db_user = User(username=user_in.username, nickname=user_in.nickname, phone=val_data["formatted_phone"], ci_value=ci_value)
             db.add(db_user)
@@ -40,6 +46,8 @@ def register_local_user(db: Session = Depends(get_db), val_data: dict = Depends(
         db.add(LocalAuth(user_id=db_user.id, email=user_in.email, password_hash=get_password_hash(user_in.password)))
         db.commit()
         db.refresh(db_user)
+        if is_new_user:
+            background_tasks.add_task(user_ml_sync_service.sync_user_regist, db_user.id, db_user.nickname)
         return UserMapper.to_account(db_user)
     except Exception as e:
         db.rollback()

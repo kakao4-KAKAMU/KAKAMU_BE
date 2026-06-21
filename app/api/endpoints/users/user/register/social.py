@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
 from app.db.session import get_db
@@ -8,6 +8,7 @@ from app.models import User, SocialAuth
 from app.core.security import create_access_token, create_refresh_token
 from app.api.deps import validate_social_registration, get_current_user
 from app.service.user.social_auth import get_kakao_user_info
+from app.service.user.ml_sync import user_ml_sync_service
 from app.schemas.errors import (
     ERROR_SOCIAL_AUTH_ALREADY_LINKED,
     ERROR_REGISTRATION_FAILED,
@@ -23,11 +24,16 @@ router = APIRouter()
     responses={400: ERROR_SOCIAL_AUTH_ALREADY_LINKED, 500: ERROR_REGISTRATION_FAILED},
     summary="소셜 회원가입"
 )
-def register_social_user(db: Session = Depends(get_db), val_data: dict = Depends(validate_social_registration)) -> TokenResponse:
+def register_social_user(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    val_data: dict = Depends(validate_social_registration),
+) -> TokenResponse:
     """추가 정보를 받아 User와 SocialAuth를 생성하고 JWT를 발급합니다."""
     request: SocialRegisterRequest = val_data["request"]
     try:
         db_user = db.scalar(select(User).where(User.ci_value == val_data["ci_value"]))
+        is_new_user = db_user is None
         if not db_user:
             db_user = User(username=request.username, nickname=request.nickname, phone=val_data["formatted_phone"], ci_value=val_data["ci_value"])
             db.add(db_user)
@@ -43,6 +49,8 @@ def register_social_user(db: Session = Depends(get_db), val_data: dict = Depends
         
         db.add(SocialAuth(user_id=db_user.id, provider=request.provider, provider_user_id=val_data["provider_user_id"], email=request.email))
         db.commit()
+        if is_new_user:
+            background_tasks.add_task(user_ml_sync_service.sync_user_regist, db_user.id, db_user.nickname)
         return TokenResponse(access_token=create_access_token(data={"sub": str(db_user.id)}), refresh_token=create_refresh_token(data={"sub": str(db_user.id)}), is_new_user=False)
     except Exception as e:
         db.rollback()
