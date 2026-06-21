@@ -30,12 +30,8 @@ class Settings(BaseSettings):
     # Social Auth
     KAKAO_REST_API_KEY: str = Field(default="", env="KAKAO_REST_API_KEY")
 
-    # ML Server
-    ML_API_BASE_URL: str = Field(default="http://ml-server:8000", env="ML_API_BASE_URL")
-
-    # VLLM Server (챗봇 텍스트 생성 및 임베딩)
-    VLLM_GENBASE_URL: str = Field(default="http://210.109.52.56/vllm/v1", env="VLLM_GENBASE_URL")
-    VLLM_EMBEDBASE_URL: str = Field(default="http://210.109.52.56/vllm-embed/v1", env="VLLM_EMBEDBASE_URL")
+    # ML Server (OpenAPI: http://210.109.52.56/chat-api/openapi.json)
+    ML_API_BASE_URL: str = Field(default="http://localhost:8080/chat-api", env="ML_API_BASE_URL")
 
     def get_database_url(self) -> str:
         # 주입된 URL이 있으면 그것을 반환하고, 없으면 생성합니다. (단, 템플릿 변수가 포함된 경우 제외)

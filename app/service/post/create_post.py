@@ -5,7 +5,7 @@ from fastapi import HTTPException
 
 from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention
 from app.utils.parser import parse_content
-from app.service.recommendation.recommendation_service import recommendation_service
+from app.service.post.ml_sync import post_ml_sync_service
 from app.schemas.request.post import PostCreate
 
 class PostCreateService:
@@ -25,9 +25,6 @@ class PostCreateService:
 
             for m_id in post_in.movie_ids:
                 db.add(PostMovie(post_id=new_post.id, movie_id=str(m_id)))
-                await recommendation_service.record_ml_relationship_log(
-                    db, persona_id, "MOVIE", m_id, "create_post"
-                )
 
             hashtags, mentions = parse_content(post_in.content)
 
@@ -53,6 +50,14 @@ class PostCreateService:
                     db.add(PostMention(post_id=new_post.id, user_id=target_user.id))
 
             db.commit()
+
+            await post_ml_sync_service.sync_create(
+                db,
+                post_id=new_post.id,
+                user_id=user_id,
+                persona_id=persona_id,
+                post_in=post_in,
+            )
 
             return new_post.id
 

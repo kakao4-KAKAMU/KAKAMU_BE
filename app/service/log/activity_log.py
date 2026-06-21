@@ -1,35 +1,86 @@
-import logging
 from uuid import UUID
-import httpx
-from app.schemas.request.log import ActivityLogCreate
-from app.core.config import settings
 
-logger = logging.getLogger(__name__)
+from app.core.logging import logger
+from app.models.ml import JudgeType
+from app.schemas.request.log import ActivityLogCreate
+from app.schemas.request.ml.ingest import (
+    MlIngestCommentLikeEnvelope,
+    MlIngestCommentLikePayload,
+    MlIngestFeedLikeEnvelope,
+    MlIngestFeedLikePayload,
+    MlIngestMovieJudgeEnvelope,
+    MlIngestMovieJudgePayload,
+    MlIngestPersonJudgeEnvelope,
+    MlIngestPersonJudgePayload,
+)
+from app.service.ml import ml_ingest_service
+from app.service.ml.sync import safe_ml_call
+
 
 class ActivityLogService:
-    async def process_activity_log(self, persona_id: UUID, log_data: ActivityLogCreate):
-        """
-        프론트엔드로부터 받은 행동 로그를 추천(ML) 서버 API로 전달합니다.
-        (백엔드는 DB에 직접 저장하지 않고 포워딩만 수행합니다)
-        """
-        ML_API_URL = f"{settings.ML_API_BASE_URL}/api/recommendation/collect"
-
+    async def process_activity_log(
+        self,
+        user_id: UUID,
+        persona_id: UUID,
+        log_data: ActivityLogCreate,
+    ) -> None:
+        target_type = log_data.target_type.upper()
         action = log_data.action.lower()
-        target_type = log_data.target_type.lower()
-        target_id = log_data.target_id
-        
-        payload = {
-            "persona_id": str(persona_id),
-            "target_type": target_type,
-            "target_id": target_id,
-            "action": action
-        }
-        
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(ML_API_URL, json=payload, timeout=3.0)
-                response.raise_for_status()
-        except httpx.RequestError as e:
-            logger.error(f"[ActivityLog] ML 서버로 로그 전송 실패: {e}")
+        target_id = str(log_data.target_id)
+
+        if target_type == "MOVIE" and action in {"like", "dislike"}:
+            envelope = MlIngestMovieJudgeEnvelope(
+                payload=MlIngestMovieJudgePayload(
+                    movie_id=target_id,
+                    user_id=str(user_id),
+                    persona_id=str(persona_id),
+                    judge_type=JudgeType.LIKE if action == "like" else JudgeType.DISLIKE,
+                )
+            )
+            await safe_ml_call("ingest movie judge", lambda: ml_ingest_service.judge_movie(envelope))
+            return
+
+        if target_type == "PEOPLE" and action in {"like", "dislike"}:
+            envelope = MlIngestPersonJudgeEnvelope(
+                payload=MlIngestPersonJudgePayload(
+                    person_id=target_id,
+                    user_id=str(user_id),
+                    persona_id=str(persona_id),
+                    judge_type=JudgeType.LIKE if action == "like" else JudgeType.DISLIKE,
+                )
+            )
+            await safe_ml_call("ingest person judge", lambda: ml_ingest_service.judge_person(envelope))
+            return
+
+        if target_type == "POST" and action in {"like", "unlike", "dislike"}:
+            envelope = MlIngestFeedLikeEnvelope(
+                payload=MlIngestFeedLikePayload(
+                    feed_id=target_id,
+                    user_id=str(user_id),
+                    persona_id=str(persona_id),
+                    is_like=action == "like",
+                )
+            )
+            await safe_ml_call("ingest feed like", lambda: ml_ingest_service.like_feed(envelope))
+            return
+
+        if target_type == "COMMENT" and action in {"like", "unlike", "dislike"}:
+            envelope = MlIngestCommentLikeEnvelope(
+                payload=MlIngestCommentLikePayload(
+                    comment_id=target_id,
+                    user_id=str(user_id),
+                    persona_id=str(persona_id),
+                    is_like=action == "like",
+                )
+            )
+            await safe_ml_call("ingest comment like", lambda: ml_ingest_service.like_comment(envelope))
+            return
+
+        logger.debug(
+            "[ActivityLog] ML ingest 대상이 아닌 로그입니다. target_type=%s action=%s",
+            target_type,
+            action,
+        )
+
 
 activity_log_service = ActivityLogService()

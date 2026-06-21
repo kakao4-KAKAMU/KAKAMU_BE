@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models import Persona
+from app.service.profile.ml_sync import persona_ml_sync_service
 from uuid import UUID
 
 class PersonaDeleteService:
@@ -42,7 +43,7 @@ class PersonaDeleteService:
             )
 
         try:
-            # 1. 페르소나 영구 삭제 (Hard Delete)
+            await persona_ml_sync_service.sync_delete(persona)
             db.delete(persona)
             db.commit()
 

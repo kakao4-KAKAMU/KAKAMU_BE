@@ -23,7 +23,7 @@ router = APIRouter()
     },
     summary="댓글(또는 대댓글) 작성"
 )
-def create_comment(
+async def create_comment(
     post_id: int, 
     comment_in: CommentCreate, 
     db: Session = Depends(get_db), 
@@ -31,7 +31,7 @@ def create_comment(
     current_persona_id: UUID = Depends(get_current_persona)
 ):
     """게시물에 댓글(또는 대댓글)을 작성합니다."""
-    comment_id = comment_service.create_comment(db, post_id, comment_in, current_user.id, current_persona_id)
+    comment_id = await comment_service.create_comment(db, post_id, comment_in, current_user.id, current_persona_id)
     return {"status": "success", "comment_id": comment_id}
 
 @router.get(

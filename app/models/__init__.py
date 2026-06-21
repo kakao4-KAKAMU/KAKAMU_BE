@@ -6,3 +6,4 @@ from .movie import Movie, Genre, People, MovieGenre, MovieStaff
 from .activity import Comment, CommentMention, CommentHashtag, LikeLog, SemanticAnalysis
 from .search_log import SearchLog, SearchDailyStat
 from .notification import Notification, NotificationType
+from .ml import ChatMetadataType, JudgeType

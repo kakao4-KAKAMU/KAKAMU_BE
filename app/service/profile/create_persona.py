@@ -8,6 +8,7 @@ from app.models import FavMovie, FavGenre, FavPeople
 from app.schemas.base.persona import Persona as PersonaSchema
 from app.schemas.mapper.persona import PersonaMapper
 from app.schemas.request.profile import PersonaCreate
+from app.service.profile.ml_sync import persona_ml_sync_service
 from opentelemetry import trace
 
 
@@ -105,6 +106,8 @@ class PersonaCreateService:
                     db.commit()
                 with tracer.start_as_current_span("persona.db_refresh"):
                     db.refresh(new_profile)
+
+                await persona_ml_sync_service.sync_create(db, new_profile, persona_data)
 
                 return PersonaMapper.to_persona(new_profile)
             except IntegrityError as e:

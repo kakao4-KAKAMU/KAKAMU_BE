@@ -1,21 +1,18 @@
-import logging
-import httpx
-from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request, Header
 from sqlalchemy.orm import Session
 from typing import Optional
 from uuid import UUID
 
+from app.core.logging import logger
 from app.db.session import get_db
-from app.core.config import settings
-from app.models import User
+from app.models import User, Persona
 from app.api.deps.auth import get_optional_user
 from app.service.search import search_service
+from app.service.search.for_you_search import for_you_search_service
 from .utils import handle_search_request, get_search_pattern
 from app.schemas.response.search import PostSearchResponse
 
 router = APIRouter()
-
-logger = logging.getLogger(__name__)
 
 @router.get(
     "/v1/search/for-you",
@@ -30,6 +27,7 @@ async def search_for_you(
     cursor: Optional[str] = Query(None, description="페이징 커서 (score_id)"),
     limit: int = Query(20, le=50),
     current_user: Optional[User] = Depends(get_optional_user),
+    x_persona_id: Optional[UUID] = Header(default=None, description="현재 활성화된 페르소나 ID"),
     db: Session = Depends(get_db)
 ):
     user_id = str(current_user.id) if current_user else "anonymous"
@@ -40,19 +38,28 @@ async def search_for_you(
         logger.info("[ForYou Search] 비회원 사용자, 기본 정렬로 Fallback을 실행합니다.")
         return _fallback_search(db, search_pattern, cursor, limit, current_user_id=None)
 
-    ML_API_URL = f"{settings.ML_API_BASE_URL}/api/recommendation/search/posts"
-    params = {"user_id": str(current_user.id), "q": q, "limit": limit}
-    if cursor:
-        params["cursor"] = cursor
-
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(ML_API_URL, params=params, timeout=3.0)
-            response.raise_for_status()
-            return response.json()
+        persona_id = None
+        if x_persona_id:
+            persona = db.get(Persona, x_persona_id)
+            if persona and persona.user_id == current_user.id and persona.status != "DELETED":
+                persona_id = persona.id
+
+        ml_result = await for_you_search_service.search_for_you(
+            db,
+            user_id=current_user.id,
+            persona_id=persona_id,
+            query=q,
+            limit=limit,
+            search_pattern=search_pattern,
+            current_user_id=current_user.id,
+        )
+        if ml_result is not None and ml_result.items:
+            return ml_result
     except Exception as e:
         logger.warning(f"[ForYou Search] ML 서버 통신 실패, 기본 정렬로 Fallback을 실행합니다: {e}")
-        return _fallback_search(db, search_pattern, cursor, limit, current_user_id=current_user.id)
+
+    return _fallback_search(db, search_pattern, cursor, limit, current_user_id=current_user.id)
 
 
 def _fallback_search(

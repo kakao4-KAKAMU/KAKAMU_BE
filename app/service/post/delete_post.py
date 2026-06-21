@@ -2,8 +2,8 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Post, Comment, LikeLog, PostMovie
-from app.service.recommendation.recommendation_service import recommendation_service
+from app.models import Post, Comment, LikeLog
+from app.service.post.ml_sync import post_ml_sync_service
 
 class PostDeleteService:
     async def delete_post(self, db: Session, post_id: int, user_id: UUID, persona_id: UUID) -> None:
@@ -23,16 +23,8 @@ class PostDeleteService:
         # 게시물에 달린 좋아요 무효화
         db.query(LikeLog).filter(LikeLog.target_type == "POST", LikeLog.target_id == post.id).update({"is_active": 0})
 
-        # 게시물 삭제 시 추천 엔진 로깅 (취소 기록)
-        post_movies = db.query(PostMovie).filter(PostMovie.post_id == post.id).all()
-        
-        # 원본 게시물을 작성했던 페르소나의 ML 데이터를 롤백해야 하므로 원본 페르소나 ID 사용
-        target_persona_id = post.persona_id or persona_id
-        for pm in post_movies:
-            await recommendation_service.record_ml_relationship_log(
-                db, target_persona_id, "MOVIE", pm.movie_id, "create_post", is_undo=True
-            )
-
         db.commit()
+
+        await post_ml_sync_service.sync_delete(post_id=post.id, user_id=user_id)
 
 post_delete_service = PostDeleteService()

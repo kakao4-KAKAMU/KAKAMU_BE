@@ -25,9 +25,9 @@ router = APIRouter()
     },
     summary="댓글 삭제 (소프트 삭제)"
 )
-def delete_comment(comment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_active_user)):
+async def delete_comment(comment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_active_user)):
     """댓글을 소프트 삭제합니다. 삭제 시 하위 대댓글도 모두 함께 비활성화(INACTIVE) 처리됩니다."""
-    comment_service.delete_comment(db, comment_id, current_user.id)
+    await comment_service.delete_comment(db, comment_id, current_user.id)
     return {"status": "success"}
 
 @router.get(

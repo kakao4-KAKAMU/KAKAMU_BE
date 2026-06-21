@@ -1,8 +1,6 @@
-import logging
+from app.core.logging import logger
 from app.db.session import SessionLocal
 from app.service.notification.notification_service import notification_service
-
-logger = logging.getLogger(__name__)
 
 def clean_expired_notifications_task():
     """

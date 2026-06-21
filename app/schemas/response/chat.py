@@ -1,7 +1,25 @@
 from pydantic import BaseModel, Field
 from typing import Any
 
-__all__ = ["ChatCompletionResponse"]
+from app.schemas.response.ml.chat import (
+    MlChatMessage,
+    MlChatMetadata,
+    MlChatSession,
+    MlChatSessionResponse,
+)
+
+__all__ = [
+    "ChatCompletionResponse",
+    "ChatMessage",
+    "ChatMetadata",
+    "ChatSession",
+    "ChatSessionHistoryResponse",
+]
+
+ChatMessage = MlChatMessage
+ChatMetadata = MlChatMetadata
+ChatSession = MlChatSession
+ChatSessionHistoryResponse = MlChatSessionResponse
 
 
 class ChatCompletionResponse(BaseModel):

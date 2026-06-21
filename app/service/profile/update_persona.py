@@ -8,6 +8,7 @@ from app.models import Persona, FavMovie, FavGenre, FavPeople
 from app.schemas.base.persona import Persona as PersonaSchema
 from app.schemas.mapper.persona import PersonaMapper
 from app.schemas.request.profile import PersonaEdit
+from app.service.profile.ml_sync import persona_ml_sync_service
 from opentelemetry import trace
 
 tracer = trace.get_tracer(__name__)
@@ -84,7 +85,9 @@ class PersonaUpdateService:
                     db.flush()
                     db.commit()
                     db.refresh(persona)
-                    
+
+                    await persona_ml_sync_service.sync_update(db, persona, persona_data)
+
                     return PersonaMapper.to_persona(persona)
                     
             except IntegrityError as e:

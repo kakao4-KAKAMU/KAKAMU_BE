@@ -1,11 +1,9 @@
-import logging
+from app.core.logging import logger
 import time
 from fastapi import BackgroundTasks, HTTPException, Request
 from typing import Optional
 from app.db.session import SessionLocal
 from app.models.search_log import SearchLog
-
-logger = logging.getLogger(__name__)
 
 # 인메모리 Rate Limit 저장소: { "client_id": [timestamp1, timestamp2, ...] }
 _rate_limit_store = {}
