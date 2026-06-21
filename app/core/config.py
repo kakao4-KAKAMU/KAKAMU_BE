@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     # Social Auth
     KAKAO_REST_API_KEY: str = Field(default="", env="KAKAO_REST_API_KEY")
 
-    # ML Server
-    ML_API_BASE_URL: str = Field(default="http://ml-server:8000", env="ML_API_BASE_URL")
+    # ML Server (OpenAPI: http://210.109.52.56/chat-api/openapi.json)
+    ML_API_BASE_URL: str = Field(default="http://210.109.52.56/chat-api", env="ML_API_BASE_URL")
 
     # VLLM Server (챗봇 텍스트 생성 및 임베딩)
     VLLM_GENBASE_URL: str = Field(default="http://210.109.52.56/vllm/v1", env="VLLM_GENBASE_URL")
