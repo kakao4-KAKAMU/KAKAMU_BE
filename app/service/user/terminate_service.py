@@ -1,12 +1,10 @@
-import logging
+from app.core.logging import logger
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from uuid import UUID
 
 from app.models import User
-
-logger = logging.getLogger(__name__)
 
 class AccountTerminationService:
     
@@ -32,5 +30,5 @@ class AccountTerminationService:
                 status_code=500, 
                 detail={"code": "TERMINATION_FAILED", "message": "탈퇴 처리 중 예기치 않은 오류가 발생했습니다."}
             )
-            
+
 account_termination_service = AccountTerminationService()

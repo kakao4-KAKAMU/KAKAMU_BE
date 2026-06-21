@@ -1,10 +1,9 @@
 import asyncio
-import logging
 from app.core.redis import redis_client
 from app.db.session import SessionLocal
 from app.models import Post, Comment
 
-logger = logging.getLogger(__name__)
+from app.core.logging import logger
 
 # Lua 스크립트: Redis의 값이 내가 방금 DB에 동기화한 값과 일치할 때만 키를 삭제 (Race Condition 방지)
 DELETE_IF_MATCH_SCRIPT = """

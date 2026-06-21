@@ -1,10 +1,8 @@
-import logging
+from app.core.logging import logger
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
 import httpx
-
-logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 

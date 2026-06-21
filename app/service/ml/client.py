@@ -1,13 +1,9 @@
-import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
 
 from app.core.config import settings
-
-logger = logging.getLogger(__name__)
-
 
 class MlApiClient:
     """ML 추천/챗봇 서버 HTTP 클라이언트 (OpenAPI base: ML_API_BASE_URL)."""

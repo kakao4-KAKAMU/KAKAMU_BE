@@ -1,9 +1,9 @@
-import logging
 from fastapi import APIRouter, Depends, Query, BackgroundTasks, Request, Header
 from sqlalchemy.orm import Session
 from typing import Optional
 from uuid import UUID
 
+from app.core.logging import logger
 from app.db.session import get_db
 from app.models import User, Persona
 from app.api.deps.auth import get_optional_user
@@ -13,8 +13,6 @@ from .utils import handle_search_request, get_search_pattern
 from app.schemas.response.search import PostSearchResponse
 
 router = APIRouter()
-
-logger = logging.getLogger(__name__)
 
 @router.get(
     "/v1/search/for-you",

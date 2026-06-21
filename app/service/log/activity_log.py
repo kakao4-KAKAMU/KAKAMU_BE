@@ -1,6 +1,6 @@
-import logging
 from uuid import UUID
 
+from app.core.logging import logger
 from app.models.ml import JudgeType
 from app.schemas.request.log import ActivityLogCreate
 from app.schemas.request.ml.ingest import (
@@ -15,8 +15,6 @@ from app.schemas.request.ml.ingest import (
 )
 from app.service.ml import ml_ingest_service
 from app.service.ml.sync import safe_ml_call
-
-logger = logging.getLogger(__name__)
 
 
 class ActivityLogService:
