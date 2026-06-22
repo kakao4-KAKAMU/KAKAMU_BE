@@ -1,25 +1,45 @@
+from datetime import datetime
 from app.core.logging import logger
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, update
 from uuid import UUID
 
-from app.models import User
+from app.models import User, Persona
 
 class AccountTerminationService:
     
     @staticmethod
     async def terminate_account(db: Session, user_id: UUID) -> bool:
         """
-        회원 탈퇴 및 데이터 파기 (Atomic Transaction 보장)
+        회원 탈퇴 처리 (Soft Delete 전환 및 종속 페르소나 일괄 처리)
         """
-        # 1. 유저 및 종속 페르소나 조회
-        user = db.scalar(select(User).where(User.id == user_id))
+        # 1. 유저 조회
+        user = db.scalar(select(User).where(User.id == user_id, User.status == "ACTIVE"))
         if not user:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "유저를 찾을 수 없습니다."})
             
         try:
-            db.delete(user)
+            # 2. 소프트 삭제 처리를 위한 현재 시각 획득
+            termination_time = datetime.now()
+            
+            # 3. 유저 상태를 DELETED로 변경하고 삭제 시점 기록
+            user.status = "DELETED"
+            user.deleted_at = termination_time
+            
+            # 4. 해당 유저가 소유한 ACTIVE 상태의 페르소나들도 일괄 DELETED 처리하며 삭제 시점을 동일하게 매핑
+            db.execute(
+                update(Persona)
+                .where(
+                    Persona.user_id == user_id,
+                    Persona.status == "ACTIVE"
+                )
+                .values(
+                    status="DELETED",
+                    deleted_at=termination_time
+                )
+            )
+            
             db.commit()
             return True
 

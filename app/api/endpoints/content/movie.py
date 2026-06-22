@@ -16,7 +16,7 @@ router = APIRouter()
     response_model=WatchMovieResponse,
     summary="영화 시청 기록 추가"
 )
-async def watch_movie(movie_id: int, current_user: User = Depends(get_active_user)):
+async def watch_movie(movie_id: UUID, current_user: User = Depends(get_active_user)):
     return {"status": "success", "message": f"User {current_user.id} watched movie {movie_id}"}
 
 @router.get(
