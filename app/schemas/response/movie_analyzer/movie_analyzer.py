@@ -1,9 +1,10 @@
+from uuid import UUID
 from pydantic import BaseModel
 from typing import Optional
 
 class MovieEvaluationResponse(BaseModel):
     message: str
-    persona_id: str
+    persona_id: UUID
     movie_id: str
     evaluation: str
 

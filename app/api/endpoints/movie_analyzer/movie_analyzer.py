@@ -27,12 +27,8 @@ router = APIRouter()
 # 중복 검색 연산을 피하기 위한 더미 영화 ID 집합 정의
 DUMMY_MOVIE_IDS = {movie["movie_id"] for movie in DUMMY_MOVIES}
 
-def verify_persona_ownership(persona_id: str, current_user: User, db: Session) -> Persona:
-    try:
-        persona_uuid = UUID(persona_id)
-        persona = db.get(Persona, persona_uuid)
-    except ValueError:
-        persona = None
+def verify_persona_ownership(persona_id: UUID, current_user: User, db: Session) -> Persona:
+    persona = db.get(Persona, persona_id)
 
     if not persona or persona.user_id != current_user.id or persona.status == "DELETED":
         raise HTTPException(
@@ -50,7 +46,7 @@ def verify_persona_ownership(persona_id: str, current_user: User, db: Session) -
     summary="평가할 영화 목록 조회"
 )
 async def get_movies_to_evaluate(
-    persona_id: str,
+    persona_id: UUID,
     current_user: User = Depends(get_active_user),
     db: Session = Depends(get_db)
 ):
@@ -62,9 +58,8 @@ async def get_movies_to_evaluate(
     verify_persona_ownership(persona_id, current_user, db)
 
     # DB에서 이미 평가 완료한 영화 ID 목록 조회
-    persona_uuid = UUID(persona_id)
     evaluated_records = db.query(MovieEvaluation.movie_id).filter(
-        MovieEvaluation.persona_id == persona_uuid
+        MovieEvaluation.persona_id == persona_id
     ).all()
     evaluated_ids = {record.movie_id for record in evaluated_records}
 
@@ -107,9 +102,8 @@ async def evaluate_movie_trailer(
     persona = verify_persona_ownership(persona_id, current_user, db)
 
     # DB에서 중복 평가 여부 검증
-    persona_uuid = UUID(persona_id)
     existing_eval = db.query(MovieEvaluation).filter(
-        MovieEvaluation.persona_id == persona_uuid,
+        MovieEvaluation.persona_id == persona_id,
         MovieEvaluation.movie_id == movie_id
     ).first()
 
@@ -121,7 +115,7 @@ async def evaluate_movie_trailer(
 
     # DB에 평가 정보 기록
     new_evaluation = MovieEvaluation(
-        persona_id=persona_uuid,
+        persona_id=persona_id,
         movie_id=movie_id,
         evaluation=evaluation
     )
@@ -134,7 +128,7 @@ async def evaluate_movie_trailer(
         payload=MlIngestMovieJudgePayload(
             movie_id=movie_id,
             user_id=str(persona.user_id),
-            persona_id=persona_id,
+            persona_id=str(persona_id),
             judge_type=judge_type,
             created_at=datetime.utcnow()
         )
@@ -162,7 +156,7 @@ async def evaluate_movie_trailer(
     summary="페르소나별 영화 평가 기록 조회"
 )
 async def get_persona_evaluations(
-    persona_id: str,
+    persona_id: UUID,
     current_user: User = Depends(get_active_user),
     db: Session = Depends(get_db)
 ):
@@ -172,9 +166,8 @@ async def get_persona_evaluations(
     # 페르소나 소유권 검증
     verify_persona_ownership(persona_id, current_user, db)
 
-    persona_uuid = UUID(persona_id)
     evaluations = db.query(MovieEvaluation).filter(
-        MovieEvaluation.persona_id == persona_uuid
+        MovieEvaluation.persona_id == persona_id
     ).all()
 
     if not evaluations:
