@@ -24,7 +24,7 @@ class PostCreateService:
             db.flush()
 
             for m_id in post_in.movie_ids:
-                db.add(PostMovie(post_id=new_post.id, movie_id=str(m_id)))
+                db.add(PostMovie(post_id=new_post.id, movie_id=m_id))
 
             hashtags, mentions = parse_content(post_in.content)
 

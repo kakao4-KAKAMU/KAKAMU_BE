@@ -1,5 +1,6 @@
 import uuid
-from sqlalchemy import Column, Integer, ForeignKey, Text, Index, Boolean
+from sqlalchemy import Column, Integer, ForeignKey, Text, Index, Boolean, UniqueConstraint, DateTime, String
+from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -93,4 +94,17 @@ class MovieTitle(Base):
 
     __table_args__ = (
         Index('ix_movie_title_trgm', 'title_name', postgresql_using='gin', postgresql_ops={'title_name': 'gin_trgm_ops'}),
+    )
+
+class MovieEvaluation(Base):
+    __tablename__ = "movie_evaluation"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)
+    movie_id = Column(String(50), nullable=False)
+    evaluation = Column(String(20), nullable=False)  # "LIKE" or "DISLIKE"
+    created_at = Column(DateTime, server_default=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint('persona_id', 'movie_id', name='uq_movie_evaluation_persona_movie'),
     )
