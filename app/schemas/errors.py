@@ -164,3 +164,22 @@ ERROR_UNAUTHORIZED = create_error_schema("인증 실패", "UNAUTHORIZED", "인�
 ERROR_NICKNAME_UNAVAILABLE = create_error_schema("닉네임 사용 불가", "NICKNAME_UNAVAILABLE", "해당 닉네임은 현재 사용할 수 없습니다. (태그 발급 실패)")
 ERROR_USER_UPDATE_FAILED = create_error_schema("회원 정보 수정 실패", "USER_UPDATE_FAILED", "사용자 정보 수정 중 서버 오류 발생")
 ERROR_DB_COMMIT_ERROR = create_error_schema("DB 반영 실패", "DB_COMMIT_ERROR", "서버 내부 DB 반영 중 오류 발생")
+
+# ==========================================
+# 10. Movie Analyzer (예고편 판독기 관련)
+# ==========================================
+ERROR_PERSONA_NOT_FOUND_OR_FORBIDDEN = create_error_schema(
+    "페르소나 권한 없음",
+    "PERSONA_NOT_FOUND_OR_FORBIDDEN",
+    "요청한 페르소나에 대한 권한이 없거나 존재하지 않습니다."
+)
+ERROR_ALREADY_EVALUATED = create_error_schema(
+    "이미 평가 완료한 영화",
+    "ALREADY_EVALUATED",
+    "이미 이 페르소나로 평가 완료한 영화 예고편입니다."
+)
+ERROR_MOVIE_NOT_FOUND = create_error_schema(
+    "영화 없음",
+    "MOVIE_NOT_FOUND",
+    "요청한 영화 정보를 찾을 수 없습니다."
+)
