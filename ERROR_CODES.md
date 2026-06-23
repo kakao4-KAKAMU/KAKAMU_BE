@@ -74,7 +74,14 @@
 | `500` | `DB_CONNECTION_FAILED` | `/db-test` Health check 중 데이터베이스 연결 실패 |
 | `503` | `ML_SERVER_UNAVAILABLE` | 추천 서버(ML/VLLM)와 통신할 수 없거나 응답이 지연됨 |
 
-## 8. Global (공통 API 에러)
+## 8. Movie Analyzer (예고편 판독기)
+| HTTP Status | Error Code | 발생 원인 / 설명 |
+|:---:|:---|:---|
+| `403` | `PERSONA_NOT_FOUND_OR_FORBIDDEN` | 요청한 페르소나에 대한 권한이 없거나 존재하지 않음 |
+| `400` | `ALREADY_EVALUATED` | 이미 해당 페르소나(또는 사용자)로 평가 완료한 영화 예고편 |
+| `404` | `MOVIE_NOT_FOUND` | 요청한 영화 정보를 찾을 수 없거나 트레일러가 없음 |
+
+## 9. Global (공통 API 에러)
 | HTTP Status | Error Code | 발생 원인 / 설명 |
 |:---:|:---|:---|
 | `401` | `UNAUTHORIZED` | JWT 액세스 토큰이 누락되었거나, 만료/유효하지 않은 토큰으로 보호된 API에 접근 시도 |
