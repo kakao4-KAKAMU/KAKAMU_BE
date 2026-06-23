@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, ForeignKey, Text, Index, Boolean, UniqueConstraint, DateTime, String
+from sqlalchemy import Column, Integer, ForeignKey, Text, Index, Boolean, DateTime, String, text
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -98,13 +98,31 @@ class MovieTitle(Base):
 
 class MovieEvaluation(Base):
     __tablename__ = "movie_evaluation"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), nullable=False)
-    movie_id = Column(String(50), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="CASCADE"), nullable=True)
+    movie_id = Column(UUID(as_uuid=True), ForeignKey("movie.id", ondelete="CASCADE"), nullable=False)
     evaluation = Column(String(20), nullable=False)  # "LIKE" or "DISLIKE"
     created_at = Column(DateTime, server_default=func.now())
-    
+
+    user = relationship("User")
+    persona = relationship("Persona")
+    movie = relationship("Movie")
+
     __table_args__ = (
-        UniqueConstraint('persona_id', 'movie_id', name='uq_movie_evaluation_persona_movie'),
+        Index(
+            "uq_movie_evaluation_persona_movie",
+            "persona_id",
+            "movie_id",
+            unique=True,
+            postgresql_where=text("persona_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_movie_evaluation_user_movie",
+            "user_id",
+            "movie_id",
+            unique=True,
+            postgresql_where=text("persona_id IS NULL"),
+        ),
     )
