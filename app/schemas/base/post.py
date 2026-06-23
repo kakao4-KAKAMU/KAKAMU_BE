@@ -5,12 +5,12 @@ from pydantic import BaseModel
 
 from app.schemas.base.mention import Mention
 from app.schemas.base.movie import Movie
-from app.schemas.base.user import UserSimple
+from app.schemas.base.user import UserSimpleWithFollow
 
 
 class ContentBaseObject(BaseModel):
     id: int
-    user: UserSimple
+    user: UserSimpleWithFollow
     hashtags: List[str]
     mentions: List[Mention]
     like_count: int
@@ -26,4 +26,3 @@ class PostItem(ContentBaseObject):
     is_spoiler: bool
     movies: List[Movie]
     comment_count: int
-    is_following: bool

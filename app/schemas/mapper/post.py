@@ -26,7 +26,10 @@ class PostMapper:
         is_deleted = not author or author.status == "DELETED"
         return PostItem(
             id=post.id,
-            user=UserMapper.to_simple_or_anonymous(author),
+            user=UserMapper.to_simple_with_follow(
+                author,
+                is_following=is_following if not is_deleted else False
+            ),
             hashtags=hashtags,
             mentions=mentions,
             like_count=post.like_count,
@@ -39,7 +42,6 @@ class PostMapper:
             is_spoiler=post.is_spoiler == 1,
             movies=movies,
             comment_count=comment_count,
-            is_following=is_following if not is_deleted else False,
         )
 
     @staticmethod
