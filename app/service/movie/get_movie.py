@@ -164,14 +164,13 @@ class MovieReadService:
         movies = (
             self.base_query(db)
             .filter(Movie.id.in_(unique_ids))
-            .options(selectinload(Movie.titles))
             .all()
         )
-        movies_by_id = {movie.id: movie for movie in movies}
+        movies_by_id = {str(movie.id): movie for movie in movies}
         return [
-            MovieMapper.to_movie(movies_by_id[movie_id])
+            MovieMapper.to_movie(movies_by_id[str(movie_id)])
             for movie_id in movie_ids
-            if movie_id in movies_by_id
+            if str(movie_id) in movies_by_id
         ]
 
 
