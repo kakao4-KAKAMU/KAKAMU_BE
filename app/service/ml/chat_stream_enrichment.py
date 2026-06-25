@@ -18,34 +18,23 @@ class ChatStreamEnrichmentService:
         self._event_type: str | None = None
 
     def _parse_metadata_ids(
-        self, metadata: list[dict]
+        self, metadata: dict
     ) -> tuple[list[int], list[UUID]]:
-        feed_ids: list[int] = []
-        movie_ids: list[UUID] = []
-
-        for item in metadata:
-            meta_type = item.get("type")
-            raw_id = item.get("id")
-            if not raw_id:
-                continue
-
-            if meta_type == "feed":
-                try:
-                    feed_ids.append(int(raw_id))
-                except (TypeError, ValueError):
-                    continue
-            elif meta_type == "movie":
-                try:
-                    movie_ids.append(UUID(str(raw_id)))
-                except (TypeError, ValueError):
-                    continue
+        movie_ids_raw = metadata.get('movie')
+        if not isinstance(movie_ids_raw, list):
+            movie_ids_raw = []
+        movie_ids = list(map(lambda x: UUID(str(x.get("id"))), movie_ids_raw))
+        feed_ids_raw = metadata.get('feed')
+        if not isinstance(feed_ids_raw, list):
+            feed_ids_raw = []
+        feed_ids = list(map(lambda x: int(x.get("id")), feed_ids_raw))
 
         return feed_ids, movie_ids
 
     def _enrich_generate_reply(self, generate_reply: dict) -> dict:
-        metadata = generate_reply.get("reply_metadata") or generate_reply.get("metadata") or []
-        if not isinstance(metadata, list):
-            metadata = []
+        metadata = generate_reply.get("reply_metadata") or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
 
         feed_ids, movie_ids = self._parse_metadata_ids(metadata)
         feed_list: list[PostItem] = post_read_service.get_posts_by_ids(
