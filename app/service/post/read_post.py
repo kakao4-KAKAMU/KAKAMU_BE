@@ -270,4 +270,49 @@ class PostReadService:
             is_following=is_following,
         )
 
+    def get_posts_by_ids(
+        self,
+        db: Session,
+        post_ids: list[int],
+        current_user_id: Optional[UUID],
+    ) -> list[PostResponse]:
+        if not post_ids:
+            return []
+
+        unique_ids = list(dict.fromkeys(post_ids))
+        blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
+
+        query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
+            Post.id.in_(unique_ids),
+            Post.status == "ACTIVE",
+            User.status == "ACTIVE",
+        ).options(selectinload(Post.movies).selectinload(Movie.titles))
+
+        if blocked_user_ids:
+            query = query.filter(Post.user_id.notin_(blocked_user_ids))
+
+        posts_with_author = query.all()
+        posts_by_id = {post.id: (post, author) for post, author in posts_with_author}
+        posts = [posts_by_id[pid][0] for pid in unique_ids if pid in posts_by_id]
+        context = self._build_post_infos(db, posts, current_user_id)
+
+        result: list[PostResponse] = []
+        for post_id in post_ids:
+            if post_id not in posts_by_id:
+                continue
+            post, author = posts_by_id[post_id]
+            result.append(
+                PostMapper.to_post_response(
+                    post,
+                    author,
+                    hashtags=context.hashtags_map.get(post.id, []),
+                    mentions=context.mentions_map.get(post.id, []),
+                    comment_count=context.comment_counts_map.get(post.id, 0),
+                    is_liked=post.id in context.liked_post_ids,
+                    is_following=post.user_id in context.followed_user_ids,
+                )
+            )
+        return result
+
+
 post_read_service = PostReadService()
