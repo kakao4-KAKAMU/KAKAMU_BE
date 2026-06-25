@@ -2,14 +2,15 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from uuid import UUID
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_persona, get_active_user
+from app.db.session import get_db
 from app.models import User
 from app.schemas.errors import ERROR_ML_SERVER_UNAVAILABLE
 from app.schemas.request.chat import ChatRequest
 from app.schemas.request.ml.chat import MlChatStreamRequest
 from app.schemas.response.chat import ChatSession, ChatSessionHistoryResponse
-from app.service.ai import chat_service
 from app.service.ml import ml_chat_service
 
 from opentelemetry import trace
@@ -41,7 +42,7 @@ async def list_chat_sessions(
     current_user: User = Depends(get_active_user),
 ):
     try:
-        return await chat_service.list_sessions(
+        return await ml_chat_service.list_sessions_for_user(
             current_user.id,
             cursor=cursor,
             limit=limit,
@@ -64,7 +65,7 @@ async def get_chat_session_history(
     current_user: User = Depends(get_active_user),
 ):
     try:
-        return await chat_service.get_session_history(
+        return await ml_chat_service.get_session_history_for_user(
             current_user.id,
             session_id,
             cursor=cursor,
@@ -84,6 +85,7 @@ async def chat_with_vllm(
     req: ChatRequest,
     current_user: User = Depends(get_active_user),
     active_persona_id: UUID = Depends(get_current_persona),
+    db: Session = Depends(get_db),
 ):
     stream_request = MlChatStreamRequest(
         user_id=str(current_user.id),
@@ -101,7 +103,7 @@ async def chat_with_vllm(
 
             try:
                 span.add_event("ml_connection_established")
-                async for chunk in ml_chat_service.stream_chat(stream_request):
+                async for chunk in ml_chat_service.stream_chat(db, current_user.id, stream_request):
                     yield chunk
                 span.set_status(trace.StatusCode.OK)
 

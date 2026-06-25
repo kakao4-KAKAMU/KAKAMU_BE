@@ -38,8 +38,8 @@ class MlApiClient:
         async with httpx.AsyncClient(timeout=request_timeout) as client:
             async with client.stream("POST", self._url(path), json=json) as response:
                 response.raise_for_status()
-                async for chunk in response.aiter_bytes():
-                    yield chunk
+                async for line in response.aiter_lines():
+                    yield line.encode("utf-8") + b"\n"
 
 
 ml_api_client = MlApiClient()

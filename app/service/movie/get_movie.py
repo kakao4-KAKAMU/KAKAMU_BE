@@ -5,6 +5,7 @@ from sqlalchemy import and_, extract
 from sqlalchemy.orm import Query, Session, selectinload
 
 from app.models.movie import Genre, Movie, MovieTitle
+from app.schemas.base.movie import Movie as MovieSchema
 from app.schemas.response.search import MovieFilterSearchResponse, MovieTabSearchResponse
 from app.schemas.mapper.movie import MovieMapper
 from app.schemas.mapper.pagination import PaginationMapper
@@ -154,6 +155,24 @@ class MovieReadService:
         total_count = query.count()
         movies = query.offset(skip).limit(limit).all()
         return movies, total_count
+
+    def get_movies_by_ids(self, db: Session, movie_ids: list[UUID]) -> list[MovieSchema]:
+        if not movie_ids:
+            return []
+
+        unique_ids = list(dict.fromkeys(movie_ids))
+        movies = (
+            self.base_query(db)
+            .filter(Movie.id.in_(unique_ids))
+            .options(selectinload(Movie.titles))
+            .all()
+        )
+        movies_by_id = {movie.id: movie for movie in movies}
+        return [
+            MovieMapper.to_movie(movies_by_id[movie_id])
+            for movie_id in movie_ids
+            if movie_id in movies_by_id
+        ]
 
 
 movie_read_service = MovieReadService()
