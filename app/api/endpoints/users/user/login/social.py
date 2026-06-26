@@ -42,6 +42,7 @@ async def social_login(request: SocialLoginRequest, db: Session = Depends(get_db
         else:
             return TokenResponse(
                 access_token="",
+                refresh_token="",
                 is_new_user=True,
                 provider_user_id=provider_user_id,
                 provider=request.provider,
