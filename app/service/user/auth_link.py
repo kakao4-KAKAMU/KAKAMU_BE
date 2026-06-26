@@ -69,8 +69,8 @@ class AuthLinkService:
         # 1. 소셜 프로바이더로부터 유저 정보 가져오기
         if request.provider == "kakao":
             user_info = await get_kakao_user_info(request.provided_token)
-            provider_user_id = str(user_info.get("id"))
-            email = user_info.get("kakao_account", {}).get("email")
+            provider_user_id = str(user_info.id)
+            email = user_info.kakao_account.email if user_info.kakao_account else None
         else:
             raise HTTPException(status_code=400, detail={"code": "UNSUPPORTED_PROVIDER", "message": "해당 플랫폼의 연동은 아직 지원하지 않습니다."})
 
