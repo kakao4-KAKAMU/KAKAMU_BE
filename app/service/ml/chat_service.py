@@ -37,6 +37,8 @@ class MlChatService:
 
     async def get_session_history(
         self,
+        db: Session,
+        user_id: UUID,
         session_id: str,
         query: MlChatHistoryQuery,
     ) -> MlChatSessionResponse:
@@ -44,10 +46,13 @@ class MlChatService:
             f"/chat/history/{session_id}",
             params=query.model_dump(mode="json", exclude_none=True),
         )
-        return MlChatSessionResponse.model_validate(response.json())
+        session_response = MlChatSessionResponse.model_validate(response.json())
+        enricher = ChatStreamEnrichmentService(db, user_id)
+        return enricher.enrich_session_response(session_response)
 
     async def get_session_history_for_user(
         self,
+        db: Session,
         user_id: UUID,
         session_id: str,
         *,
@@ -55,6 +60,8 @@ class MlChatService:
         limit: int = 20,
     ) -> MlChatSessionResponse:
         return await self.get_session_history(
+            db,
+            user_id,
             session_id,
             MlChatHistoryQuery(
                 user_id=str(user_id),

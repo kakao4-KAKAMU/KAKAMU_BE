@@ -1,4 +1,10 @@
-from .chat import MlChatMetadata, MlChatMessage, MlChatSession, MlChatSessionResponse
+from .chat import (
+    MlChatMetadata,
+    MlChatMessage,
+    MlChatSession,
+    MlChatSessionResponse,
+    MlChatMetadataList,
+)
 from .recommend import (
     MlFeedRecommendItem,
     MlFeedRecommendResponse,
@@ -9,6 +15,7 @@ from .ingest import MlIngestResponse
 
 __all__ = [
     "MlChatMetadata",
+    "MlChatMetadataList",
     "MlChatMessage",
     "MlChatSession",
     "MlChatSessionResponse",

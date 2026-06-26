@@ -64,7 +64,7 @@ class CommentReadService:
 
         total_count = base_query.with_entities(func.count(Comment.id)).scalar() or 0
 
-        comments = base_query.order_by(Comment.created_at.asc()).offset(offset).limit(size).all()
+        comments = base_query.order_by(Comment.created_at.desc()).offset(offset).limit(size).all()
 
         comment_ids = [c.id for c, _ in comments]
         mentions_map = self._get_mentions_for_comments(db, comment_ids)

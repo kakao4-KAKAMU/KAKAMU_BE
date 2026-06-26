@@ -63,9 +63,11 @@ async def get_chat_session_history(
     cursor: int | None = Query(default=None, ge=1, description="페이지 커서"),
     limit: int = Query(default=20, ge=1, le=200, description="조회 개수"),
     current_user: User = Depends(get_active_user),
+    db: Session = Depends(get_db),
 ):
     try:
         return await ml_chat_service.get_session_history_for_user(
+            db,
             current_user.id,
             session_id,
             cursor=cursor,
