@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.schemas.base.movie import Movie
 from app.schemas.base.post import PostItem
+from app.schemas.response.ml.chat import MlChatMessage, MlChatSessionResponse
 from app.service.movie.get_movie import movie_read_service
 from app.service.post.read_post import post_read_service
 
@@ -31,24 +32,47 @@ class ChatStreamEnrichmentService:
 
         return feed_ids, movie_ids
 
+    def _fetch_enriched_lists(
+        self, metadata: dict
+    ) -> tuple[list[PostItem], list[Movie]]:
+        feed_ids, movie_ids = self._parse_metadata_ids(metadata)
+        feed_list = post_read_service.get_posts_by_ids(
+            self._db, feed_ids, self._user_id
+        )
+        movie_list = movie_read_service.get_movies_by_ids(self._db, movie_ids)
+        return feed_list, movie_list
+
     def _enrich_generate_reply(self, generate_reply: dict) -> dict:
         metadata = generate_reply.get("reply_metadata") or {}
         if not isinstance(metadata, dict):
             metadata = {}
 
-        feed_ids, movie_ids = self._parse_metadata_ids(metadata)
-        feed_list: list[PostItem] = post_read_service.get_posts_by_ids(
-            self._db, feed_ids, self._user_id
-        )
-        movie_list: list[Movie] = movie_read_service.get_movies_by_ids(
-            self._db, movie_ids
-        )
+        feed_list, movie_list = self._fetch_enriched_lists(metadata)
 
         return {
             "reply": generate_reply.get("reply", ""),
             "feed_list": [item.model_dump(mode="json") for item in feed_list],
             "movie_list": [item.model_dump(mode="json") for item in movie_list],
         }
+
+    def enrich_message(self, message: MlChatMessage) -> MlChatMessage:
+        metadata: dict = {}
+        if message.reply_metadata is not None:
+            metadata = message.reply_metadata.model_dump(mode="json")
+
+        feed_list, movie_list = self._fetch_enriched_lists(metadata)
+        return message.model_copy(
+            update={"feed_list": feed_list, "movie_list": movie_list}
+        )
+
+    def enrich_session_response(
+        self, response: MlChatSessionResponse
+    ) -> MlChatSessionResponse:
+        return response.model_copy(
+            update={
+                "messages": [self.enrich_message(m) for m in response.messages]
+            }
+        )
 
     def _is_node_event(self, payload: dict, event_type: str | None) -> bool:
         return payload.get("type") == "node" or event_type == "node"
