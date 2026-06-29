@@ -14,6 +14,11 @@ from app.schemas.request.ml.ingest import (
 from app.service.ml import ml_ingest_service
 from app.service.ml.sync import safe_ml_call
 from app.core.redis import redis_client
+from app.service.like.like_count_service import (
+    build_like_count_redis_key,
+    clamp_like_count,
+    REDIS_DECR_WITH_FLOOR_SCRIPT,
+)
 from app.service.notification.notification_service import notification_service
 from app.models.notification import NotificationType
 
@@ -49,9 +54,9 @@ class LikeService:
             
         db.commit()
 
-        new_like_count = target.like_count or 0
+        new_like_count = clamp_like_count(target.like_count or 0)
         try:
-            redis_key = f"kakamu:stat:{req.target_type.lower()}:{req.target_id}:likes"
+            redis_key = build_like_count_redis_key(req.target_type, req.target_id)
             
             # Redis에 키가 없을 경우 DB의 현재 좋아요 수로 초기화 (Cache Miss 현상 방지)
             await redis_client.setnx(redis_key, new_like_count)
@@ -59,11 +64,11 @@ class LikeService:
             if is_liked:
                 new_like_count = await redis_client.incr(redis_key)
             else:
-                new_like_count = await redis_client.decr(redis_key)
+                new_like_count = await redis_client.eval(REDIS_DECR_WITH_FLOOR_SCRIPT, 1, redis_key)
         except Exception as e:
             # Redis 실패 시 Fallback
             print(f"[Redis Error] Like stat update failed for {req.target_id}: {e}")
-            new_like_count += 1 if is_liked else -1
+            new_like_count = clamp_like_count(new_like_count + (1 if is_liked else -1))
             
         if target.user_id != user_id:
             await self._sync_like_to_ml(
