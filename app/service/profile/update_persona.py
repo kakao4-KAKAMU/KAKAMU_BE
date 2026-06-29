@@ -9,6 +9,7 @@ from app.schemas.base.persona import Persona as PersonaSchema
 from app.schemas.mapper.persona import PersonaMapper
 from app.schemas.request.profile import PersonaEdit
 from app.service.profile.ml_sync import persona_ml_sync_service
+from app.service.profile.read_persona import PersonaReadService
 from opentelemetry import trace
 
 tracer = trace.get_tracer(__name__)
@@ -88,6 +89,11 @@ class PersonaUpdateService:
 
                     await persona_ml_sync_service.sync_update(db, persona, persona_data)
 
+                    persona = db.scalar(
+                        select(Persona)
+                        .where(Persona.id == persona.id)
+                        .options(*PersonaReadService._persona_load_options())
+                    )
                     return PersonaMapper.to_persona(persona)
                     
             except IntegrityError as e:
