@@ -10,6 +10,7 @@ from app.schemas.base.mention import Mention
 from app.schemas.mapper.comment import CommentMapper
 from app.schemas.mapper.pagination import PaginationMapper
 from app.schemas.response.post import CommentDetailResponse, CommentListResponse
+from app.service.like.like_count_service import like_count_service
 
 
 class CommentReadService:
@@ -80,12 +81,18 @@ class CommentReadService:
             ).all()
             liked_comment_ids = {log[0] for log in liked_logs}
 
+        like_counts_map = like_count_service.resolve_like_counts(
+            "COMMENT",
+            {c.id: c.like_count or 0 for c, _ in comments},
+        )
+
         items = [
             CommentMapper.to_comment_item(
                 c,
                 author,
                 hashtags=hashtags_map.get(c.id, []),
                 mentions=mentions_map.get(c.id, []),
+                like_count=like_counts_map.get(c.id, c.like_count or 0),
                 is_liked=c.id in liked_comment_ids,
             )
             for c, author in comments
@@ -129,11 +136,17 @@ class CommentReadService:
                 LikeLog.is_active == 1
             ).first() is not None
 
+        like_counts_map = like_count_service.resolve_like_counts(
+            "COMMENT",
+            {comment.id: comment.like_count or 0},
+        )
+
         return CommentMapper.to_comment_item(
             comment,
             author,
             hashtags=hashtags_map.get(comment.id, []),
             mentions=mentions_map.get(comment.id, []),
+            like_count=like_counts_map.get(comment.id, comment.like_count or 0),
             is_liked=is_liked,
         )
 

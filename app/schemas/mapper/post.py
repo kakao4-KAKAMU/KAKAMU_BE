@@ -22,6 +22,7 @@ class PostMapper:
         comment_count: int,
         is_liked: bool,
         is_following: bool,
+        like_count: int | None = None,
     ) -> PostItem:
         is_deleted = not author or author.status == "DELETED"
         return PostItem(
@@ -32,7 +33,7 @@ class PostMapper:
             ),
             hashtags=hashtags,
             mentions=mentions,
-            like_count=post.like_count,
+            like_count=like_count if like_count is not None else (post.like_count or 0),
             is_liked=is_liked,
             created_at=post.created_at,
             updated_at=post.updated_at,
@@ -54,6 +55,7 @@ class PostMapper:
         comment_count: int,
         is_liked: bool,
         is_following: bool,
+        like_count: int | None = None,
     ) -> PostItem:
         return PostMapper._to_post_item(
             post,
@@ -64,6 +66,7 @@ class PostMapper:
             comment_count=comment_count,
             is_liked=is_liked,
             is_following=is_following,
+            like_count=like_count,
         )
 
     @staticmethod
@@ -77,6 +80,7 @@ class PostMapper:
         comment_count: int,
         is_liked: bool,
         is_following: bool,
+        like_count: int | None = None,
     ) -> SearchPost:
         return SearchPost(
             **PostMapper._to_post_item(
@@ -88,5 +92,6 @@ class PostMapper:
                 comment_count=comment_count,
                 is_liked=is_liked,
                 is_following=is_following,
+                like_count=like_count,
             ).model_dump()
         )
