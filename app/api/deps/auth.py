@@ -1,16 +1,44 @@
+import json
+import time
+
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-import jwt
 from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.core.config import settings
+from app.core.logging import logger
+from app.core.redis import sync_redis_client
 from app.db.session import get_db
 from app.models import User
 
 security = HTTPBearer()
+
+
+def _get_cached_payload(access_token: str) -> Optional[dict]:
+    try:
+        cached = sync_redis_client.get(access_token)
+        if cached is None:
+            return None
+        return json.loads(cached)
+    except Exception as e:
+        logger.warning(f"[Redis Error] Auth payload cache read failed: {e}")
+        return None
+
+
+def _cache_payload(access_token: str, payload: dict) -> None:
+    exp = payload.get("exp")
+    if exp is None:
+        return
+    try:
+        ttl = max(1, int(exp) - int(time.time()))
+        sync_redis_client.setex(access_token, ttl, json.dumps(payload))
+    except Exception as e:
+        logger.warning(f"[Redis Error] Auth payload cache write failed: {e}")
+
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> User:
     access_token = credentials.credentials
@@ -19,25 +47,30 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         detail={"code": "INVALID_CREDENTIALS", "message": "Could not validate credentials"},
         headers={"WWW-Authenticate": "Bearer"},
     )
-    try:
-        payload = jwt.decode(access_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        
-        # 리프레시 토큰이 액세스 토큰 자리에 사용되는 것을 차단 (Token Substitution 방어)
-        if payload.get("type") == "refresh":
+
+    payload = _get_cached_payload(access_token)
+
+    if payload is None:
+        try:
+            payload = jwt.decode(access_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            _cache_payload(access_token, payload)
+        except ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": "TOKEN_EXPIRED", "message": "액세스 토큰이 만료되었습니다. 토큰을 재발급 받아주세요."},
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except InvalidTokenError:
             raise credentials_exception
-            
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-    except ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"code": "TOKEN_EXPIRED", "message": "액세스 토큰이 만료되었습니다. 토큰을 재발급 받아주세요."},
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except InvalidTokenError:
+
+    # 리프레시 토큰이 액세스 토큰 자리에 사용되는 것을 차단 (Token Substitution 방어)
+    if payload.get("type") == "refresh":
         raise credentials_exception
-        
+
+    user_id: str = payload.get("sub")
+    if user_id is None:
+        raise credentials_exception
+
     user = db.scalar(select(User).where(User.id == user_id))
     if user is None:
         raise credentials_exception
