@@ -1,14 +1,21 @@
 from typing import List, Optional, Tuple
 from uuid import UUID
 
+from fastapi import HTTPException, status
 from sqlalchemy import and_, extract
 from sqlalchemy.orm import Query, Session, selectinload
 
-from app.models.movie import Genre, Movie, MovieTitle
+from app.models.movie import Genre, Movie, MovieStaff, MovieTitle, People
 from app.schemas.base.movie import Movie as MovieSchema
+from app.schemas.errors import ERROR_MOVIE_NOT_FOUND
+from app.schemas.response.movie import MovieDetailResponse
 from app.schemas.response.search import MovieFilterSearchResponse, MovieTabSearchResponse
 from app.schemas.mapper.movie import MovieMapper
 from app.schemas.mapper.pagination import PaginationMapper
+
+
+def _error_detail(error_schema: dict) -> dict:
+    return error_schema["content"]["application/json"]["example"]["detail"]
 
 
 class MovieReadService:
@@ -155,6 +162,40 @@ class MovieReadService:
         total_count = query.count()
         movies = query.offset(skip).limit(limit).all()
         return movies, total_count
+
+    def _movie_detail_load_options(self) -> list:
+        return [
+            selectinload(Movie.titles),
+            selectinload(Movie.genres),
+            selectinload(Movie.overviews),
+            selectinload(Movie.youtube_videos),
+        ]
+
+    def _get_staff_for_movie(self, db: Session, movie_id: UUID) -> list[tuple[People, str]]:
+        rows = (
+            db.query(People, MovieStaff.job)
+            .join(MovieStaff, MovieStaff.people_id == People.id)
+            .filter(MovieStaff.movie_id == movie_id)
+            .order_by(MovieStaff.job, People.person_name)
+            .all()
+        )
+        return [(person, job) for person, job in rows]
+
+    def get_movie_detail(self, db: Session, movie_id: UUID) -> MovieDetailResponse:
+        movie = (
+            self.base_query(db)
+            .filter(Movie.id == movie_id)
+            .options(*self._movie_detail_load_options())
+            .first()
+        )
+        if not movie:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=_error_detail(ERROR_MOVIE_NOT_FOUND),
+            )
+
+        staffs = self._get_staff_for_movie(db, movie_id)
+        return MovieMapper.to_movie_detail(movie, staffs=staffs)
 
     def get_movies_by_ids(self, db: Session, movie_ids: list[UUID]) -> list[MovieSchema]:
         if not movie_ids:

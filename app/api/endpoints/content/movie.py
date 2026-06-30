@@ -1,15 +1,29 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from uuid import UUID
 import httpx
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_persona, get_active_user
+from app.db.session import get_db
 from app.models.user import User
-from app.schemas.response.movie import WatchMovieResponse
+from app.schemas.response.movie import MovieDetailResponse, WatchMovieResponse
 from app.schemas.response.ml.recommend import MlMovieRecommendResponse
-from app.schemas.errors import ERROR_ML_SERVER_UNAVAILABLE
+from app.schemas.errors import ERROR_ML_SERVER_UNAVAILABLE, ERROR_MOVIE_NOT_FOUND
+from app.service.movie.get_movie import movie_read_service
 from app.service.movie.recommendation import movie_recommendation_service
 
 router = APIRouter()
+
+
+@router.get(
+    "/{movie_id}",
+    response_model=MovieDetailResponse,
+    responses={404: ERROR_MOVIE_NOT_FOUND},
+    summary="영화 상세 조회",
+)
+def get_movie_detail(movie_id: UUID, db: Session = Depends(get_db)):
+    return movie_read_service.get_movie_detail(db, movie_id)
+
 
 @router.post(
     "/{movie_id}/watch",
