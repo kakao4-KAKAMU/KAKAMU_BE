@@ -5,12 +5,13 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Block, Comment, CommentHashtag, CommentMention, Hashtag, LikeLog, User
+from app.models import Block, Comment, CommentHashtag, CommentMention, Hashtag, LikeLog, SaveLog, User
 from app.schemas.base.mention import Mention
 from app.schemas.mapper.comment import CommentMapper
 from app.schemas.mapper.pagination import PaginationMapper
 from app.schemas.response.post import CommentDetailResponse, CommentListResponse
 from app.service.like.like_count_service import like_count_service
+from app.service.save.save_lookup import get_saved_target_ids
 
 
 class CommentReadService:
@@ -81,6 +82,10 @@ class CommentReadService:
             ).all()
             liked_comment_ids = {log[0] for log in liked_logs}
 
+        saved_comment_ids = get_saved_target_ids(
+            db, current_user_id, "COMMENT", comment_ids
+        )
+
         like_counts_map = like_count_service.resolve_like_counts(
             "COMMENT",
             {c.id: c.like_count or 0 for c, _ in comments},
@@ -94,6 +99,7 @@ class CommentReadService:
                 mentions=mentions_map.get(c.id, []),
                 like_count=like_counts_map.get(c.id, c.like_count or 0),
                 is_liked=c.id in liked_comment_ids,
+                is_saved=c.id in saved_comment_ids,
             )
             for c, author in comments
         ]
@@ -128,6 +134,7 @@ class CommentReadService:
         author = db.query(User).filter(User.id == comment.user_id).first()
 
         is_liked = False
+        is_saved = False
         if current_user_id:
             is_liked = db.query(LikeLog).filter(
                 LikeLog.user_id == current_user_id,
@@ -135,6 +142,9 @@ class CommentReadService:
                 LikeLog.target_id == comment.id,
                 LikeLog.is_active == 1
             ).first() is not None
+            is_saved = comment.id in get_saved_target_ids(
+                db, current_user_id, "COMMENT", [comment.id]
+            )
 
         like_counts_map = like_count_service.resolve_like_counts(
             "COMMENT",
@@ -148,6 +158,96 @@ class CommentReadService:
             mentions=mentions_map.get(comment.id, []),
             like_count=like_counts_map.get(comment.id, comment.like_count or 0),
             is_liked=is_liked,
+            is_saved=is_saved,
+        )
+
+    def get_my_saved_comments(
+        self,
+        db: Session,
+        current_user_id: UUID,
+        page: int = 1,
+        size: int = 20,
+    ) -> CommentListResponse:
+        """내가 저장한 댓글 목록 조회"""
+        saved_comment_ids_subquery = select(SaveLog.target_id).where(
+            SaveLog.user_id == current_user_id,
+            SaveLog.target_type == "COMMENT",
+            SaveLog.is_active == 1,
+        )
+
+        query = db.query(Comment).join(User, User.id == Comment.user_id).filter(
+            Comment.id.in_(saved_comment_ids_subquery),
+            Comment.status == "ACTIVE",
+            User.status == "ACTIVE",
+        )
+
+        blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_user_id)
+        blocking_me = select(Block.blocker_id).where(Block.blocked_id == current_user_id)
+        query = query.filter(
+            Comment.user_id.notin_(blocked_by_me),
+            Comment.user_id.notin_(blocking_me),
+        )
+
+        total_count = query.count()
+        comments = (
+            query.order_by(Comment.id.desc())
+            .offset((page - 1) * size)
+            .limit(size)
+            .all()
+        )
+
+        if not comments:
+            return CommentListResponse(
+                items=[],
+                meta=PaginationMapper.build_page_meta(
+                    total_count=total_count,
+                    current_page=page,
+                    page_size=size,
+                ),
+            )
+
+        comment_ids = [c.id for c in comments]
+        mentions_map = self._get_mentions_for_comments(db, comment_ids)
+        hashtags_map = self._get_hashtags_for_comments(db, comment_ids)
+
+        liked_logs = db.query(LikeLog.target_id).filter(
+            LikeLog.user_id == current_user_id,
+            LikeLog.target_type == "COMMENT",
+            LikeLog.target_id.in_(comment_ids),
+            LikeLog.is_active == 1,
+        ).all()
+        liked_comment_ids = {log[0] for log in liked_logs}
+
+        like_counts_map = like_count_service.resolve_like_counts(
+            "COMMENT",
+            {c.id: c.like_count or 0 for c in comments},
+        )
+
+        authors = {
+            user.id: user
+            for user in db.query(User).filter(User.id.in_({c.user_id for c in comments})).all()
+        }
+
+        items = [
+            CommentMapper.to_comment_item(
+                comment,
+                authors[comment.user_id],
+                hashtags=hashtags_map.get(comment.id, []),
+                mentions=mentions_map.get(comment.id, []),
+                like_count=like_counts_map.get(comment.id, comment.like_count or 0),
+                is_liked=comment.id in liked_comment_ids,
+                is_saved=True,
+            )
+            for comment in comments
+        ]
+
+        return CommentListResponse(
+            items=items,
+            meta=PaginationMapper.build_page_meta(
+                total_count=total_count,
+                current_page=page,
+                page_size=size,
+            ),
         )
 
 

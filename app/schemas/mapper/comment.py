@@ -15,6 +15,7 @@ class CommentMapper:
         hashtags: Optional[List[str]] = None,
         mentions: Optional[List[Mention]] = None,
         is_liked: bool = False,
+        is_saved: bool = False,
         like_count: int | None = None,
     ) -> CommentItem:
         is_spoiler = comment.is_spoiler == 1
@@ -27,6 +28,7 @@ class CommentMapper:
             created_at=comment.created_at,
             like_count=like_count if like_count is not None else (comment.like_count or 0),
             is_liked=is_liked,
+            is_saved=is_saved,
             hashtags=hashtags or [],
             mentions=mentions or [],
         )

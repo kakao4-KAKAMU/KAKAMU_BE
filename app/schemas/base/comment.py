@@ -16,6 +16,7 @@ class CommentItem(BaseModel):
     created_at: datetime
     like_count: int
     is_liked: bool
+    is_saved: bool
     hashtags: List[str] = []
     mentions: List[Mention] = []
 

@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional
 from uuid import UUID
 import httpx
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_persona, get_active_user
+from app.api.deps.auth import get_optional_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.response.movie import MovieDetailResponse, WatchMovieResponse
@@ -21,8 +23,13 @@ router = APIRouter()
     responses={404: ERROR_MOVIE_NOT_FOUND},
     summary="영화 상세 조회",
 )
-def get_movie_detail(movie_id: UUID, db: Session = Depends(get_db)):
-    return movie_read_service.get_movie_detail(db, movie_id)
+def get_movie_detail(
+    movie_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    user_id = current_user.id if current_user else None
+    return movie_read_service.get_movie_detail(db, movie_id, user_id)
 
 
 @router.post(

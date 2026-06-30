@@ -26,6 +26,7 @@ from app.schemas.mapper.person import PersonMapper
 from app.schemas.mapper.post import PostMapper
 from app.schemas.mapper.user import UserMapper
 from app.service.like.like_count_service import like_count_service
+from app.service.save.save_lookup import get_saved_target_ids
 
 
 class SearchService:
@@ -235,6 +236,7 @@ class SearchService:
         )
 
         liked_post_ids: Set[int] = set()
+        saved_post_ids: Set[int] = set()
         followed_user_ids: Set[UUID] = set()
         if current_user_id:
             liked_logs = db.query(LikeLog.target_id).filter(
@@ -244,6 +246,9 @@ class SearchService:
                 LikeLog.is_active == 1,
             ).all()
             liked_post_ids = {log[0] for log in liked_logs}
+            saved_post_ids = get_saved_target_ids(
+                db, current_user_id, "POST", post_ids
+            )
 
             follows = db.query(Follow.following_id).filter(
                 Follow.follower_id == current_user_id,
@@ -261,6 +266,7 @@ class SearchService:
                 comment_count=comment_counts_map.get(post.id, 0),
                 like_count=like_counts_map.get(post.id, post.like_count or 0),
                 is_liked=post.id in liked_post_ids,
+                is_saved=post.id in saved_post_ids,
                 is_following=post.user_id in followed_user_ids,
             )
             for post, author in posts_with_author

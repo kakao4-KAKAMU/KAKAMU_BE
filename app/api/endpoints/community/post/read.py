@@ -62,7 +62,6 @@ def get_my_liked_posts(
         cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"),
         limit: int = Query(20, le=100),
         db: Session = Depends(get_db),
-        current_persona_id: UUID = Depends(get_current_persona),
         current_user: User = Depends(get_active_user)
 ):
     """

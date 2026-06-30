@@ -44,3 +44,4 @@ class MovieDetail(BaseModel):
     overviews: List[Overview] = []
     genres: List[Genre] = []
     staffs: List[Person] = []
+    is_saved: bool = False

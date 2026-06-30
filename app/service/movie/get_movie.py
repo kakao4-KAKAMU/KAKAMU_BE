@@ -15,6 +15,7 @@ from app.schemas.response.movie import MovieDetailResponse
 from app.schemas.response.search import MovieFilterSearchResponse, MovieTabSearchResponse
 from app.schemas.mapper.movie import MovieMapper
 from app.schemas.mapper.pagination import PaginationMapper
+from app.service.save.save_lookup import is_movie_saved
 
 
 def _error_detail(error_schema: dict) -> dict:
@@ -227,14 +228,23 @@ class MovieReadService:
         staffs = self._get_staff_for_movie(db, movie_id)
         return MovieMapper.to_movie_detail(movie, staffs=staffs)
 
-    def get_movie_detail(self, db: Session, movie_id: UUID) -> MovieDetailResponse:
+    def get_movie_detail(
+        self,
+        db: Session,
+        movie_id: UUID,
+        current_user_id: Optional[UUID] = None,
+    ) -> MovieDetailResponse:
         cached = self._get_cached_movie_detail(movie_id)
         if cached is not None:
-            return cached
+            detail = cached
+        else:
+            detail = self._fetch_movie_detail_from_db(db, movie_id)
+            self._set_cached_movie_detail(movie_id, detail)
 
-        detail = self._fetch_movie_detail_from_db(db, movie_id)
-        self._set_cached_movie_detail(movie_id, detail)
-        return detail
+        is_saved = is_movie_saved(db, current_user_id, movie_id)
+        if detail.is_saved == is_saved:
+            return detail
+        return detail.model_copy(update={"is_saved": is_saved})
 
     def get_movies_by_ids(self, db: Session, movie_ids: list[UUID]) -> list[MovieSchema]:
         if not movie_ids:

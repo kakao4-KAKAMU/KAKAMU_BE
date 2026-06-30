@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, SmallInteger, Text, JSON, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, SmallInteger, Text, JSON, UniqueConstraint, Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -51,6 +51,35 @@ class LikeLog(Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'target_type', 'target_id', name='uq_likelog_user_target'),
         Index('ix_likelog_target', 'target_type', 'target_id'),
+    )
+
+class SaveLog(Base):
+    __tablename__ = "save_log"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    persona_id = Column(UUID(as_uuid=True), ForeignKey("persona.id", ondelete="SET NULL"), nullable=True)
+    target_type = Column(String(20), nullable=False)
+    target_id = Column(Integer, nullable=True)
+    movie_id = Column(UUID(as_uuid=True), ForeignKey("movie.id", ondelete="CASCADE"), nullable=True)
+    is_active = Column(SmallInteger, default=1)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+
+    __table_args__ = (
+        Index('ix_savelog_target', 'target_type', 'target_id'),
+        Index('ix_savelog_movie', 'target_type', 'movie_id'),
+        Index(
+            'uq_savelog_user_post_comment',
+            'user_id', 'target_type', 'target_id',
+            unique=True,
+            postgresql_where=text('target_id IS NOT NULL'),
+        ),
+        Index(
+            'uq_savelog_user_movie',
+            'user_id', 'target_type', 'movie_id',
+            unique=True,
+            postgresql_where=text('movie_id IS NOT NULL'),
+        ),
     )
 
 class SemanticAnalysis(Base):

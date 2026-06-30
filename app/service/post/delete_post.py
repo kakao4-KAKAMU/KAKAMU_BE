@@ -2,7 +2,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Post, Comment, LikeLog
+from app.models import Post, Comment, LikeLog, SaveLog
 from app.service.post.ml_sync import post_ml_sync_service
 from app.service.post.redis import post_cache_service
 
@@ -23,6 +23,9 @@ class PostDeleteService:
 
         # 게시물에 달린 좋아요 무효화
         db.query(LikeLog).filter(LikeLog.target_type == "POST", LikeLog.target_id == post.id).update({"is_active": 0})
+
+        # 게시물 저장 무효화
+        db.query(SaveLog).filter(SaveLog.target_type == "POST", SaveLog.target_id == post.id).update({"is_active": 0})
 
         db.commit()
         post_cache_service.invalidate_post(post.id)
