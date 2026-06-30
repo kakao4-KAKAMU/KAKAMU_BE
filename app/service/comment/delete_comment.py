@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from uuid import UUID
 from sqlalchemy import func
 
-from app.models import Comment, LikeLog
+from app.models import Comment, LikeLog, SaveLog
 from app.service.comment.ml_sync import comment_ml_sync_service
 from app.service.post.redis import post_cache_service
 
@@ -27,6 +27,7 @@ class CommentDeleteService:
         comment.status = "INACTIVE"
         db.query(Comment).filter(Comment.parent_id == comment.id).update({"status": "INACTIVE"})
         db.query(LikeLog).filter(LikeLog.target_type == "COMMENT", LikeLog.target_id == comment.id).update({"is_active": 0})
+        db.query(SaveLog).filter(SaveLog.target_type == "COMMENT", SaveLog.target_id == comment.id).update({"is_active": 0})
         db.commit()
         post_cache_service.sync_comment_count(db, comment.post_id, delta=-deactivated_count)
 
