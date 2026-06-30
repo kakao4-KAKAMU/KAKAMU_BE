@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.models import Persona
 from app.schemas.base.persona import Persona as PersonaSchema
 from app.schemas.mapper.persona import PersonaMapper
+from app.service.profile.read_persona import PersonaReadService
 from uuid import UUID
 
 class PersonaRestoreService:
@@ -50,7 +51,12 @@ class PersonaRestoreService:
             persona.status = "ACTIVE"
             persona.deleted_at = None
             db.commit()
-            db.refresh(persona)
+
+            persona = db.scalar(
+                select(Persona)
+                .where(Persona.id == persona_id)
+                .options(*PersonaReadService._persona_load_options())
+            )
             return PersonaMapper.to_persona(persona)
             
         except Exception as e:

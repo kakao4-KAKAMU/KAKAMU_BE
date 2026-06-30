@@ -15,6 +15,7 @@ class CommentMapper:
         hashtags: Optional[List[str]] = None,
         mentions: Optional[List[Mention]] = None,
         is_liked: bool = False,
+        like_count: int | None = None,
     ) -> CommentItem:
         is_spoiler = comment.is_spoiler == 1
         return CommentItem(
@@ -24,7 +25,7 @@ class CommentMapper:
             content=comment.content,
             is_spoiler=is_spoiler,
             created_at=comment.created_at,
-            like_count=comment.like_count,
+            like_count=like_count if like_count is not None else (comment.like_count or 0),
             is_liked=is_liked,
             hashtags=hashtags or [],
             mentions=mentions or [],

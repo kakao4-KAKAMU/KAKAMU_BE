@@ -11,6 +11,7 @@ from app.schemas.base.mention import Mention
 from app.schemas.mapper.post import PostMapper
 from app.schemas.response.post import PostResponse, PostListResponse
 from app.service.relation.relation_service import RelationService
+from app.service.like.like_count_service import like_count_service
 
 
 @dataclass
@@ -18,6 +19,7 @@ class PostListContext:
     mentions_map: Dict[int, List[Mention]]
     hashtags_map: Dict[int, List[str]]
     comment_counts_map: Dict[int, int]
+    like_counts_map: Dict[int, int]
     liked_post_ids: Set[int]
     followed_user_ids: Set[UUID]
 
@@ -96,7 +98,7 @@ class PostReadService:
     ) -> PostListContext:
         post_ids = [post.id for post in posts]
         if not post_ids:
-            return PostListContext({}, {}, {}, set(), set())
+            return PostListContext({}, {}, {}, {}, set(), set())
 
         liked_post_ids: Set[int] = set()
         followed_user_ids: Set[UUID] = set()
@@ -120,6 +122,10 @@ class PostReadService:
             mentions_map=self._get_mentions_for_posts(db, post_ids),
             hashtags_map=self._get_hashtags_for_posts(db, post_ids),
             comment_counts_map=self._get_comment_counts_for_posts(db, post_ids),
+            like_counts_map=like_count_service.resolve_like_counts(
+                "POST",
+                {post.id: post.like_count or 0 for post in posts},
+            ),
             liked_post_ids=liked_post_ids,
             followed_user_ids=followed_user_ids,
         )
@@ -141,6 +147,7 @@ class PostReadService:
                     hashtags=context.hashtags_map.get(post.id, []),
                     mentions=context.mentions_map.get(post.id, []),
                     comment_count=context.comment_counts_map.get(post.id, 0),
+                    like_count=context.like_counts_map.get(post.id, post.like_count or 0),
                     is_liked=force_liked or post.id in context.liked_post_ids,
                     is_following=post.user_id in context.followed_user_ids,
                 )
@@ -266,6 +273,7 @@ class PostReadService:
             hashtags=context.hashtags_map.get(post.id, []),
             mentions=context.mentions_map.get(post.id, []),
             comment_count=context.comment_counts_map.get(post.id, 0),
+            like_count=context.like_counts_map.get(post.id, post.like_count or 0),
             is_liked=post.id in context.liked_post_ids,
             is_following=is_following,
         )
@@ -308,6 +316,7 @@ class PostReadService:
                     hashtags=context.hashtags_map.get(post.id, []),
                     mentions=context.mentions_map.get(post.id, []),
                     comment_count=context.comment_counts_map.get(post.id, 0),
+                    like_count=context.like_counts_map.get(post.id, post.like_count or 0),
                     is_liked=post.id in context.liked_post_ids,
                     is_following=post.user_id in context.followed_user_ids,
                 )

@@ -25,6 +25,7 @@ from app.schemas.mapper.pagination import PaginationMapper
 from app.schemas.mapper.person import PersonMapper
 from app.schemas.mapper.post import PostMapper
 from app.schemas.mapper.user import UserMapper
+from app.service.like.like_count_service import like_count_service
 
 
 class SearchService:
@@ -222,6 +223,10 @@ class SearchService:
         hashtags_map = self._get_hashtags_for_posts(db, post_ids)
         mentions_map = self._get_mentions_for_posts(db, post_ids)
         comment_counts_map = self._get_comment_counts_for_posts(db, post_ids)
+        like_counts_map = like_count_service.resolve_like_counts(
+            "POST",
+            {post.id: post.like_count or 0 for post, _ in posts_with_author},
+        )
 
         liked_post_ids: Set[int] = set()
         followed_user_ids: Set[UUID] = set()
@@ -248,6 +253,7 @@ class SearchService:
                 mentions=mentions_map.get(post.id, []),
                 movies=[MovieMapper.to_movie(movie) for movie in post.movies],
                 comment_count=comment_counts_map.get(post.id, 0),
+                like_count=like_counts_map.get(post.id, post.like_count or 0),
                 is_liked=post.id in liked_post_ids,
                 is_following=post.user_id in followed_user_ids,
             )

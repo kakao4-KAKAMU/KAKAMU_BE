@@ -1,9 +1,11 @@
-from typing import Optional, Union
-from uuid import UUID
+from typing import Optional
 
 from app.core.config import settings
 from app.models import Persona as PersonaModel
 from app.schemas.base.persona import Persona
+from app.schemas.mapper.genre import GenreMapper
+from app.schemas.mapper.movie import MovieMapper
+from app.schemas.mapper.person import PersonMapper
 
 
 class PersonaMapper:
@@ -24,4 +26,19 @@ class PersonaMapper:
             user_id=persona.user_id,
             nickname=persona.nickname,
             profile_image_url=PersonaMapper._resolve_profile_image_url(persona.profile_image_url),
+            fav_genres=[
+                GenreMapper.to_genre(fav.genre)
+                for fav in (persona.fav_genres or [])
+                if fav.genre
+            ],
+            fav_people=[
+                PersonMapper.to_person(fav.person, job=fav.type)
+                for fav in (persona.fav_people or [])
+                if fav.person
+            ],
+            fav_movies=[
+                MovieMapper.to_movie(fav.movie)
+                for fav in (persona.fav_movies or [])
+                if fav.movie
+            ],
         )

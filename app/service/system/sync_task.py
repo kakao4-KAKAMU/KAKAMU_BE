@@ -2,6 +2,7 @@ import asyncio
 from app.core.redis import redis_client
 from app.db.session import SessionLocal
 from app.models import Post, Comment
+from app.service.like.like_count_service import clamp_like_count
 
 from app.core.logging import logger
 
@@ -51,9 +52,9 @@ async def stat_sync_worker():
                             target_id = int(parts[3])
                             
                             if target_type == "post":
-                                post_updates.append({"id": target_id, "like_count": int(current_val)})
+                                post_updates.append({"id": target_id, "like_count": clamp_like_count(int(current_val))})
                             elif target_type == "comment":
-                                comment_updates.append({"id": target_id, "like_count": int(current_val)})
+                                comment_updates.append({"id": target_id, "like_count": clamp_like_count(int(current_val))})
                     
                     # [최적화 2] DB 일괄 업데이트 (Bulk Update) - 쿼리 호출 수 극적 감소
                     if post_updates:
