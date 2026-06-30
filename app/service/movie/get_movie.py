@@ -1,14 +1,31 @@
+import json
 from typing import List, Optional, Tuple
 from uuid import UUID
 
+from fastapi import HTTPException, status
 from sqlalchemy import and_, extract
 from sqlalchemy.orm import Query, Session, selectinload
 
-from app.models.movie import Genre, Movie, MovieTitle
-from app.schemas.base.movie import Movie as MovieSchema
+from app.core.logging import logger
+from app.core.redis import sync_redis_client
+from app.models.movie import Genre, Movie, MovieStaff, MovieTitle, People
+from app.schemas.base.movie import Movie as MovieSchema, MovieDetail
+from app.schemas.errors import ERROR_MOVIE_NOT_FOUND
+from app.schemas.response.movie import MovieDetailResponse
 from app.schemas.response.search import MovieFilterSearchResponse, MovieTabSearchResponse
 from app.schemas.mapper.movie import MovieMapper
 from app.schemas.mapper.pagination import PaginationMapper
+
+
+def _error_detail(error_schema: dict) -> dict:
+    return error_schema["content"]["application/json"]["example"]["detail"]
+
+
+def build_movie_detail_redis_key(movie_id: UUID) -> str:
+    return f"kakamu:movie:{movie_id}:detail"
+
+
+MOVIE_DETAIL_CACHE_TTL_SECONDS = 3600
 
 
 class MovieReadService:
@@ -155,6 +172,69 @@ class MovieReadService:
         total_count = query.count()
         movies = query.offset(skip).limit(limit).all()
         return movies, total_count
+
+    def _movie_detail_load_options(self) -> list:
+        return [
+            selectinload(Movie.titles),
+            selectinload(Movie.genres),
+            selectinload(Movie.overviews),
+            selectinload(Movie.youtube_videos),
+        ]
+
+    def _get_staff_for_movie(self, db: Session, movie_id: UUID) -> list[tuple[People, str]]:
+        rows = (
+            db.query(People, MovieStaff.job)
+            .join(MovieStaff, MovieStaff.people_id == People.id)
+            .filter(MovieStaff.movie_id == movie_id)
+            .order_by(MovieStaff.job, People.person_name)
+            .all()
+        )
+        return [(person, job) for person, job in rows]
+
+    def _get_cached_movie_detail(self, movie_id: UUID) -> Optional[MovieDetailResponse]:
+        try:
+            cached = sync_redis_client.get(build_movie_detail_redis_key(movie_id))
+            if cached is None:
+                return None
+            return MovieDetail.model_validate(json.loads(cached))
+        except Exception as e:
+            logger.warning(f"[Redis Error] Movie detail cache read failed: {e}")
+            return None
+
+    def _set_cached_movie_detail(self, movie_id: UUID, detail: MovieDetailResponse) -> None:
+        try:
+            sync_redis_client.setex(
+                build_movie_detail_redis_key(movie_id),
+                MOVIE_DETAIL_CACHE_TTL_SECONDS,
+                json.dumps(detail.model_dump(mode="json")),
+            )
+        except Exception as e:
+            logger.warning(f"[Redis Error] Movie detail cache write failed: {e}")
+
+    def _fetch_movie_detail_from_db(self, db: Session, movie_id: UUID) -> MovieDetailResponse:
+        movie = (
+            self.base_query(db)
+            .filter(Movie.id == movie_id)
+            .options(*self._movie_detail_load_options())
+            .first()
+        )
+        if not movie:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=_error_detail(ERROR_MOVIE_NOT_FOUND),
+            )
+
+        staffs = self._get_staff_for_movie(db, movie_id)
+        return MovieMapper.to_movie_detail(movie, staffs=staffs)
+
+    def get_movie_detail(self, db: Session, movie_id: UUID) -> MovieDetailResponse:
+        cached = self._get_cached_movie_detail(movie_id)
+        if cached is not None:
+            return cached
+
+        detail = self._fetch_movie_detail_from_db(db, movie_id)
+        self._set_cached_movie_detail(movie_id, detail)
+        return detail
 
     def get_movies_by_ids(self, db: Session, movie_ids: list[UUID]) -> list[MovieSchema]:
         if not movie_ids:

@@ -29,11 +29,17 @@ from app.service.like.like_count_service import like_count_service
 
 
 class SearchService:
+    genre_response: GenreListResponse = GenreListResponse(
+        genres=[],
+    )
     def get_genre_list(self, db: Session) -> GenreListResponse:
+        if len(self.genre_response.genres) > 0:
+            return self.genre_response
         genres = db.query(Genre).order_by(Genre.genre_name.asc()).all()
-        return GenreListResponse(
+        self.genre_response = GenreListResponse(
             genres=[GenreMapper.to_genre(genre) for genre in genres],
         )
+        return self.genre_response
 
     def search_people(
         self,

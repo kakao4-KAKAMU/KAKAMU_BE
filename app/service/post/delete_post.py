@@ -4,6 +4,7 @@ from fastapi import HTTPException
 
 from app.models import Post, Comment, LikeLog
 from app.service.post.ml_sync import post_ml_sync_service
+from app.service.post.redis import post_cache_service
 
 class PostDeleteService:
     async def delete_post(self, db: Session, post_id: int, user_id: UUID, persona_id: UUID) -> None:
@@ -24,6 +25,7 @@ class PostDeleteService:
         db.query(LikeLog).filter(LikeLog.target_type == "POST", LikeLog.target_id == post.id).update({"is_active": 0})
 
         db.commit()
+        post_cache_service.invalidate_post(post.id)
 
         await post_ml_sync_service.sync_delete(post_id=post.id, user_id=user_id)
 

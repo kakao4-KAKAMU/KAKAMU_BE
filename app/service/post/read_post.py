@@ -12,6 +12,7 @@ from app.schemas.mapper.post import PostMapper
 from app.schemas.response.post import PostResponse, PostListResponse
 from app.service.relation.relation_service import RelationService
 from app.service.like.like_count_service import like_count_service
+from app.service.post.redis import CachedPostInfo, post_cache_service
 
 
 @dataclass
@@ -100,6 +101,44 @@ class PostReadService:
         if not post_ids:
             return PostListContext({}, {}, {}, {}, set(), set())
 
+        cached_infos = post_cache_service.get_post_infos(post_ids)
+        cache_miss_ids = [post_id for post_id in post_ids if cached_infos.get(post_id) is None]
+
+        mentions_map: Dict[int, List[Mention]] = {post_id: [] for post_id in post_ids}
+        hashtags_map: Dict[int, List[str]] = {post_id: [] for post_id in post_ids}
+        comment_counts_map: Dict[int, int] = {}
+
+        for post_id in post_ids:
+            cached = cached_infos.get(post_id)
+            if cached is None:
+                continue
+            mentions_map[post_id] = cached.mentions
+            hashtags_map[post_id] = cached.hashtags
+            comment_counts_map[post_id] = cached.comment_count
+
+        if cache_miss_ids:
+            db_mentions_map = self._get_mentions_for_posts(db, cache_miss_ids)
+            db_hashtags_map = self._get_hashtags_for_posts(db, cache_miss_ids)
+            db_comment_counts_map = self._get_comment_counts_for_posts(db, cache_miss_ids)
+
+            to_cache: Dict[int, CachedPostInfo] = {}
+            for post_id in cache_miss_ids:
+                mentions = db_mentions_map.get(post_id, [])
+                hashtags = db_hashtags_map.get(post_id, [])
+                comment_count = db_comment_counts_map.get(post_id, 0)
+                mentions_map[post_id] = mentions
+                hashtags_map[post_id] = hashtags
+                comment_counts_map[post_id] = comment_count
+                to_cache[post_id] = CachedPostInfo(
+                    mentions=mentions,
+                    hashtags=hashtags,
+                    comment_count=comment_count,
+                )
+            post_cache_service.set_post_infos(to_cache)
+
+        for post_id in post_ids:
+            comment_counts_map.setdefault(post_id, 0)
+
         liked_post_ids: Set[int] = set()
         followed_user_ids: Set[UUID] = set()
 
@@ -119,9 +158,9 @@ class PostReadService:
             )
 
         return PostListContext(
-            mentions_map=self._get_mentions_for_posts(db, post_ids),
-            hashtags_map=self._get_hashtags_for_posts(db, post_ids),
-            comment_counts_map=self._get_comment_counts_for_posts(db, post_ids),
+            mentions_map=mentions_map,
+            hashtags_map=hashtags_map,
+            comment_counts_map=comment_counts_map,
             like_counts_map=like_count_service.resolve_like_counts(
                 "POST",
                 {post.id: post.like_count or 0 for post in posts},

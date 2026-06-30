@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from app.models import Comment, Post, User, CommentMention, Hashtag, CommentHashtag
 from app.schemas.request.post import CommentCreate
 from app.service.comment.ml_sync import comment_ml_sync_service
+from app.service.post.redis import post_cache_service
 from app.utils.parser import parse_content
 
 
@@ -64,6 +65,7 @@ class CommentCreateService:
                 db.add(CommentMention(comment_id=new_comment.id, user_id=target_user.id))
 
         db.commit()
+        post_cache_service.sync_comment_count(db, post_id, delta=1)
 
         await comment_ml_sync_service.sync_create(
             db,
