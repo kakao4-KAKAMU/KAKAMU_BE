@@ -1,9 +1,11 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
+from sqlalchemy import func
 
 from app.models import Comment, LikeLog
 from app.service.comment.ml_sync import comment_ml_sync_service
+from app.service.post.redis import post_cache_service
 
 
 class CommentDeleteService:
@@ -15,10 +17,18 @@ class CommentDeleteService:
         if comment.user_id != user_id:
             raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_COMMENT_DELETE", "message": "본인이 작성한 댓글만 삭제할 수 있습니다."})
 
+        deactivated_count = 1 + (
+            db.query(func.count(Comment.id))
+            .filter(Comment.parent_id == comment.id, Comment.status == "ACTIVE")
+            .scalar()
+            or 0
+        )
+
         comment.status = "INACTIVE"
         db.query(Comment).filter(Comment.parent_id == comment.id).update({"status": "INACTIVE"})
         db.query(LikeLog).filter(LikeLog.target_type == "COMMENT", LikeLog.target_id == comment.id).update({"is_active": 0})
         db.commit()
+        post_cache_service.sync_comment_count(db, comment.post_id, delta=-deactivated_count)
 
         await comment_ml_sync_service.sync_delete(comment_id=comment.id, user_id=user_id)
 
