@@ -6,13 +6,14 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, select
 from fastapi import HTTPException
 
-from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, Block, User, PostMention, Follow, Movie
+from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, SaveLog, Block, User, PostMention, Follow, Movie
 from app.schemas.base.mention import Mention
 from app.schemas.mapper.post import PostMapper
 from app.schemas.response.post import PostResponse, PostListResponse
 from app.service.relation.relation_service import RelationService
 from app.service.like.like_count_service import like_count_service
 from app.service.post.redis import CachedPostInfo, post_cache_service
+from app.service.save.save_lookup import get_saved_target_ids
 
 
 @dataclass
@@ -22,6 +23,7 @@ class PostListContext:
     comment_counts_map: Dict[int, int]
     like_counts_map: Dict[int, int]
     liked_post_ids: Set[int]
+    saved_post_ids: Set[int]
     followed_user_ids: Set[UUID]
 
 
@@ -96,10 +98,11 @@ class PostReadService:
         current_user_id: Optional[UUID],
         *,
         force_liked: bool = False,
+        force_saved: bool = False,
     ) -> PostListContext:
         post_ids = [post.id for post in posts]
         if not post_ids:
-            return PostListContext({}, {}, {}, {}, set(), set())
+            return PostListContext({}, {}, {}, {}, set(), set(), set())
 
         cached_infos = post_cache_service.get_post_infos(post_ids)
         cache_miss_ids = [post_id for post_id in post_ids if cached_infos.get(post_id) is None]
@@ -140,6 +143,7 @@ class PostReadService:
             comment_counts_map.setdefault(post_id, 0)
 
         liked_post_ids: Set[int] = set()
+        saved_post_ids: Set[int] = set()
         followed_user_ids: Set[UUID] = set()
 
         if current_user_id:
@@ -151,6 +155,11 @@ class PostReadService:
                     LikeLog.is_active == 1,
                 ).all()
                 liked_post_ids = {log[0] for log in liked_logs}
+
+            if not force_saved:
+                saved_post_ids = get_saved_target_ids(
+                    db, current_user_id, "POST", post_ids
+                )
 
             author_user_ids = list({post.user_id for post in posts})
             followed_user_ids = RelationService.get_followed_user_ids(
@@ -166,6 +175,7 @@ class PostReadService:
                 {post.id: post.like_count or 0 for post in posts},
             ),
             liked_post_ids=liked_post_ids,
+            saved_post_ids=saved_post_ids,
             followed_user_ids=followed_user_ids,
         )
 
@@ -176,6 +186,7 @@ class PostReadService:
         context: PostListContext,
         limit: int,
         force_liked: bool = False,
+        force_saved: bool = False,
     ) -> PostListResponse:
         result: List[PostResponse] = []
         for post, author in posts_with_author:
@@ -188,6 +199,7 @@ class PostReadService:
                     comment_count=context.comment_counts_map.get(post.id, 0),
                     like_count=context.like_counts_map.get(post.id, post.like_count or 0),
                     is_liked=force_liked or post.id in context.liked_post_ids,
+                    is_saved=force_saved or post.id in context.saved_post_ids,
                     is_following=post.user_id in context.followed_user_ids,
                 )
             )
@@ -253,6 +265,39 @@ class PostReadService:
             force_liked=True,
         )
 
+    def get_my_saved_posts(self, db: Session, current_user_id: UUID, cursor: Optional[int], limit: int) -> PostListResponse:
+        """내가 저장한 게시물 조회 로직"""
+        blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
+
+        saved_post_ids_subquery = select(SaveLog.target_id).where(
+            SaveLog.user_id == current_user_id,
+            SaveLog.target_type == "POST",
+            SaveLog.is_active == 1,
+        )
+
+        query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
+            Post.id.in_(saved_post_ids_subquery),
+            Post.status == "ACTIVE",
+            User.status == "ACTIVE",
+        ).options(selectinload(Post.movies).selectinload(Movie.titles))
+
+        if blocked_user_ids:
+            query = query.filter(Post.user_id.notin_(blocked_user_ids))
+
+        if cursor:
+            query = query.filter(Post.id < cursor)
+
+        posts_with_author = query.order_by(Post.id.desc()).limit(limit).all()
+        posts = [post for post, _ in posts_with_author]
+        context = self._build_post_infos(db, posts, current_user_id, force_saved=True)
+
+        return self._build_post_list(
+            posts_with_author,
+            context=context,
+            limit=limit,
+            force_saved=True,
+        )
+
     def get_user_posts(
         self,
         db: Session,
@@ -314,6 +359,7 @@ class PostReadService:
             comment_count=context.comment_counts_map.get(post.id, 0),
             like_count=context.like_counts_map.get(post.id, post.like_count or 0),
             is_liked=post.id in context.liked_post_ids,
+            is_saved=post.id in context.saved_post_ids,
             is_following=is_following,
         )
 
@@ -357,6 +403,7 @@ class PostReadService:
                     comment_count=context.comment_counts_map.get(post.id, 0),
                     like_count=context.like_counts_map.get(post.id, post.like_count or 0),
                     is_liked=post.id in context.liked_post_ids,
+                    is_saved=post.id in context.saved_post_ids,
                     is_following=post.user_id in context.followed_user_ids,
                 )
             )

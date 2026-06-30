@@ -21,6 +21,7 @@ class PostMapper:
         movies: List[Movie],
         comment_count: int,
         is_liked: bool,
+        is_saved: bool,
         is_following: bool,
         like_count: int | None = None,
     ) -> PostItem:
@@ -35,6 +36,7 @@ class PostMapper:
             mentions=mentions,
             like_count=like_count if like_count is not None else (post.like_count or 0),
             is_liked=is_liked,
+            is_saved=is_saved,
             created_at=post.created_at,
             updated_at=post.updated_at,
             title=post.title,
@@ -54,6 +56,7 @@ class PostMapper:
         mentions: List[Mention],
         comment_count: int,
         is_liked: bool,
+        is_saved: bool,
         is_following: bool,
         like_count: int | None = None,
     ) -> PostItem:
@@ -65,6 +68,7 @@ class PostMapper:
             movies=[MovieMapper.to_movie(movie) for movie in post.movies],
             comment_count=comment_count,
             is_liked=is_liked,
+            is_saved=is_saved,
             is_following=is_following,
             like_count=like_count,
         )
@@ -79,6 +83,7 @@ class PostMapper:
         movies: List[Movie],
         comment_count: int,
         is_liked: bool,
+        is_saved: bool,
         is_following: bool,
         like_count: int | None = None,
     ) -> SearchPost:
@@ -91,6 +96,7 @@ class PostMapper:
                 movies=movies,
                 comment_count=comment_count,
                 is_liked=is_liked,
+                is_saved=is_saved,
                 is_following=is_following,
                 like_count=like_count,
             ).model_dump()

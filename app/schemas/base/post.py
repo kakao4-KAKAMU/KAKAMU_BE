@@ -15,6 +15,7 @@ class ContentBaseObject(BaseModel):
     mentions: List[Mention]
     like_count: int
     is_liked: bool
+    is_saved: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
 

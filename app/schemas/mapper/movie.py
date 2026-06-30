@@ -54,6 +54,7 @@ class MovieMapper:
         movie: MovieModel,
         *,
         staffs: list[tuple[People, str]],
+        is_saved: bool = False,
     ) -> MovieDetail:
         return MovieDetail(
             id=movie.id,
@@ -74,4 +75,5 @@ class MovieMapper:
                 PersonMapper.to_person(person, job=job)
                 for person, job in staffs
             ],
+            is_saved=is_saved,
         )
