@@ -7,8 +7,8 @@ from app.core.logging import logger
 # (settings.py에서 이미 POSTGRES_SERVER 등을 읽어 URL을 만들었으므로 이를 믿고 사용합니다.)
 engine = create_engine(
     settings.DATABASE_URL,
-    pool_size=20,           # 동시 연결 수 상향
-    max_overflow=10,
+    pool_size=50,           # 동시 연결 수 상향
+    max_overflow=50,
     pool_recycle=3600,
     pool_pre_ping=True      # 연결 유효성 체크 (네트워크 불안정 대비)
 )
