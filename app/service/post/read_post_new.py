@@ -10,12 +10,15 @@ from app.models import (
     Comment,
     Hashtag,
     LikeLog,
+    Movie,
     Post,
     PostHashtag,
     PostMention,
+    PostMovie,
     SaveLog,
     User,
 )
+from app.models.movie import MovieTitle
 
 @dataclass
 class PostInfoQueryOptions:
@@ -36,7 +39,7 @@ class PostReadServiceNew:
         return value or []
 
     @staticmethod
-    def _build_mentions_hashtags_subqueries(post_ids: List[int] | None):
+    def _build_relation_subqueries(post_ids: List[int] | None):
         hashtags_subq = (
             select(
                 PostHashtag.post_id,
@@ -71,7 +74,39 @@ class PostReadServiceNew:
             mentions_subq = mentions_subq.where(PostMention.post_id.in_(post_ids))
         mentions_subq = mentions_subq.subquery()
 
-        return mentions_subq, hashtags_subq
+        title_subq = (
+            select(MovieTitle.title_name)
+            .where(MovieTitle.movie_id == Movie.id)
+            .order_by(MovieTitle.is_original.desc())
+            .limit(1)
+            .correlate(Movie)
+            .scalar_subquery()
+        )
+
+        movies_subq = (
+            select(
+                PostMovie.post_id,
+                func.json_agg(
+                    func.json_build_object(
+                        "id",
+                        Movie.id,
+                        "poster_url",
+                        Movie.poster_url,
+                        "release_date",
+                        Movie.release_date,
+                        "title",
+                        func.coalesce(title_subq, "제목 없음"),
+                    )
+                ).label("movies"),
+            )
+            .join(Movie, Movie.id == PostMovie.movie_id)
+            .group_by(PostMovie.post_id)
+        )
+        if post_ids:
+            movies_subq = movies_subq.where(PostMovie.post_id.in_(post_ids))
+        movies_subq = movies_subq.subquery()
+
+        return mentions_subq, hashtags_subq, movies_subq
 
     @staticmethod
     def get_post_info_by_ids(
@@ -84,7 +119,7 @@ class PostReadServiceNew:
         if post_ids is not None and not post_ids:
             return {}, []
 
-        mentions_subq, hashtags_subq = PostReadServiceNew._build_mentions_hashtags_subqueries(
+        mentions_subq, hashtags_subq, movies_subq = PostReadServiceNew._build_relation_subqueries(
             post_ids
         )
         empty_json = text("'[]'::json")
@@ -94,6 +129,7 @@ class PostReadServiceNew:
             User,
             func.coalesce(mentions_subq.c.mentions, empty_json).label("mentions"),
             func.coalesce(hashtags_subq.c.hashtags, empty_json).label("hashtags"),
+            func.coalesce(movies_subq.c.movies, empty_json).label("movies"),
         )
 
         if opts.include_author:
@@ -104,6 +140,7 @@ class PostReadServiceNew:
         query = (
             query.outerjoin(mentions_subq, mentions_subq.c.post_id == Post.id)
             .outerjoin(hashtags_subq, hashtags_subq.c.post_id == Post.id)
+            .outerjoin(movies_subq, movies_subq.c.post_id == Post.id)
             .filter(Post.status == "ACTIVE")
         )
 
@@ -131,13 +168,14 @@ class PostReadServiceNew:
         ordered_post_ids: List[int] = []
 
         for row in query_result:
-            post, author, mentions_raw, hashtags_raw = row
+            post, author, mentions_raw, hashtags_raw, movies_raw = row
 
             info_map[post.id] = {
                 "post": post,
                 "author": author,
                 "mentions": PostReadServiceNew._parse_json_col(mentions_raw),
                 "hashtags": PostReadServiceNew._parse_json_col(hashtags_raw),
+                "movies": PostReadServiceNew._parse_json_col(movies_raw),
             }
             ordered_post_ids.append(post.id)
 
