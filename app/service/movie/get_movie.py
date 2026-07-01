@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, extract
+from sqlalchemy import func, and_, extract
 from sqlalchemy.orm import Query, Session, selectinload
 
 from app.core.logging import logger
@@ -184,10 +184,11 @@ class MovieReadService:
 
     def _get_staff_for_movie(self, db: Session, movie_id: UUID) -> list[tuple[People, str]]:
         rows = (
-            db.query(People, MovieStaff.job)
+            db.query(People, func.string_agg(MovieStaff.job, ", "))
             .join(MovieStaff, MovieStaff.people_id == People.id)
+            .group_by(People.id)
             .filter(MovieStaff.movie_id == movie_id)
-            .order_by(MovieStaff.job, People.person_name)
+            .order_by(People.person_name)
             .all()
         )
         return [(person, job) for person, job in rows]
