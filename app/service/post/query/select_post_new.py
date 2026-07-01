@@ -7,6 +7,12 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.schemas.base.mention import Mention
+from app.service.post.schema.read_post_base import (
+    GetPostInfoStruct,
+    GetPostCountsStruct,
+    GetPostStatusStruct,
+    GetPostInfoFullStruct,
+)
 from pydantic import TypeAdapter
 from app.models import (
     Comment,
@@ -19,6 +25,7 @@ from app.models import (
     PostMovie,
     SaveLog,
     User,
+    Follow
 )
 from app.models.movie import MovieOriginalTitle
 from app.schemas.base.movie import Movie as MovieBase
@@ -121,7 +128,7 @@ class PostReadServiceNew:
         post_ids: List[int] | None = None,
         *,
         options: PostInfoQueryOptions | None = None,
-    ) -> Tuple[Dict[int, dict], List[int]]:
+    ) -> Tuple[Dict[int, GetPostInfoStruct], List[int]]:
         opts = options or PostInfoQueryOptions()
         if post_ids is not None and not post_ids:
             return {}, []
@@ -171,7 +178,7 @@ class PostReadServiceNew:
 
         query_result = query.all()
 
-        info_map: Dict[int, dict] = {}
+        info_map: Dict[int, GetPostInfoStruct] = {}
         ordered_post_ids: List[int] = []
 
         for row in query_result:
@@ -180,19 +187,19 @@ class PostReadServiceNew:
             mentions = PostReadServiceNew._parse_mentions(PostReadServiceNew._parse_json_col(mentions_raw))
             hashtags = PostReadServiceNew._parse_hashtags(PostReadServiceNew._parse_json_col(hashtags_raw))
             movies = PostReadServiceNew._parse_movies(PostReadServiceNew._parse_json_col(movies_raw))
-            info_map[post.id] = {
-                "post": post,
-                "author": author,
-                "mentions": mentions,
-                "hashtags": hashtags,
-                "movies": movies,
-            }
+            info_map[post.id] = GetPostInfoStruct(
+                post=post,
+                author=author,
+                mentions=mentions,
+                hashtags=hashtags,
+                movies=movies,
+            )
             ordered_post_ids.append(post.id)
 
         return info_map, ordered_post_ids
 
     @staticmethod
-    def get_post_counts_by_ids(db: Session, post_ids: List[int]) -> Dict[int, dict]:
+    def get_post_counts_by_ids(db: Session, post_ids: List[int]) -> Dict[int, GetPostCountsStruct]:
         if not post_ids:
             return {}
 
@@ -210,17 +217,17 @@ class PostReadServiceNew:
             .all()
         )
         return {
-            post_count.id: {
-                "like_count": post_count.like_count,
-                "comment_count": post_count.comment_count or 0,
-            }
+            post_count.id: GetPostCountsStruct(
+                like_count=post_count.like_count,
+                comment_count=post_count.comment_count or 0,
+            )
             for post_count in post_counts_query
         }
 
     @staticmethod
     def get_post_status_by_user_and_post_ids(
         db: Session, current_user_id: Optional[UUID], post_ids: List[int]
-    ) -> Dict[int, dict]:
+    ) -> Dict[int, GetPostStatusStruct]:
         if not post_ids:
             return {}
 
@@ -248,18 +255,27 @@ class PostReadServiceNew:
             .subquery()
         )
 
+        following_subq = (
+            select(Follow.following_id, func.count(Follow.following_id).label("is_following"))
+            .where(Follow.follower_id == current_user_id)
+            .group_by(Follow.following_id)
+            .subquery()
+        )
+
         post_status_query = (
-            db.query(Post.id, like_subq.c.is_liked, save_subq.c.is_saved)
+            db.query(Post.id, like_subq.c.is_liked, save_subq.c.is_saved, following_subq.c.is_following)
             .outerjoin(like_subq, like_subq.c.target_id == Post.id)
+            .outerjoin(following_subq, following_subq.c.following_id == Post.user_id)
             .outerjoin(save_subq, save_subq.c.target_id == Post.id)
             .filter(Post.id.in_(post_ids))
             .all()
         )
         return {
-            post_status.id: {
-                "is_liked": bool(post_status.is_liked),
-                "is_saved": bool(post_status.is_saved),
-            }
+            post_status.id: GetPostStatusStruct(
+                is_liked=bool(post_status.is_liked),
+                is_saved=bool(post_status.is_saved),
+                is_following=bool(post_status.is_following),
+            )
             for post_status in post_status_query
         }
 
@@ -269,18 +285,29 @@ class PostReadServiceNew:
         post_id_list: List[int],
         current_user_id: Optional[UUID],
         options: PostInfoQueryOptions | None = None,
-    ) -> List[dict]:
+    ) -> Tuple[Dict[int, GetPostInfoFullStruct], List[int]]:
         if not post_id_list:
-            return []
+            return {}, []
 
         post_info_map, ordered_post_ids = PostReadServiceNew.get_post_info_by_ids(db, post_id_list, options=options)
         post_counts_map = PostReadServiceNew.get_post_counts_by_ids(db, post_id_list)
         post_status_map = PostReadServiceNew.get_post_status_by_user_and_post_ids(
             db, current_user_id, post_id_list
         )
-        return [
-            post_info_map.get(post_id, {})
-            | post_counts_map.get(post_id, {})
-            | post_status_map.get(post_id, {"is_liked": False, "is_saved": False})
-            for post_id in ordered_post_ids
-        ]
+        full_info_map: Dict[int, GetPostInfoFullStruct] = {}
+        for post_id in ordered_post_ids:
+            counts = post_counts_map.get(post_id, {})
+            status = post_status_map.get(post_id, {})
+            full_info_map[post_id] = GetPostInfoFullStruct(
+                post=post_info_map[post_id]["post"],
+                author=post_info_map[post_id]["author"],
+                mentions=post_info_map[post_id]["mentions"],
+                hashtags=post_info_map[post_id]["hashtags"],
+                movies=post_info_map[post_id]["movies"],
+                like_count=counts.get("like_count", 0) or 0,
+                comment_count=counts.get("comment_count", 0) or 0,
+                is_liked=status.get("is_liked", False),
+                is_saved=status.get("is_saved", False),
+                is_following=status.get("is_following", False),
+            )
+        return full_info_map, ordered_post_ids

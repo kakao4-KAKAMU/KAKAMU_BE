@@ -8,8 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 from app.models import Post
-from app.service.post.read_post import PostReadService
-from app.service.post.read_post_new import PostInfoQueryOptions, PostReadServiceNew
+from app.service.post.query.select_post_new import PostInfoQueryOptions, PostReadServiceNew
 
 logger = logging.getLogger(__name__)
 
@@ -81,18 +80,15 @@ def test_get_post_status_by_user_and_post_ids(db):
     assert result
 
 
-def test_build_post_infos_original(db):
-    prs = PostReadService()
-    posts = db.query(Post).filter(Post.id.in_(TEST_POST_IDS)).all()
-    info_map, _ = PostReadServiceNew.get_post_info_by_ids(db, [post.id for post in posts])
-    result = prs._build_post_infos(db, posts, TEST_USER_ID, info_map)
-    assert result.mentions_map is not None
-    assert result.hashtags_map is not None
-
-
 def test_build_post_infos_new(db):
     start_cpu = time.process_time()
-    result = PostReadServiceNew.build_post_infos(db, TEST_POST_IDS, TEST_USER_ID)
+    info_map, ordered_post_ids = PostReadServiceNew.build_post_infos(db, TEST_POST_IDS, TEST_USER_ID)
     end_cpu = time.process_time()
     logger.info("new CPU time: %s seconds", end_cpu - start_cpu)
-    assert result
+    assert info_map
+    assert ordered_post_ids
+    for post_id in ordered_post_ids:
+        row = info_map[post_id]
+        assert "post" in row
+        assert "like_count" in row
+        assert "is_liked" in row
