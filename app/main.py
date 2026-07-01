@@ -9,6 +9,12 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+import os
+
+# DISABLE_ACCESS_LOG가 설정되어 있으면 uvicorn 로그 레벨을 높여 출력을 제어합니다.
+if os.getenv("DISABLE_ACCESS_LOG", "false").lower() == "true":
+    for logger_name in ("uvicorn.access", "uvicorn"):
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 from app.core.tracing import setup_tracing
 from fastapi.staticfiles import StaticFiles
