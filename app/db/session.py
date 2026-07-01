@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
+from app.core.logging import logger
 
 # 1. settings.DATABASE_URL을 사용하여 엔진 생성
 # (settings.py에서 이미 POSTGRES_SERVER 등을 읽어 URL을 만들었으므로 이를 믿고 사용합니다.)
@@ -20,7 +21,9 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
-    except Exception:
+    except Exception as e:
         db.rollback()
+        logger.error(f"DB 세션 오류: {e}")
+        raise e
     finally:
         db.close()
