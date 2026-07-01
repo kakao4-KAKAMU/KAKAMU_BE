@@ -48,11 +48,9 @@ def test_get_post_info_by_ids(db):
         assert "author" in row
         assert "mentions" in row
         assert "hashtags" in row
-        assert "movies" in row
         assert row["post"].id == post_id
         assert isinstance(row["mentions"], list)
         assert isinstance(row["hashtags"], list)
-        assert isinstance(row["movies"], list)
 
 
 def test_get_post_info_by_ids_with_options(db):

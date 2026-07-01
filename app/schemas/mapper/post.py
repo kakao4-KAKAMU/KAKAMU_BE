@@ -85,15 +85,13 @@ class PostMapper:
         liked_post_ids: set[int],
         saved_post_ids: set[int],
         followed_user_ids: set[UUID],
-        movies_map: dict[int, List[Movie]] | None = None,
         force_liked: bool = False,
         force_saved: bool = False,
     ) -> List[PostItem]:
-        if movies_map is None:
-            movies_map = {
-                post.id: [MovieMapper.to_movie(movie) for movie in post.movies]
-                for post, _ in posts_with_author
-            }
+        movies_map = {
+            post.id: [MovieMapper.to_movie(movie) for movie in post.movies]
+            for post, _ in posts_with_author
+        }
         return [
             PostMapper._to_post_item(
                 post,
