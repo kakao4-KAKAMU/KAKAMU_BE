@@ -2,18 +2,19 @@ import time
 from dataclasses import dataclass
 from uuid import UUID
 from typing import Optional, Dict, List, Set, Tuple
+
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import func, select
+from sqlalchemy import select
 from fastapi import HTTPException
 
-from app.models import Post, Hashtag, PostHashtag, Comment, LikeLog, SaveLog, Block, User, PostMention, Follow, Movie
+from app.models import Post, LikeLog, SaveLog, Block, User, Movie
 from app.schemas.base.mention import Mention
 from app.schemas.mapper.post import PostMapper
 from app.schemas.response.post import PostResponse, PostListResponse
 from app.service.relation.relation_service import RelationService
 from app.service.like.like_count_service import like_count_service
 from app.service.post.redis import CachedPostInfo, post_cache_service
-from app.service.save.save_lookup import get_saved_target_ids
+from app.service.post.read_post_new import PostInfoQueryOptions, PostReadServiceNew
 
 
 @dataclass
@@ -28,10 +29,11 @@ class PostListContext:
 
 
 class PostReadService:
+    _MOVIE_LOADER = (selectinload(Post.movies).selectinload(Movie.titles),)
+
     def __init__(self):
-        # 차단 유저 인메모리 캐시 (Key: current_user_id, Value: (timestamp, {blocked_user_ids}))
         self._block_cache: Dict[UUID, Tuple[float, Set[UUID]]] = {}
-        self._cache_ttl = 60  # 캐시 유지 시간 (60초)
+        self._cache_ttl = 60
 
     def _get_cached_blocked_user_ids(self, db: Session, user_id: Optional[UUID]) -> Set[UUID]:
         if not user_id:
@@ -39,7 +41,6 @@ class PostReadService:
 
         now = time.time()
 
-        # 메모리 누수 방지: 캐시된 유저가 10,000명을 넘어가면 캐시 초기화
         if len(self._block_cache) > 10000:
             self._block_cache.clear()
 
@@ -55,47 +56,52 @@ class PostReadService:
         self._block_cache[user_id] = (now, block_set)
         return block_set
 
-    def _get_mentions_for_posts(self, db: Session, post_ids: List[int]) -> Dict[int, List[Mention]]:
-        if not post_ids:
-            return {}
+    @staticmethod
+    def _posts_with_author_from_info(
+        info_map: Dict[int, dict],
+        ordered_post_ids: List[int],
+    ) -> List[Tuple[Post, User]]:
+        return [
+            (info_map[post_id]["post"], info_map[post_id]["author"])
+            for post_id in ordered_post_ids
+            if post_id in info_map
+        ]
 
-        mentions_query = db.query(PostMention.post_id, User.id, User.nickname, User.tag)\
-            .join(User, User.id == PostMention.user_id)\
-            .filter(PostMention.post_id.in_(post_ids), User.status == "ACTIVE").all()
+    @staticmethod
+    def _mentions_from_raw(raw_mentions: List[dict]) -> List[Mention]:
+        return [Mention(**mention) for mention in raw_mentions]
 
-        mentions_map: Dict[int, List[Mention]] = {pid: [] for pid in post_ids}
-        for m in mentions_query:
-            mentions_map[m.post_id].append(Mention(id=m.id, nickname=m.nickname, tag=m.tag))
-        return mentions_map
+    def _fetch_posts(
+        self,
+        db: Session,
+        *,
+        filters: tuple = (),
+        cursor: Optional[int] = None,
+        limit: Optional[int] = None,
+        post_ids: List[int] | None = None,
+    ) -> Tuple[Dict[int, dict], List[int]]:
+        query_filters = list(filters)
+        if cursor is not None:
+            query_filters.append(Post.id < cursor)
 
-    def _get_hashtags_for_posts(self, db: Session, post_ids: List[int]) -> Dict[int, List[str]]:
-        if not post_ids:
-            return {}
-
-        hashtags_query = db.query(PostHashtag.post_id, Hashtag.normalized_keyword)\
-            .join(Hashtag, Hashtag.id == PostHashtag.hashtag_id)\
-            .filter(PostHashtag.post_id.in_(post_ids)).all()
-
-        hashtags_map: Dict[int, List[str]] = {pid: [] for pid in post_ids}
-        for h in hashtags_query:
-            hashtags_map[h.post_id].append(h.normalized_keyword)
-        return hashtags_map
-
-    def _get_comment_counts_for_posts(self, db: Session, post_ids: List[int]) -> Dict[int, int]:
-        if not post_ids:
-            return {}
-
-        counts = db.query(Comment.post_id, func.count(Comment.id))\
-            .filter(Comment.post_id.in_(post_ids), Comment.status == "ACTIVE")\
-            .group_by(Comment.post_id).all()
-
-        return {pid: count for pid, count in counts}
+        info_map, ordered_post_ids = PostReadServiceNew.get_post_info_by_ids(
+            db,
+            post_ids,
+            options=PostInfoQueryOptions(
+                filters=tuple(query_filters),
+                loader_options=self._MOVIE_LOADER,
+                order_by=Post.id.desc(),
+                limit=limit,
+            ),
+        )
+        return info_map, ordered_post_ids
 
     def _build_post_infos(
         self,
         db: Session,
         posts: List[Post],
         current_user_id: Optional[UUID],
+        info_map: Dict[int, dict] | None = None,
         *,
         force_liked: bool = False,
         force_saved: bool = False,
@@ -107,28 +113,31 @@ class PostReadService:
         cached_infos = post_cache_service.get_post_infos(post_ids)
         cache_miss_ids = [post_id for post_id in post_ids if cached_infos.get(post_id) is None]
 
-        mentions_map: Dict[int, List[Mention]] = {post_id: [] for post_id in post_ids}
-        hashtags_map: Dict[int, List[str]] = {post_id: [] for post_id in post_ids}
+        mentions_map: Dict[int, List[Mention]] = {}
+        hashtags_map: Dict[int, List[str]] = {}
         comment_counts_map: Dict[int, int] = {}
 
         for post_id in post_ids:
             cached = cached_infos.get(post_id)
-            if cached is None:
-                continue
-            mentions_map[post_id] = cached.mentions
-            hashtags_map[post_id] = cached.hashtags
-            comment_counts_map[post_id] = cached.comment_count
+            if cached is not None:
+                mentions_map[post_id] = cached.mentions
+                hashtags_map[post_id] = cached.hashtags
+                comment_counts_map[post_id] = cached.comment_count
+            elif info_map and post_id in info_map:
+                row = info_map[post_id]
+                mentions_map[post_id] = self._mentions_from_raw(row.get("mentions", []))
+                hashtags_map[post_id] = row.get("hashtags", [])
 
         if cache_miss_ids:
-            db_mentions_map = self._get_mentions_for_posts(db, cache_miss_ids)
-            db_hashtags_map = self._get_hashtags_for_posts(db, cache_miss_ids)
-            db_comment_counts_map = self._get_comment_counts_for_posts(db, cache_miss_ids)
-
+            db_info_map, _ = PostReadServiceNew.get_post_info_by_ids(db, cache_miss_ids)
+            counts_map = PostReadServiceNew.get_post_counts_by_ids(db, cache_miss_ids)
             to_cache: Dict[int, CachedPostInfo] = {}
+
             for post_id in cache_miss_ids:
-                mentions = db_mentions_map.get(post_id, [])
-                hashtags = db_hashtags_map.get(post_id, [])
-                comment_count = db_comment_counts_map.get(post_id, 0)
+                row = db_info_map.get(post_id, {}) | counts_map.get(post_id, {})
+                mentions = self._mentions_from_raw(row.get("mentions", []))
+                hashtags = row.get("hashtags", [])
+                comment_count = row.get("comment_count") or 0
                 mentions_map[post_id] = mentions
                 hashtags_map[post_id] = hashtags
                 comment_counts_map[post_id] = comment_count
@@ -137,29 +146,40 @@ class PostReadService:
                     hashtags=hashtags,
                     comment_count=comment_count,
                 )
+
             post_cache_service.set_post_infos(to_cache)
 
         for post_id in post_ids:
             comment_counts_map.setdefault(post_id, 0)
+            mentions_map.setdefault(post_id, [])
+            hashtags_map.setdefault(post_id, [])
 
         liked_post_ids: Set[int] = set()
         saved_post_ids: Set[int] = set()
         followed_user_ids: Set[UUID] = set()
 
         if current_user_id:
-            if not force_liked:
-                liked_logs = db.query(LikeLog.target_id).filter(
-                    LikeLog.user_id == current_user_id,
-                    LikeLog.target_type == "POST",
-                    LikeLog.target_id.in_(post_ids),
-                    LikeLog.is_active == 1,
-                ).all()
-                liked_post_ids = {log[0] for log in liked_logs}
+            if force_liked:
+                liked_post_ids = set(post_ids)
+            if force_saved:
+                saved_post_ids = set(post_ids)
 
-            if not force_saved:
-                saved_post_ids = get_saved_target_ids(
-                    db, current_user_id, "POST", post_ids
+            if not (force_liked and force_saved):
+                status_map = PostReadServiceNew.get_post_status_by_user_and_post_ids(
+                    db, current_user_id, post_ids
                 )
+                if not force_liked:
+                    liked_post_ids = {
+                        post_id
+                        for post_id in post_ids
+                        if status_map.get(post_id, {}).get("is_liked", False)
+                    }
+                if not force_saved:
+                    saved_post_ids = {
+                        post_id
+                        for post_id in post_ids
+                        if status_map.get(post_id, {}).get("is_saved", False)
+                    }
 
             author_user_ids = list({post.user_id for post in posts})
             followed_user_ids = RelationService.get_followed_user_ids(
@@ -188,43 +208,40 @@ class PostReadService:
         force_liked: bool = False,
         force_saved: bool = False,
     ) -> PostListResponse:
-        result: List[PostResponse] = []
-        for post, author in posts_with_author:
-            result.append(
-                PostMapper.to_post_response(
-                    post,
-                    author,
-                    hashtags=context.hashtags_map.get(post.id, []),
-                    mentions=context.mentions_map.get(post.id, []),
-                    comment_count=context.comment_counts_map.get(post.id, 0),
-                    like_count=context.like_counts_map.get(post.id, post.like_count or 0),
-                    is_liked=force_liked or post.id in context.liked_post_ids,
-                    is_saved=force_saved or post.id in context.saved_post_ids,
-                    is_following=post.user_id in context.followed_user_ids,
-                )
-            )
+        result = PostMapper.to_post_responses(
+            posts_with_author,
+            hashtags_map=context.hashtags_map,
+            mentions_map=context.mentions_map,
+            comment_counts_map=context.comment_counts_map,
+            like_counts_map=context.like_counts_map,
+            liked_post_ids=context.liked_post_ids,
+            saved_post_ids=context.saved_post_ids,
+            followed_user_ids=context.followed_user_ids,
+            force_liked=force_liked,
+            force_saved=force_saved,
+        )
 
         next_cursor = result[-1].id if result else None
         return PostListResponse(items=result, next_cursor=next_cursor, has_next=len(result) == limit)
 
-    def get_posts(self, db: Session, current_user_id: Optional[UUID], cursor: Optional[int], limit: int) -> PostListResponse:
-        """게시물 피드 조회 로직"""
+    def get_posts(
+        self, db: Session, current_user_id: Optional[UUID], cursor: Optional[int], limit: int
+    ) -> PostListResponse:
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
 
-        query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
-            Post.status == "ACTIVE",
-            User.status == "ACTIVE"
-        ).options(selectinload(Post.movies).selectinload(Movie.titles))
-
+        filters: list = [User.status == "ACTIVE"]
         if blocked_user_ids:
-            query = query.filter(Post.user_id.notin_(blocked_user_ids))
+            filters.append(Post.user_id.notin_(blocked_user_ids))
 
-        if cursor:
-            query = query.filter(Post.id < cursor)
-
-        posts_with_author = query.order_by(Post.id.desc()).limit(limit).all()
+        info_map, ordered_post_ids = self._fetch_posts(
+            db,
+            filters=tuple(filters),
+            cursor=cursor,
+            limit=limit,
+        )
+        posts_with_author = self._posts_with_author_from_info(info_map, ordered_post_ids)
         posts = [post for post, _ in posts_with_author]
-        context = self._build_post_infos(db, posts, current_user_id)
+        context = self._build_post_infos(db, posts, current_user_id, info_map)
 
         return self._build_post_list(
             posts_with_author,
@@ -232,31 +249,35 @@ class PostReadService:
             limit=limit,
         )
 
-    def get_my_liked_posts(self, db: Session, current_user_id: UUID, cursor: Optional[int], limit: int) -> PostListResponse:
-        """내가 좋아요 누른 게시물 조회 로직"""
+    def get_my_liked_posts(
+        self, db: Session, current_user_id: UUID, cursor: Optional[int], limit: int
+    ) -> PostListResponse:
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
 
         liked_post_ids_subquery = select(LikeLog.target_id).where(
             LikeLog.user_id == current_user_id,
             LikeLog.target_type == "POST",
-            LikeLog.is_active == 1
+            LikeLog.is_active == 1,
         )
 
-        query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
+        filters: list = [
             Post.id.in_(liked_post_ids_subquery),
-            Post.status == "ACTIVE",
-            User.status == "ACTIVE"
-        ).options(selectinload(Post.movies).selectinload(Movie.titles))
-
+            User.status == "ACTIVE",
+        ]
         if blocked_user_ids:
-            query = query.filter(Post.user_id.notin_(blocked_user_ids))
+            filters.append(Post.user_id.notin_(blocked_user_ids))
 
-        if cursor:
-            query = query.filter(Post.id < cursor)
-
-        posts_with_author = query.order_by(Post.id.desc()).limit(limit).all()
+        info_map, ordered_post_ids = self._fetch_posts(
+            db,
+            filters=tuple(filters),
+            cursor=cursor,
+            limit=limit,
+        )
+        posts_with_author = self._posts_with_author_from_info(info_map, ordered_post_ids)
         posts = [post for post, _ in posts_with_author]
-        context = self._build_post_infos(db, posts, current_user_id, force_liked=True)
+        context = self._build_post_infos(
+            db, posts, current_user_id, info_map, force_liked=True
+        )
 
         return self._build_post_list(
             posts_with_author,
@@ -265,8 +286,9 @@ class PostReadService:
             force_liked=True,
         )
 
-    def get_my_saved_posts(self, db: Session, current_user_id: UUID, cursor: Optional[int], limit: int) -> PostListResponse:
-        """내가 저장한 게시물 조회 로직"""
+    def get_my_saved_posts(
+        self, db: Session, current_user_id: UUID, cursor: Optional[int], limit: int
+    ) -> PostListResponse:
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
 
         saved_post_ids_subquery = select(SaveLog.target_id).where(
@@ -275,21 +297,24 @@ class PostReadService:
             SaveLog.is_active == 1,
         )
 
-        query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
+        filters: list = [
             Post.id.in_(saved_post_ids_subquery),
-            Post.status == "ACTIVE",
             User.status == "ACTIVE",
-        ).options(selectinload(Post.movies).selectinload(Movie.titles))
-
+        ]
         if blocked_user_ids:
-            query = query.filter(Post.user_id.notin_(blocked_user_ids))
+            filters.append(Post.user_id.notin_(blocked_user_ids))
 
-        if cursor:
-            query = query.filter(Post.id < cursor)
-
-        posts_with_author = query.order_by(Post.id.desc()).limit(limit).all()
+        info_map, ordered_post_ids = self._fetch_posts(
+            db,
+            filters=tuple(filters),
+            cursor=cursor,
+            limit=limit,
+        )
+        posts_with_author = self._posts_with_author_from_info(info_map, ordered_post_ids)
         posts = [post for post, _ in posts_with_author]
-        context = self._build_post_infos(db, posts, current_user_id, force_saved=True)
+        context = self._build_post_infos(
+            db, posts, current_user_id, info_map, force_saved=True
+        )
 
         return self._build_post_list(
             posts_with_author,
@@ -306,23 +331,19 @@ class PostReadService:
         cursor: Optional[int],
         limit: int,
     ) -> PostListResponse:
-        """특정 유저가 작성한 게시물 조회 로직"""
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
         if target_user_id in blocked_user_ids:
             return PostListResponse(items=[], next_cursor=None, has_next=False)
 
-        query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
-            Post.user_id == target_user_id,
-            Post.status == "ACTIVE",
-            User.status == "ACTIVE"
-        ).options(selectinload(Post.movies).selectinload(Movie.titles))
-
-        if cursor:
-            query = query.filter(Post.id < cursor)
-
-        posts_with_author = query.order_by(Post.id.desc()).limit(limit).all()
+        info_map, ordered_post_ids = self._fetch_posts(
+            db,
+            filters=(Post.user_id == target_user_id, User.status == "ACTIVE"),
+            cursor=cursor,
+            limit=limit,
+        )
+        posts_with_author = self._posts_with_author_from_info(info_map, ordered_post_ids)
         posts = [post for post, _ in posts_with_author]
-        context = self._build_post_infos(db, posts, current_user_id)
+        context = self._build_post_infos(db, posts, current_user_id, info_map)
 
         return self._build_post_list(
             posts_with_author,
@@ -330,38 +351,44 @@ class PostReadService:
             limit=limit,
         )
 
-    def get_post_detail(self, db: Session, post_id: int, current_user_id: Optional[UUID]) -> PostResponse:
-        """게시물 상세 조회 로직"""
-        db_result = db.query(Post, User).join(User, Post.user_id == User.id)\
-            .options(selectinload(Post.movies).selectinload(Movie.titles))\
-            .filter(Post.id == post_id, Post.status == "ACTIVE").first()
+    def get_post_detail(
+        self, db: Session, post_id: int, current_user_id: Optional[UUID]
+    ) -> PostResponse:
+        info_map, ordered_post_ids = PostReadServiceNew.get_post_info_by_ids(
+            db,
+            [post_id],
+            options=PostInfoQueryOptions(
+                loader_options=self._MOVIE_LOADER,
+            ),
+        )
 
-        if not db_result:
-            raise HTTPException(status_code=404, detail={"code": "POST_NOT_FOUND", "message": "게시물을 찾을 수 없습니다."})
+        if post_id not in info_map:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "POST_NOT_FOUND", "message": "게시물을 찾을 수 없습니다."},
+            )
 
-        post, author = db_result
+        post = info_map[post_id]["post"]
+        author = info_map[post_id]["author"]
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
         if post.user_id in blocked_user_ids:
-            raise HTTPException(status_code=403, detail={"code": "FORBIDDEN_BLOCKED_POST", "message": "차단된 사용자의 게시물입니다."})
+            raise HTTPException(
+                status_code=403,
+                detail={"code": "FORBIDDEN_BLOCKED_POST", "message": "차단된 사용자의 게시물입니다."},
+            )
 
-        context = self._build_post_infos(db, [post], current_user_id)
-        is_following = (
-            post.user_id in context.followed_user_ids
-            if current_user_id and author and author.status != "DELETED"
-            else False
+        context = self._build_post_infos(db, [post], current_user_id, info_map)
+        responses = PostMapper.to_post_responses(
+            [(post, author)],
+            hashtags_map=context.hashtags_map,
+            mentions_map=context.mentions_map,
+            comment_counts_map=context.comment_counts_map,
+            like_counts_map=context.like_counts_map,
+            liked_post_ids=context.liked_post_ids,
+            saved_post_ids=context.saved_post_ids,
+            followed_user_ids=context.followed_user_ids,
         )
-
-        return PostMapper.to_post_response(
-            post,
-            author,
-            hashtags=context.hashtags_map.get(post.id, []),
-            mentions=context.mentions_map.get(post.id, []),
-            comment_count=context.comment_counts_map.get(post.id, 0),
-            like_count=context.like_counts_map.get(post.id, post.like_count or 0),
-            is_liked=post.id in context.liked_post_ids,
-            is_saved=post.id in context.saved_post_ids,
-            is_following=is_following,
-        )
+        return responses[0]
 
     def get_posts_by_ids(
         self,
@@ -375,39 +402,37 @@ class PostReadService:
         unique_ids = list(dict.fromkeys(post_ids))
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
 
-        query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
-            Post.id.in_(unique_ids),
-            Post.status == "ACTIVE",
-            User.status == "ACTIVE",
-        ).options(selectinload(Post.movies).selectinload(Movie.titles))
-
+        filters: list = [User.status == "ACTIVE"]
         if blocked_user_ids:
-            query = query.filter(Post.user_id.notin_(blocked_user_ids))
+            filters.append(Post.user_id.notin_(blocked_user_ids))
 
-        posts_with_author = query.all()
-        posts_by_id = {post.id: (post, author) for post, author in posts_with_author}
-        posts = [posts_by_id[pid][0] for pid in unique_ids if pid in posts_by_id]
-        context = self._build_post_infos(db, posts, current_user_id)
+        info_map, _ = PostReadServiceNew.get_post_info_by_ids(
+            db,
+            unique_ids,
+            options=PostInfoQueryOptions(
+                filters=tuple(filters),
+                loader_options=self._MOVIE_LOADER,
+            ),
+        )
 
-        result: list[PostResponse] = []
-        for post_id in post_ids:
-            if post_id not in posts_by_id:
-                continue
-            post, author = posts_by_id[post_id]
-            result.append(
-                PostMapper.to_post_response(
-                    post,
-                    author,
-                    hashtags=context.hashtags_map.get(post.id, []),
-                    mentions=context.mentions_map.get(post.id, []),
-                    comment_count=context.comment_counts_map.get(post.id, 0),
-                    like_count=context.like_counts_map.get(post.id, post.like_count or 0),
-                    is_liked=post.id in context.liked_post_ids,
-                    is_saved=post.id in context.saved_post_ids,
-                    is_following=post.user_id in context.followed_user_ids,
-                )
-            )
-        return result
+        posts_with_author = [
+            (info_map[pid]["post"], info_map[pid]["author"])
+            for pid in post_ids
+            if pid in info_map
+        ]
+        posts = [post for post, _ in posts_with_author]
+        context = self._build_post_infos(db, posts, current_user_id, info_map)
+
+        return PostMapper.to_post_responses(
+            posts_with_author,
+            hashtags_map=context.hashtags_map,
+            mentions_map=context.mentions_map,
+            comment_counts_map=context.comment_counts_map,
+            like_counts_map=context.like_counts_map,
+            liked_post_ids=context.liked_post_ids,
+            saved_post_ids=context.saved_post_ids,
+            followed_user_ids=context.followed_user_ids,
+        )
 
 
 post_read_service = PostReadService()

@@ -1,4 +1,5 @@
 from typing import List, Optional
+from uuid import UUID
 
 from app.models.post import Post as PostModel
 from app.models.user import User as UserModel
@@ -72,6 +73,40 @@ class PostMapper:
             is_following=is_following,
             like_count=like_count,
         )
+
+    @staticmethod
+    def to_post_responses(
+        posts_with_author: List[tuple[PostModel, UserModel]],
+        *,
+        hashtags_map: dict[int, List[str]],
+        mentions_map: dict[int, List[Mention]],
+        comment_counts_map: dict[int, int],
+        like_counts_map: dict[int, int],
+        liked_post_ids: set[int],
+        saved_post_ids: set[int],
+        followed_user_ids: set[UUID],
+        force_liked: bool = False,
+        force_saved: bool = False,
+    ) -> List[PostItem]:
+        movies_map = {
+            post.id: [MovieMapper.to_movie(movie) for movie in post.movies]
+            for post, _ in posts_with_author
+        }
+        return [
+            PostMapper._to_post_item(
+                post,
+                author,
+                hashtags=hashtags_map.get(post.id, []),
+                mentions=mentions_map.get(post.id, []),
+                movies=movies_map[post.id],
+                comment_count=comment_counts_map.get(post.id, 0),
+                is_liked=force_liked or post.id in liked_post_ids,
+                is_saved=force_saved or post.id in saved_post_ids,
+                is_following=post.user_id in followed_user_ids,
+                like_count=like_counts_map.get(post.id, post.like_count or 0),
+            )
+            for post, author in posts_with_author
+        ]
 
     @staticmethod
     def to_search_post(
