@@ -13,6 +13,11 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     # request : 현재 들어온 요청
     # call_next : request 요청을 다음 단계로 넘겨주는 함수
     async def dispatch(self, request: Request, call_next):
+        import os
+        disable_log = os.getenv("DISABLE_ACCESS_LOG", "false").lower() == "true"
+        if disable_log:
+            return await call_next(request)
+
         request_id = str(uuid.uuid4()) # 고유한 랜덤 ID 생성
         start_time = time.time() # 요청이 들어온 시간
 

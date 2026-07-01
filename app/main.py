@@ -9,6 +9,12 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+import os
+
+# DISABLE_ACCESS_LOG가 설정되어 있으면 uvicorn 로그 레벨을 높여 출력을 제어합니다.
+if os.getenv("DISABLE_ACCESS_LOG", "false").lower() == "true":
+    for logger_name in ("uvicorn.access", "uvicorn"):
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 from app.core.tracing import setup_tracing
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +28,9 @@ from app.worker.scheduler import start_scheduler
 from app.middleware.logging_middleware import LoggingMiddleware
 from app.core.exceptions import setup_exception_handlers
 from app.core.db_startup import create_database_if_not_exists, run_migrations
+
+
+from prometheus_fastapi_instrumentator import Instrumentator # 부하 메트릭 수집용
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +85,7 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 HTTP 헤더 허용
 )
 setup_tracing(app)
+Instrumentator().instrument(app).expose(app)
 # 로그 미들웨어 등록
 app.add_middleware(LoggingMiddleware)
 

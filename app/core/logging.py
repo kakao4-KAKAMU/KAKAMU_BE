@@ -21,8 +21,12 @@ class JsonFormatter(logging.Formatter):
 
         return json.dumps(log_record, ensure_ascii=False)
 
+import os
+
 logger = logging.getLogger("fastapi_app")
-logger.setLevel(logging.INFO) # INFO 레벨 이상만 출력
+log_level_env = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level = getattr(logging, log_level_env, logging.INFO)
+logger.setLevel(log_level) # 설정된 레벨 이상만 출력
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(JsonFormatter())

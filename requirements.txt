@@ -72,4 +72,7 @@ opentelemetry-exporter-otlp
 # Auto instrumentation
 opentelemetry-instrumentation-fastapi 
 opentelemetry-instrumentation-sqlalchemy 
-opentelemetry-instrumentation-redis 
+opentelemetry-instrumentation-redis
+
+# Prometheus metrics
+prometheus-fastapi-instrumentator
