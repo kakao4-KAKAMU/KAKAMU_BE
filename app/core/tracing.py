@@ -56,9 +56,9 @@ def setup_tracing(app: FastAPI) -> None:
     if not hasattr(app.state, "otel_instrumented"):
         FastAPIInstrumentor.instrument_app(app)
 
-        RedisInstrumentor().instrument()
+        # RedisInstrumentor().instrument()
 
-        SQLAlchemyInstrumentor().instrument(
-            engine=engine
-        )
+        # SQLAlchemyInstrumentor().instrument(
+        #     engine=engine
+        # )
         app.state.otel_instrumented = True
