@@ -35,7 +35,6 @@ async def search_for_you(
     search_pattern = get_search_pattern(q)
 
     if not current_user:
-        logger.info("[ForYou Search] 비회원 사용자, 기본 정렬로 Fallback을 실행합니다.")
         return _fallback_search(db, search_pattern, cursor, limit, current_user_id=None)
 
     try:
