@@ -6,6 +6,8 @@ from uuid import UUID
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.schemas.base.mention import Mention
+from pydantic import TypeAdapter
 from app.models import (
     Comment,
     Hashtag,
@@ -18,7 +20,8 @@ from app.models import (
     SaveLog,
     User,
 )
-from app.models.movie import MovieTitle
+from app.models.movie import MovieOriginalTitle
+from app.schemas.base.movie import Movie as MovieBase
 
 @dataclass
 class PostInfoQueryOptions:
@@ -37,6 +40,18 @@ class PostReadServiceNew:
         if isinstance(value, str):
             return json.loads(value)
         return value or []
+
+    @staticmethod
+    def _parse_mentions(value):
+        return TypeAdapter(List[Mention]).validate_python(value)
+
+    @staticmethod
+    def _parse_hashtags(value):
+        return TypeAdapter(List[str]).validate_python(value)
+
+    @staticmethod
+    def _parse_movies(value):
+        return TypeAdapter(List[MovieBase]).validate_python(value)
 
     @staticmethod
     def _build_relation_subqueries(post_ids: List[int] | None):
@@ -74,15 +89,6 @@ class PostReadServiceNew:
             mentions_subq = mentions_subq.where(PostMention.post_id.in_(post_ids))
         mentions_subq = mentions_subq.subquery()
 
-        title_subq = (
-            select(MovieTitle.title_name)
-            .where(MovieTitle.movie_id == Movie.id)
-            .order_by(MovieTitle.is_original.desc())
-            .limit(1)
-            .correlate(Movie)
-            .scalar_subquery()
-        )
-
         movies_subq = (
             select(
                 PostMovie.post_id,
@@ -95,11 +101,12 @@ class PostReadServiceNew:
                         "release_date",
                         Movie.release_date,
                         "title",
-                        func.coalesce(title_subq, "제목 없음"),
+                        MovieOriginalTitle.title_name,
                     )
                 ).label("movies"),
             )
             .join(Movie, Movie.id == PostMovie.movie_id)
+            .join(MovieOriginalTitle, MovieOriginalTitle.movie_id == Movie.id)
             .group_by(PostMovie.post_id)
         )
         if post_ids:
@@ -170,12 +177,15 @@ class PostReadServiceNew:
         for row in query_result:
             post, author, mentions_raw, hashtags_raw, movies_raw = row
 
+            mentions = PostReadServiceNew._parse_mentions(PostReadServiceNew._parse_json_col(mentions_raw))
+            hashtags = PostReadServiceNew._parse_hashtags(PostReadServiceNew._parse_json_col(hashtags_raw))
+            movies = PostReadServiceNew._parse_movies(PostReadServiceNew._parse_json_col(movies_raw))
             info_map[post.id] = {
                 "post": post,
                 "author": author,
-                "mentions": PostReadServiceNew._parse_json_col(mentions_raw),
-                "hashtags": PostReadServiceNew._parse_json_col(hashtags_raw),
-                "movies": PostReadServiceNew._parse_json_col(movies_raw),
+                "mentions": mentions,
+                "hashtags": hashtags,
+                "movies": movies,
             }
             ordered_post_ids.append(post.id)
 
@@ -255,12 +265,15 @@ class PostReadServiceNew:
 
     @staticmethod
     def build_post_infos(
-        db: Session, post_id_list: List[int], current_user_id: Optional[UUID]
+        db: Session,
+        post_id_list: List[int],
+        current_user_id: Optional[UUID],
+        options: PostInfoQueryOptions | None = None,
     ) -> List[dict]:
         if not post_id_list:
             return []
 
-        post_info_map, _ = PostReadServiceNew.get_post_info_by_ids(db, post_id_list)
+        post_info_map, ordered_post_ids = PostReadServiceNew.get_post_info_by_ids(db, post_id_list, options=options)
         post_counts_map = PostReadServiceNew.get_post_counts_by_ids(db, post_id_list)
         post_status_map = PostReadServiceNew.get_post_status_by_user_and_post_ids(
             db, current_user_id, post_id_list
@@ -269,5 +282,5 @@ class PostReadServiceNew:
             post_info_map.get(post_id, {})
             | post_counts_map.get(post_id, {})
             | post_status_map.get(post_id, {"is_liked": False, "is_saved": False})
-            for post_id in post_id_list
+            for post_id in ordered_post_ids
         ]
