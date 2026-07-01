@@ -8,11 +8,11 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcess
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+# from opentelemetry.instrumentation.redis import RedisInstrumentor
+# from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter # 로컬 전용
-from app.db.session import engine
+# from app.db.session import engine
 from fastapi import FastAPI
 
 def setup_tracing(app: FastAPI) -> None:
@@ -56,9 +56,9 @@ def setup_tracing(app: FastAPI) -> None:
     if not hasattr(app.state, "otel_instrumented"):
         FastAPIInstrumentor.instrument_app(app)
 
-        RedisInstrumentor().instrument()
+        # RedisInstrumentor().instrument()
 
-        SQLAlchemyInstrumentor().instrument(
-            engine=engine
-        )
+        # SQLAlchemyInstrumentor().instrument(
+        #     engine=engine
+        # )
         app.state.otel_instrumented = True
