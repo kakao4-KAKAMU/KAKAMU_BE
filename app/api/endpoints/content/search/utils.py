@@ -49,12 +49,12 @@ def insert_search_log_background(user_id: Optional[str], keyword: str):
         safe_keyword = keyword.strip()[:100]
         if not safe_keyword:
             return
-        # search_log_buffer.append(SearchLog(user_id=user_id, keyword=safe_keyword))
-        # if len(search_log_buffer) >= 10: # 100개 이상 버퍼링되면 저장
-        #     search_log_buffer
-        #     db.add_all(search_log_buffer)
-        #     search_log_buffer[:] = []
-        #     db.commit()
+        search_log_buffer.append(SearchLog(user_id=user_id, keyword=safe_keyword))
+        if len(search_log_buffer) >= 100: # 100개 이상 버퍼링되면 저장
+            search_log_buffer
+            db.add_all(search_log_buffer)
+            search_log_buffer[:] = []
+            db.commit()
 
     except Exception as e:
         db.rollback()
