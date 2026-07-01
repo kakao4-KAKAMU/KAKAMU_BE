@@ -3,12 +3,13 @@ from dataclasses import dataclass
 from uuid import UUID
 from typing import Optional, Dict, List, Set, Tuple
 
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 from sqlalchemy import select
 from fastapi import HTTPException
 
-from app.models import Post, LikeLog, SaveLog, Block, User, Movie
+from app.models import Post, LikeLog, SaveLog, Block, User
 from app.schemas.base.mention import Mention
+from app.schemas.base.movie import Movie
 from app.schemas.mapper.post import PostMapper
 from app.schemas.response.post import PostResponse, PostListResponse
 from app.service.relation.relation_service import RelationService
@@ -29,8 +30,6 @@ class PostListContext:
 
 
 class PostReadService:
-    _MOVIE_LOADER = (selectinload(Post.movies).selectinload(Movie.titles),)
-
     def __init__(self):
         self._block_cache: Dict[UUID, Tuple[float, Set[UUID]]] = {}
         self._cache_ttl = 60
@@ -71,6 +70,13 @@ class PostReadService:
     def _mentions_from_raw(raw_mentions: List[dict]) -> List[Mention]:
         return [Mention(**mention) for mention in raw_mentions]
 
+    @staticmethod
+    def _movies_map_from_info(info_map: Dict[int, dict]) -> Dict[int, List[Movie]]:
+        return {
+            post_id: [Movie(**movie) for movie in row.get("movies", [])]
+            for post_id, row in info_map.items()
+        }
+
     def _fetch_posts(
         self,
         db: Session,
@@ -89,7 +95,6 @@ class PostReadService:
             post_ids,
             options=PostInfoQueryOptions(
                 filters=tuple(query_filters),
-                loader_options=self._MOVIE_LOADER,
                 order_by=Post.id.desc(),
                 limit=limit,
             ),
@@ -205,6 +210,7 @@ class PostReadService:
         *,
         context: PostListContext,
         limit: int,
+        info_map: Dict[int, dict],
         force_liked: bool = False,
         force_saved: bool = False,
     ) -> PostListResponse:
@@ -217,6 +223,7 @@ class PostReadService:
             liked_post_ids=context.liked_post_ids,
             saved_post_ids=context.saved_post_ids,
             followed_user_ids=context.followed_user_ids,
+            movies_map=self._movies_map_from_info(info_map),
             force_liked=force_liked,
             force_saved=force_saved,
         )
@@ -247,6 +254,7 @@ class PostReadService:
             posts_with_author,
             context=context,
             limit=limit,
+            info_map=info_map,
         )
 
     def get_my_liked_posts(
@@ -283,6 +291,7 @@ class PostReadService:
             posts_with_author,
             context=context,
             limit=limit,
+            info_map=info_map,
             force_liked=True,
         )
 
@@ -320,6 +329,7 @@ class PostReadService:
             posts_with_author,
             context=context,
             limit=limit,
+            info_map=info_map,
             force_saved=True,
         )
 
@@ -349,17 +359,15 @@ class PostReadService:
             posts_with_author,
             context=context,
             limit=limit,
+            info_map=info_map,
         )
 
     def get_post_detail(
         self, db: Session, post_id: int, current_user_id: Optional[UUID]
     ) -> PostResponse:
-        info_map, ordered_post_ids = PostReadServiceNew.get_post_info_by_ids(
+        info_map, _ = PostReadServiceNew.get_post_info_by_ids(
             db,
             [post_id],
-            options=PostInfoQueryOptions(
-                loader_options=self._MOVIE_LOADER,
-            ),
         )
 
         if post_id not in info_map:
@@ -387,6 +395,7 @@ class PostReadService:
             liked_post_ids=context.liked_post_ids,
             saved_post_ids=context.saved_post_ids,
             followed_user_ids=context.followed_user_ids,
+            movies_map=self._movies_map_from_info(info_map),
         )
         return responses[0]
 
@@ -411,7 +420,6 @@ class PostReadService:
             unique_ids,
             options=PostInfoQueryOptions(
                 filters=tuple(filters),
-                loader_options=self._MOVIE_LOADER,
             ),
         )
 
@@ -432,6 +440,7 @@ class PostReadService:
             liked_post_ids=context.liked_post_ids,
             saved_post_ids=context.saved_post_ids,
             followed_user_ids=context.followed_user_ids,
+            movies_map=self._movies_map_from_info(info_map),
         )
 
 

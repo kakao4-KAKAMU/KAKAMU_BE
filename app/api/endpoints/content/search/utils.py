@@ -11,6 +11,8 @@ _last_cleanup_time = time.time()
 RATE_LIMIT_WINDOW = 1.0  # 1초 기준
 RATE_LIMIT_MAX_REQUESTS = 5  # 1초당 최대 허용 횟수
 
+search_log_buffer = []
+
 def check_rate_limit(client_identifier: str):
     """인메모리 기반 단시간 검색 트래픽 도배 방지 (Rate Limiter)"""
     global _last_cleanup_time
@@ -47,10 +49,13 @@ def insert_search_log_background(user_id: Optional[str], keyword: str):
         safe_keyword = keyword.strip()[:100]
         if not safe_keyword:
             return
-            
-        new_log = SearchLog(user_id=user_id, keyword=safe_keyword)
-        db.add(new_log)
-        db.commit()
+        search_log_buffer.append(SearchLog(user_id=user_id, keyword=safe_keyword))
+        if len(search_log_buffer) >= 100: # 100개 이상 버퍼링되면 저장
+            search_log_buffer
+            db.add_all(search_log_buffer)
+            search_log_buffer[:] = []
+            db.commit()
+
     except Exception as e:
         db.rollback()
         logger.error(f"Search log insert error: {e}")
@@ -64,7 +69,7 @@ def handle_search_request(request: Request, background_tasks: BackgroundTasks, u
     check_rate_limit(client_id)
 
     # API 속도에 전혀 영향을 주지 않고 백그라운드 큐에 작업을 위임
-    background_tasks.add_task(insert_search_log_background, user_id, q)
+    # background_tasks.add_task(insert_search_log_background, user_id, q)
 
 def get_search_pattern(q: str) -> str:
     """검색어 패턴 생성 (양방향 부분 일치)"""
