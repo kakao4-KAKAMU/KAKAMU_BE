@@ -10,7 +10,6 @@ from app.schemas.request.post import PostUpdate
 
 class PostUpdateService:
     async def update_post(self, db: Session, post_id: int, post_in: PostUpdate, user_id: UUID, persona_id: UUID) -> int:
-        
         """게시물 수정 로직"""
         post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()
         if not post:
@@ -27,7 +26,6 @@ class PostUpdateService:
         # post.persona_id = persona_id  # 💡 만약 수정 시 현재 페르소나로 작성자를 갱신하고 싶다면 주석 해제
 
         # 2. 영화 태그 수정 로직 (기존 데이터와 비교하여 변경된 부분만 ML 로그 및 DB 반영)
-        
         existing_movies = db.query(PostMovie).filter(PostMovie.post_id == post.id).all()
         current_movie_ids = {em.movie_id for em in existing_movies}
         new_movie_ids = set(post_in.movie_ids)

@@ -31,12 +31,6 @@ class Movie(Base):
     posts = relationship("Post", secondary="post_movie", back_populates="movies")
     staff = relationship("People", secondary="movie_person_relation", back_populates="movies")
     titles = relationship("MovieTitle", back_populates="movie")
-    original_title = relationship(
-        "MovieOriginalTitle",
-        back_populates="movie",
-        uselist=False,
-        viewonly=True,
-    )
     overviews = relationship("Overview", back_populates="movie")
     youtube_videos = relationship("YoutubeVideo", back_populates="movie")
 
@@ -88,15 +82,6 @@ class MovieStaff(Base):
     movie_id = Column(UUID(as_uuid=True), ForeignKey("movie.id", ondelete="CASCADE"), primary_key=True)
     people_id = Column("person_id", UUID(as_uuid=True), ForeignKey("person.id", ondelete="CASCADE"), primary_key=True)
     job = Column(Text, primary_key=True, nullable=False)
-
-class MovieOriginalTitle(Base):
-    __tablename__ = "movie_original_title"
-
-    movie_id = Column(UUID(as_uuid=True), ForeignKey("movie.id"), primary_key=True)
-    title_name = Column(Text, nullable=False)
-
-    movie = relationship("Movie", back_populates="original_title", viewonly=True)
-
 
 class MovieTitle(Base):
     __tablename__ = "movie_title"

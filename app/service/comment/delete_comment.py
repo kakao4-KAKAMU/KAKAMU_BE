@@ -29,7 +29,7 @@ class CommentDeleteService:
         db.query(LikeLog).filter(LikeLog.target_type == "COMMENT", LikeLog.target_id == comment.id).update({"is_active": 0})
         db.query(SaveLog).filter(SaveLog.target_type == "COMMENT", SaveLog.target_id == comment.id).update({"is_active": 0})
         db.commit()
-        post_cache_service.sync_comment_count(comment.post_id, delta=-deactivated_count)
+        post_cache_service.sync_comment_count(db, comment.post_id, delta=-deactivated_count)
 
         await comment_ml_sync_service.sync_delete(comment_id=comment.id, user_id=user_id)
 
