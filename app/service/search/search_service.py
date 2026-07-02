@@ -3,7 +3,7 @@ from typing import List, Optional, Set, Tuple
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import Block, Comment, Follow, Hashtag, LikeLog, Post, PostHashtag, PostMention, User
 from app.models.movie import Genre, Movie, MovieStaff, People
@@ -26,8 +26,6 @@ from app.schemas.mapper.person import PersonMapper
 from app.schemas.mapper.post import PostMapper
 from app.schemas.mapper.user import UserMapper
 from app.service.like.like_count_service import like_count_service
-from app.service.post.query.select_post_new import PostInfoQueryOptions, PostReadServiceNew
-from app.service.post.read_post import post_read_service
 from app.service.save.save_lookup import get_saved_target_ids
 
 
@@ -158,33 +156,27 @@ class SearchService:
         fallback: bool = False,
         message: Optional[str] = None,
     ) -> PostSearchResponse:
-        blocked_user_ids = post_read_service._get_cached_blocked_user_ids(db, current_user_id)
-
-        filters: list = [
-            User.status == "ACTIVE",
-            or_(Post.title.ilike(search_pattern), Post.content.ilike(search_pattern)),
-        ]
-        if blocked_user_ids:
-            filters.append(Post.user_id.notin_(blocked_user_ids))
-        if cursor is not None:
-            filters.append(Post.id < cursor)
-
-        order_by = (
-            (Post.like_count.desc(), Post.id.desc())
-            if order_by_likes
-            else Post.id.desc()
+        query = (
+            db.query(Post, UserModel)
+            .join(UserModel, Post.user_id == UserModel.id)
+            .filter(
+                Post.status == "ACTIVE",
+                UserModel.status == "ACTIVE",
+                or_(Post.title.ilike(search_pattern), Post.content.ilike(search_pattern)),
+            )
+            .options(selectinload(Post.movies).selectinload(Movie.titles))
         )
 
-        _, ordered_post_ids = PostReadServiceNew.get_post_info_by_ids(
-            db,
-            None,
-            options=PostInfoQueryOptions(
-                filters=tuple(filters),
-                order_by=order_by,
-                limit=limit,
-            ),
-        )
-        if not ordered_post_ids:
+        if cursor:
+            query = query.filter(Post.id < cursor)
+
+        if order_by_likes:
+            query = query.order_by(Post.like_count.desc(), Post.id.desc())
+        else:
+            query = query.order_by(Post.id.desc())
+
+        posts_with_author = query.limit(limit).all()
+        if not posts_with_author:
             return PostSearchResponse(
                 items=[],
                 meta=PaginationMapper.build_cursor_meta(),
@@ -192,11 +184,8 @@ class SearchService:
                 message=message,
             )
 
-        info_map, ordered_post_ids = PostReadServiceNew.build_post_infos(
-            db, ordered_post_ids, current_user_id
-        )
-        items = PostMapper.to_search_posts(info_map, ordered_post_ids)
-        next_cursor = ordered_post_ids[-1] if len(ordered_post_ids) == limit else None
+        items = self._map_posts(db, posts_with_author, current_user_id)
+        next_cursor = posts_with_author[-1][0].id if len(posts_with_author) == limit else None
 
         return PostSearchResponse(
             items=items,
