@@ -96,6 +96,16 @@ class PostMapper:
         ]
 
     @staticmethod
+    def to_search_posts(
+        info_map: Dict[int, GetPostInfoFullStruct],
+        ordered_post_ids: List[int],
+    ) -> List[SearchPost]:
+        return [
+            SearchPost(**item.model_dump())
+            for item in PostMapper.to_post_responses(info_map, ordered_post_ids)
+        ]
+
+    @staticmethod
     def to_search_post(
         post: PostModel,
         author: UserModel,
