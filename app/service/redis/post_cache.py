@@ -1,43 +1,77 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+from uuid import UUID
 
 from pydantic import BaseModel
-from sqlalchemy import func
-from sqlalchemy.orm import Session
 
 from app.core.logging import logger
-from app.models import Comment, Hashtag, PostHashtag, PostMention, User
 from app.schemas.base.mention import Mention
-from app.service.redis.keys.post import build_post_info_redis_key
+from app.schemas.base.movie import Movie as MovieBase
+from app.service.post.schema.read_post_base import GetPostCountsStruct, GetPostStatusStruct
+from app.service.redis.keys.post import (
+    build_post_comment_count_redis_key,
+    build_post_info_redis_key,
+    build_post_liked_count_redis_key,
+    build_post_saved_count_redis_key,
+)
 from app.service.redis.redis import redis_client
 
-POST_INFO_CACHE_TTL_SECONDS = 3600
+POST_CACHE_TTL_SECONDS = 3600
 
 
 class CachedPostInfo(BaseModel):
     mentions: List[Mention] = []
     hashtags: List[str] = []
-    like_count: int = 0
-    comment_count: int = 0
+    movies: List[MovieBase] = []
 
 
-class PostInfoCacheService:
-    def get_post_infos(self, post_ids: List[int]) -> Dict[int, Optional[CachedPostInfo]]:
+class CachedPostStatus(BaseModel):
+    is_liked: bool = False
+    is_saved: bool = False
+    is_following: bool = False
+
+
+class PostCacheService:
+    @staticmethod
+    def _mget_raw(keys: List[str]) -> List[Optional[bytes]]:
+        if not keys:
+            return []
+        return redis_client.redis_client.mget(keys)
+
+    @staticmethod
+    def _all_hit(values: List[Optional[bytes]]) -> bool:
+        return bool(values) and all(value is not None for value in values)
+
+    def get_infos(self, post_ids: List[int]) -> Tuple[Dict[int, CachedPostInfo], List[int]]:
         if not post_ids:
-            return {}
+            return {}, []
 
         keys = [build_post_info_redis_key(post_id) for post_id in post_ids]
         try:
-            cached_by_key = redis_client.get_many(keys, CachedPostInfo)
+            values = self._mget_raw(keys)
         except Exception as e:
             logger.warning(f"[Redis Error] Post info cache read failed: {e}")
-            return {post_id: None for post_id in post_ids}
+            return {}, post_ids
 
-        return {
-            post_id: cached_by_key.get(build_post_info_redis_key(post_id))
-            for post_id in post_ids
-        }
+        if self._all_hit(values):
+            return {
+                post_id: CachedPostInfo.model_validate_json(values[index])
+                for index, post_id in enumerate(post_ids)
+            }, []
 
-    def set_post_infos(self, infos: Dict[int, CachedPostInfo]) -> None:
+        cached: Dict[int, CachedPostInfo] = {}
+        miss_ids: List[int] = []
+        for index, post_id in enumerate(post_ids):
+            value = values[index]
+            if value is None:
+                miss_ids.append(post_id)
+                continue
+            try:
+                cached[post_id] = CachedPostInfo.model_validate_json(value)
+            except Exception:
+                miss_ids.append(post_id)
+        return cached, miss_ids
+
+    def set_infos(self, infos: Dict[int, CachedPostInfo]) -> None:
         if not infos:
             return
 
@@ -47,69 +81,142 @@ class PostInfoCacheService:
                     build_post_info_redis_key(post_id): info.model_dump(mode="json")
                     for post_id, info in infos.items()
                 },
-                POST_INFO_CACHE_TTL_SECONDS,
+                POST_CACHE_TTL_SECONDS,
             )
         except Exception as e:
             logger.warning(f"[Redis Error] Post info cache write failed: {e}")
 
-    def invalidate_post(self, post_id: int) -> None:
+    def get_counts(self, post_ids: List[int]) -> Tuple[Dict[int, GetPostCountsStruct], List[int]]:
+        if not post_ids:
+            return {}, []
+
+        like_keys = [build_post_liked_count_redis_key(post_id) for post_id in post_ids]
+        comment_keys = [build_post_comment_count_redis_key(post_id) for post_id in post_ids]
         try:
-            redis_client.delete(build_post_info_redis_key(post_id))
+            like_values = self._mget_raw(like_keys)
+            comment_values = self._mget_raw(comment_keys)
         except Exception as e:
-            logger.warning(f"[Redis Error] Post info cache invalidate failed for {post_id}: {e}")
+            logger.warning(f"[Redis Error] Post count cache read failed: {e}")
+            return {}, post_ids
 
-    def _populate_post_info_from_db(self, db: Session, post_id: int) -> None:
-        mentions_query = (
-            db.query(User.id, User.nickname, User.tag)
-            .join(PostMention, PostMention.user_id == User.id)
-            .filter(PostMention.post_id == post_id, User.status == "ACTIVE")
-            .all()
-        )
-        mentions = [
-            Mention(id=row.id, nickname=row.nickname, tag=row.tag)
-            for row in mentions_query
-        ]
-
-        hashtags_query = (
-            db.query(Hashtag.normalized_keyword)
-            .join(PostHashtag, PostHashtag.hashtag_id == Hashtag.id)
-            .filter(PostHashtag.post_id == post_id)
-            .all()
-        )
-        hashtags = [row.normalized_keyword for row in hashtags_query]
-
-        comment_count = (
-            db.query(func.count(Comment.id))
-            .filter(Comment.post_id == post_id, Comment.status == "ACTIVE")
-            .scalar()
-        ) or 0
-
-        self.set_post_infos(
-            {
-                post_id: CachedPostInfo(
-                    mentions=mentions,
-                    hashtags=hashtags,
-                    comment_count=comment_count,
+        if self._all_hit(like_values) and self._all_hit(comment_values):
+            return {
+                post_id: GetPostCountsStruct(
+                    like_count=int(like_values[index]),
+                    comment_count=int(comment_values[index]),
                 )
-            }
-        )
+                for index, post_id in enumerate(post_ids)
+            }, []
 
-    def sync_comment_count(self, db: Session, post_id: int, delta: int) -> None:
+        cached: Dict[int, GetPostCountsStruct] = {}
+        miss_ids: List[int] = []
+        for index, post_id in enumerate(post_ids):
+            if like_values[index] is None or comment_values[index] is None:
+                miss_ids.append(post_id)
+                continue
+            cached[post_id] = GetPostCountsStruct(
+                like_count=int(like_values[index]),
+                comment_count=int(comment_values[index]),
+            )
+        return cached, miss_ids
+
+    def set_counts(self, counts: Dict[int, GetPostCountsStruct]) -> None:
+        if not counts:
+            return
+
+        payload: Dict[str, str] = {}
+        for post_id, count in counts.items():
+            payload[build_post_liked_count_redis_key(post_id)] = str(count["like_count"] or 0)
+            payload[build_post_comment_count_redis_key(post_id)] = str(count["comment_count"] or 0)
+
+        try:
+            redis_client.setex_many(payload, POST_CACHE_TTL_SECONDS)
+        except Exception as e:
+            logger.warning(f"[Redis Error] Post count cache write failed: {e}")
+
+    def get_statuses(
+        self, post_ids: List[int], user_id: UUID
+    ) -> Tuple[Dict[int, CachedPostStatus], List[int]]:
+        if not post_ids:
+            return {}, []
+
+        keys = [build_post_saved_count_redis_key(post_id, user_id) for post_id in post_ids]
+        try:
+            values = self._mget_raw(keys)
+        except Exception as e:
+            logger.warning(f"[Redis Error] Post status cache read failed: {e}")
+            return {}, post_ids
+
+        if self._all_hit(values):
+            return {
+                post_id: CachedPostStatus.model_validate_json(values[index])
+                for index, post_id in enumerate(post_ids)
+            }, []
+
+        cached: Dict[int, CachedPostStatus] = {}
+        miss_ids: List[int] = []
+        for index, post_id in enumerate(post_ids):
+            value = values[index]
+            if value is None:
+                miss_ids.append(post_id)
+                continue
+            try:
+                cached[post_id] = CachedPostStatus.model_validate_json(value)
+            except Exception:
+                miss_ids.append(post_id)
+        return cached, miss_ids
+
+    def set_statuses(self, user_id: UUID, statuses: Dict[int, GetPostStatusStruct]) -> None:
+        if not statuses:
+            return
+
+        try:
+            redis_client.setex_many(
+                {
+                    build_post_saved_count_redis_key(post_id, user_id): CachedPostStatus(
+                        is_liked=status["is_liked"],
+                        is_saved=status["is_saved"],
+                        is_following=status.get("is_following", False),
+                    ).model_dump(mode="json")
+                    for post_id, status in statuses.items()
+                },
+                POST_CACHE_TTL_SECONDS,
+            )
+        except Exception as e:
+            logger.warning(f"[Redis Error] Post status cache write failed: {e}")
+
+    def invalidate_post(self, post_id: int) -> None:
+        keys = [
+            build_post_info_redis_key(post_id),
+            build_post_liked_count_redis_key(post_id),
+            build_post_comment_count_redis_key(post_id),
+        ]
+        try:
+            redis_client.redis_client.delete(*keys)
+        except Exception as e:
+            logger.warning(f"[Redis Error] Post cache invalidate failed for {post_id}: {e}")
+
+    def sync_comment_count(self, post_id: int, delta: int) -> None:
         if delta == 0:
             return
 
-        key = build_post_info_redis_key(post_id)
+        key = build_post_comment_count_redis_key(post_id)
         try:
-            cached = redis_client.get(key, CachedPostInfo)
-
-            if cached is None:
-                self._populate_post_info_from_db(db, post_id)
+            if redis_client.redis_client.get(key) is None:
+                self.invalidate_post(post_id)
                 return
-
-            cached.comment_count = max(0, cached.comment_count + delta)
-            redis_client.set(key, cached.model_dump(mode="json"), ex=POST_INFO_CACHE_TTL_SECONDS)
+            if delta > 0:
+                redis_client.increment_by(key, delta)
+            else:
+                new_count = redis_client.decrement_by(key, abs(delta))
+                if new_count < 0:
+                    redis_client.set(key, "0", ex=POST_CACHE_TTL_SECONDS)
         except Exception as e:
             logger.warning(f"[Redis Error] Post comment_count sync failed for {post_id}: {e}")
 
 
-post_info_cache = PostInfoCacheService()
+post_cache_service = PostCacheService()
+
+# backward compatibility
+POST_INFO_CACHE_TTL_SECONDS = POST_CACHE_TTL_SECONDS
+post_info_cache = post_cache_service

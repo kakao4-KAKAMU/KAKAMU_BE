@@ -1,6 +1,6 @@
 from uuid import UUID
 
-# {mentions, hashtags, *post_info}
+# {mentions, hashtags, movies, *post_info}
 def build_post_info_redis_key(post_id: int) -> str:
     return f"kakamu:post:{post_id}:info"
 
