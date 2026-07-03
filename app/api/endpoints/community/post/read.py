@@ -1,9 +1,8 @@
-from typing import Optional, Union
+from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from uuid import UUID
 from app.db.session import get_db
-from app.api.deps import get_current_persona
 from app.api.deps.auth import get_active_user, get_optional_user
 from app.models.user import User
 from app.service.post.read_post import post_read_service
@@ -28,11 +27,10 @@ tracer = trace.get_tracer(__name__)
     summary="피드(게시물) 무한 스크롤 조회"
 )
 def get_posts(
-        cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"),
-        limit: int = Query(20, le=100),
-        db: Session = Depends(get_db),
-        current_persona_id: Optional[UUID] = Depends(get_current_persona),
-        current_user: Optional[User] = Depends(get_optional_user)
+    cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"),
+    limit: int = Query(20, le=100),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """게시물 피드를 무한 스크롤(Cursor-based) 방식으로 조회합니다. (비회원 접근 가능)"""
     user_id = current_user.id if current_user else None
@@ -90,12 +88,11 @@ def get_my_liked_posts(
     summary="특정 유저의 게시물 목록 조회"
 )
 def get_user_posts(
-        target_user_id: UUID,
-        cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"),
-        limit: int = Query(20, le=100),
-        db: Session = Depends(get_db),
-        current_persona_id: Optional[UUID] = Depends(get_current_persona),
-        current_user: Optional[User] = Depends(get_optional_user)
+    target_user_id: UUID,
+    cursor: Optional[int] = Query(None, description="마지막으로 조회한 게시물의 ID"),
+    limit: int = Query(20, le=100),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
     """
     특정 유저(본인 또는 타인)가 작성한 게시물 목록을 조회합니다. (비회원 접근 가능)
@@ -131,7 +128,6 @@ def get_user_posts(
 def get_post_detail(
         post_id: int,
         db: Session = Depends(get_db),
-        current_persona_id: Optional[UUID] = Depends(get_current_persona),
         current_user: Optional[User] = Depends(get_optional_user)
 ):
     """
