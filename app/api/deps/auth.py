@@ -89,7 +89,7 @@ def get_active_user(current_user: User = Depends(get_current_user)) -> User:
         
     return current_user
 
-def get_optional_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> Optional[User]:
+def get_optional_user(credentials: HTTPAuthorizationCredentials = Optional[Depends(security)], db: Session = Depends(get_db)) -> Optional[User]:
     """
     비회원(로그인하지 않은 유저)도 접근 가능한 API를 위한 선택적 인증 의존성입니다.
     토큰이 없거나 유효하지 않으면 에러를 띄우지 않고 None을 반환합니다.
