@@ -9,16 +9,19 @@ from app.api.deps.auth import get_optional_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.response.movie import MovieDetailResponse, WatchMovieResponse
-from app.schemas.response.ml.recommend import MlMovieRecommendResponse
+from app.schemas.response.ml.recommend import (
+    MovieRecommendResponse,
+)
 from app.schemas.errors import ERROR_ML_SERVER_UNAVAILABLE, ERROR_MOVIE_NOT_FOUND
 from app.service.movie.get_movie import movie_read_service
 from app.service.movie.recommendation import movie_recommendation_service
 
 router = APIRouter()
 
+
 @router.get(
     "/recommend",
-    response_model=MlMovieRecommendResponse,
+    response_model=MovieRecommendResponse,
     responses={503: ERROR_ML_SERVER_UNAVAILABLE},
     summary="맞춤 영화 추천",
 )
@@ -26,13 +29,19 @@ async def get_movies(
     query: str = Query(default="맞춤 영화 추천", min_length=1, description="추천 쿼리"),
     current_user: User = Depends(get_active_user),
     active_persona_id: UUID = Depends(get_current_persona),
+    db: Session = Depends(get_db),
 ):
     try:
-        return await movie_recommendation_service.recommend(
+        response = await movie_recommendation_service.recommend(
             user_id=current_user.id,
             persona_id=active_persona_id,
             query=query,
         )
+        response.movies = movie_read_service.get_movies_by_ids(
+            db, [UUID(movie.movie_id) for movie in response.movies]
+        )
+        print(response)
+        return response
     except httpx.RequestError:
         raise HTTPException(
             status_code=503,
