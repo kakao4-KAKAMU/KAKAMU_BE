@@ -19,6 +19,7 @@ from app.models import (
     User,
     PostStatus,
     UserStatus,
+    CommentStatus,
 )
 from app.models.movie import MovieTitle
 
@@ -190,7 +191,7 @@ class PostReadServiceNew:
 
         comment_subq = (
             select(Comment.post_id, func.count(Comment.id).label("comment_count"))
-            .where(Comment.status == "ACTIVE")
+            .where(Comment.status == CommentStatus.ACTIVE)
             .filter(Comment.post_id.in_(post_ids))
             .group_by(Comment.post_id)
             .subquery()

@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Block, Comment, Follow, Hashtag, LikeLog, Post, PostHashtag, PostMention, User, PostStatus
+from app.models import Block, Comment, Follow, Hashtag, LikeLog, Post, PostHashtag, PostMention, User, PostStatus, CommentStatus
 from app.models.movie import Genre, Movie, MovieStaff, People
 from app.models.search_log import SearchDailyStat
 from app.models.user import User as UserModel, UserStatus
@@ -311,7 +311,7 @@ class SearchService:
 
         rows = (
             db.query(Comment.post_id, func.count(Comment.id))
-            .filter(Comment.post_id.in_(post_ids), Comment.status == "ACTIVE")
+            .filter(Comment.post_id.in_(post_ids), Comment.status == CommentStatus.ACTIVE)
             .group_by(Comment.post_id)
             .all()
         )

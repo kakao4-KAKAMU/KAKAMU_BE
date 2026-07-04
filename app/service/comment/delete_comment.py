@@ -3,14 +3,14 @@ from fastapi import HTTPException
 from uuid import UUID
 from sqlalchemy import func
 
-from app.models import Comment, LikeLog, SaveLog
+from app.models import Comment, LikeLog, SaveLog, CommentStatus
 from app.service.comment.ml_sync import comment_ml_sync_service
 from app.service.post.redis import post_cache_service
 
 
 class CommentDeleteService:
     async def delete_comment(self, db: Session, comment_id: int, user_id: UUID) -> None:
-        comment = db.query(Comment).filter(Comment.id == comment_id, Comment.status == "ACTIVE").first()
+        comment = db.query(Comment).filter(Comment.id == comment_id, Comment.status == CommentStatus.ACTIVE).first()
         if not comment:
             raise HTTPException(status_code=404, detail={"code": "COMMENT_NOT_FOUND", "message": "댓글을 찾을 수 없거나 이미 삭제되었습니다."})
 
@@ -19,13 +19,13 @@ class CommentDeleteService:
 
         deactivated_count = 1 + (
             db.query(func.count(Comment.id))
-            .filter(Comment.parent_id == comment.id, Comment.status == "ACTIVE")
+            .filter(Comment.parent_id == comment.id, Comment.status == CommentStatus.ACTIVE)
             .scalar()
             or 0
         )
 
-        comment.status = "INACTIVE"
-        db.query(Comment).filter(Comment.parent_id == comment.id).update({"status": "INACTIVE"})
+        comment.status = CommentStatus.INACTIVE
+        db.query(Comment).filter(Comment.parent_id == comment.id).update({"status": CommentStatus.INACTIVE})
         db.query(LikeLog).filter(LikeLog.target_type == "COMMENT", LikeLog.target_id == comment.id).update({"is_active": 0})
         db.query(SaveLog).filter(SaveLog.target_type == "COMMENT", SaveLog.target_id == comment.id).update({"is_active": 0})
         db.commit()

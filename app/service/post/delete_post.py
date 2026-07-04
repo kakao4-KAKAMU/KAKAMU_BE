@@ -2,7 +2,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Post, Comment, LikeLog, SaveLog, PostStatus
+from app.models import Post, Comment, LikeLog, SaveLog, PostStatus, CommentStatus
 from app.service.post.ml_sync import post_ml_sync_service
 from app.service.post.redis import post_cache_service
 
@@ -19,7 +19,7 @@ class PostDeleteService:
         post.status = PostStatus.INACTIVE
 
         # 게시물 삭제 시 연관된 하위 댓글들도 모두 비활성화 처리 (Soft Delete)
-        db.query(Comment).filter(Comment.post_id == post.id).update({"status": "INACTIVE"})
+        db.query(Comment).filter(Comment.post_id == post.id).update({"status": CommentStatus.INACTIVE})
 
         # 게시물에 달린 좋아요 무효화
         db.query(LikeLog).filter(LikeLog.target_type == "POST", LikeLog.target_id == post.id).update({"is_active": 0})

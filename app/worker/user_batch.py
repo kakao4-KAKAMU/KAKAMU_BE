@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_
 from app.db.session import SessionLocal
-from app.models import User, Persona, Post, Comment, LikeLog, Follow, FavMovie, FavGenre, FavPeople, PostStatus, UserStatus
+from app.models import User, Persona, Post, Comment, LikeLog, Follow, FavMovie, FavGenre, FavPeople, PostStatus, UserStatus, CommentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def hard_delete_old_users():
 
             db.query(Comment).filter(Comment.user_id.in_(user_ids)).update({
                 "content": "탈퇴한 사용자의 댓글입니다.",
-                "status": "INACTIVE",
+                "status": CommentStatus.INACTIVE,
                 "user_id": None,
                 "persona_id": None
             }, synchronize_session=False)

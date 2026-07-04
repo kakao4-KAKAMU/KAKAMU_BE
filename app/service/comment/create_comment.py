@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Comment, Post, User, CommentMention, Hashtag, CommentHashtag, PostStatus, UserStatus
+from app.models import Comment, Post, User, CommentMention, Hashtag, CommentHashtag, PostStatus, UserStatus, CommentStatus
 from app.schemas.request.post import CommentCreate
 from app.service.comment.ml_sync import comment_ml_sync_service
 from app.service.post.redis import post_cache_service
@@ -26,7 +26,7 @@ class CommentCreateService:
         parent_id = comment_in.parent_id if comment_in.parent_id else None
 
         if parent_id:
-            parent_comment = db.query(Comment).filter(Comment.id == parent_id, Comment.status == "ACTIVE").first()
+            parent_comment = db.query(Comment).filter(Comment.id == parent_id, Comment.status == CommentStatus.ACTIVE).first()
             if not parent_comment:
                 raise HTTPException(status_code=404, detail={"code": "PARENT_COMMENT_NOT_FOUND", "message": "답글을 작성할 원본 댓글을 찾을 수 없습니다."})
             if parent_comment.post_id != post_id:

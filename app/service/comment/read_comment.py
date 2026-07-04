@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Block, Comment, CommentHashtag, CommentMention, Hashtag, LikeLog, SaveLog, User, UserStatus
+from app.models import Block, Comment, CommentHashtag, CommentMention, Hashtag, LikeLog, SaveLog, User, UserStatus, CommentStatus
 from app.schemas.base.mention import Mention
 from app.schemas.mapper.comment import CommentMapper
 from app.schemas.mapper.pagination import PaginationMapper
@@ -53,7 +53,7 @@ class CommentReadService:
 
         base_query = db.query(Comment, User).join(User, Comment.user_id == User.id).filter(
             Comment.post_id == post_id,
-            Comment.status == "ACTIVE"
+            Comment.status == CommentStatus.ACTIVE
         )
 
         if current_user_id:
@@ -114,7 +114,7 @@ class CommentReadService:
         )
 
     def get_comment_detail(self, db: Session, comment_id: int, current_user_id: Optional[UUID]) -> CommentDetailResponse:
-        comment = db.query(Comment).filter(Comment.id == comment_id, Comment.status == "ACTIVE").first()
+        comment = db.query(Comment).filter(Comment.id == comment_id, Comment.status == CommentStatus.ACTIVE).first()
         if not comment:
             raise HTTPException(status_code=404, detail={"code": "COMMENT_NOT_FOUND", "message": "댓글을 찾을 수 없습니다."})
 
@@ -177,7 +177,7 @@ class CommentReadService:
 
         query = db.query(Comment).join(User, User.id == Comment.user_id).filter(
             Comment.id.in_(saved_comment_ids_subquery),
-            Comment.status == "ACTIVE",
+            Comment.status == CommentStatus.ACTIVE,
             User.status == UserStatus.ACTIVE,
         )
 
