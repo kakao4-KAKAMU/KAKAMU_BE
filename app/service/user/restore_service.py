@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 from uuid import UUID
-from app.models import User, Persona
+from app.models import User, Persona, UserStatus
 
 class AccountRestoreService:
     
@@ -16,14 +16,14 @@ class AccountRestoreService:
         if not user:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "유저를 찾을 수 없습니다."})
             
-        if user.status == "ACTIVE":
+        if user.status == UserStatus.ACTIVE:
             raise HTTPException(status_code=400, detail={"code": "ALREADY_ACTIVE", "message": "이미 활성화된 계정입니다."})
 
         try:
             user_deleted_at = user.deleted_at
             
             # 1. 유저 계정 상태 복원
-            user.status = "ACTIVE"
+            user.status = UserStatus.ACTIVE
             user.deleted_at = None
 
             # 2. 회원 탈퇴 시 함께 삭제(Soft Delete)되었던 페르소나 일괄 복원

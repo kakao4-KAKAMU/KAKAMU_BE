@@ -1,4 +1,4 @@
-from .user import User, LocalAuth, SocialAuth
+from .user import User, UserStatus, LocalAuth, SocialAuth
 from .persona import Persona, FavGenre, FavPeople, FavMovie
 from .relation import Follow, Block, BlockLevel
 from .post import Post, PostStatus, Hashtag, PostHashtag, PostMention, PostMovie

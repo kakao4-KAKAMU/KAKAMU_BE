@@ -2,7 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.models import User
+from app.models import User, UserStatus
 from app.schemas.request.ml.ingest import (
     MlIngestCommentDeleteEnvelope,
     MlIngestCommentDeletePayload,
@@ -25,7 +25,7 @@ def _resolve_mentioned_user_ids(db: Session, content: str) -> list[str]:
         target_user = db.query(User).filter(
             User.nickname == nickname,
             User.tag == tag,
-            User.status == "ACTIVE",
+            User.status == UserStatus.ACTIVE,
         ).first()
         if target_user:
             mentioned_user_ids.append(str(target_user.id))

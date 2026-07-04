@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import Block, Comment, Follow, Hashtag, LikeLog, Post, PostHashtag, PostMention, User, PostStatus
 from app.models.movie import Genre, Movie, MovieStaff, People
 from app.models.search_log import SearchDailyStat
-from app.models.user import User as UserModel
+from app.models.user import User as UserModel, UserStatus
 from app.schemas.response.search import (
     GenreListResponse,
     PersonFilterSearchResponse,
@@ -87,7 +87,7 @@ class SearchService:
         current_user_id: Optional[UUID] = None,
     ) -> UserSearchResponse:
         query = db.query(UserModel).filter(
-            UserModel.status == "ACTIVE",
+            UserModel.status == UserStatus.ACTIVE,
             or_(
                 UserModel.username.ilike(search_pattern),
                 UserModel.nickname.ilike(search_pattern),
@@ -161,7 +161,7 @@ class SearchService:
             .join(UserModel, Post.user_id == UserModel.id)
             .filter(
                 Post.status == PostStatus.ACTIVE,
-                UserModel.status == "ACTIVE",
+                UserModel.status == UserStatus.ACTIVE,
                 or_(Post.title.ilike(search_pattern), Post.content.ilike(search_pattern)),
             )
             .options(selectinload(Post.movies).selectinload(Movie.titles))
@@ -296,7 +296,7 @@ class SearchService:
         rows = (
             db.query(PostMention.post_id, UserModel.id, UserModel.nickname, UserModel.tag)
             .join(UserModel, UserModel.id == PostMention.user_id)
-            .filter(PostMention.post_id.in_(post_ids), UserModel.status == "ACTIVE")
+            .filter(PostMention.post_id.in_(post_ids), UserModel.status == UserStatus.ACTIVE)
             .all()
         )
         result = {post_id: [] for post_id in post_ids}

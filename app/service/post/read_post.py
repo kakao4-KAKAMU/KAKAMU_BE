@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from fastapi import HTTPException
 
-from app.models import Post, LikeLog, SaveLog, Block, User
+from app.models import Post, LikeLog, SaveLog, Block, User, UserStatus
 from app.schemas.base.mention import Mention
 from app.schemas.base.movie import Movie
 from app.schemas.mapper.post import PostMapper
@@ -236,7 +236,7 @@ class PostReadService:
     ) -> PostListResponse:
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
 
-        filters: list = [User.status == "ACTIVE"]
+        filters: list = [User.status == UserStatus.ACTIVE]
         if blocked_user_ids:
             filters.append(Post.user_id.notin_(blocked_user_ids))
 
@@ -270,7 +270,7 @@ class PostReadService:
 
         filters: list = [
             Post.id.in_(liked_post_ids_subquery),
-            User.status == "ACTIVE",
+            User.status == UserStatus.ACTIVE,
         ]
         if blocked_user_ids:
             filters.append(Post.user_id.notin_(blocked_user_ids))
@@ -308,7 +308,7 @@ class PostReadService:
 
         filters: list = [
             Post.id.in_(saved_post_ids_subquery),
-            User.status == "ACTIVE",
+            User.status == UserStatus.ACTIVE,
         ]
         if blocked_user_ids:
             filters.append(Post.user_id.notin_(blocked_user_ids))
@@ -347,7 +347,7 @@ class PostReadService:
 
         info_map, ordered_post_ids = self._fetch_posts(
             db,
-            filters=(Post.user_id == target_user_id, User.status == "ACTIVE"),
+            filters=(Post.user_id == target_user_id, User.status == UserStatus.ACTIVE),
             cursor=cursor,
             limit=limit,
         )
@@ -411,7 +411,7 @@ class PostReadService:
         unique_ids = list(dict.fromkeys(post_ids))
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
 
-        filters: list = [User.status == "ACTIVE"]
+        filters: list = [User.status == UserStatus.ACTIVE]
         if blocked_user_ids:
             filters.append(Post.user_id.notin_(blocked_user_ids))
 

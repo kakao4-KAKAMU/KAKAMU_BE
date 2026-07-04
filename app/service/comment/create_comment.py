@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Comment, Post, User, CommentMention, Hashtag, CommentHashtag, PostStatus
+from app.models import Comment, Post, User, CommentMention, Hashtag, CommentHashtag, PostStatus, UserStatus
 from app.schemas.request.post import CommentCreate
 from app.service.comment.ml_sync import comment_ml_sync_service
 from app.service.post.redis import post_cache_service
@@ -60,7 +60,7 @@ class CommentCreateService:
             if "#" not in mention_str:
                 continue
             nickname, tag = mention_str.split("#", 1)
-            target_user = db.query(User).filter(User.nickname == nickname, User.tag == tag, User.status == "ACTIVE").first()
+            target_user = db.query(User).filter(User.nickname == nickname, User.tag == tag, User.status == UserStatus.ACTIVE).first()
             if target_user:
                 db.add(CommentMention(comment_id=new_comment.id, user_id=target_user.id))
 

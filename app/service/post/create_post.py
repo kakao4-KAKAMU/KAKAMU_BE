@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 
-from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention
+from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention, UserStatus
 from app.utils.parser import parse_content
 from app.service.post.ml_sync import post_ml_sync_service
 from app.schemas.request.post import PostCreate
@@ -44,7 +44,7 @@ class PostCreateService:
                     continue
                 nickname, tag = mention_str.split("#", 1)
                 target_user = db.query(User).filter(
-                    User.nickname == nickname, User.tag == tag, User.status == "ACTIVE"
+                    User.nickname == nickname, User.tag == tag, User.status == UserStatus.ACTIVE
                 ).first()
                 if target_user:
                     db.add(PostMention(post_id=new_post.id, user_id=target_user.id))

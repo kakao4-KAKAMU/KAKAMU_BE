@@ -18,6 +18,7 @@ from app.models import (
     SaveLog,
     User,
     PostStatus,
+    UserStatus,
 )
 from app.models.movie import MovieTitle
 
@@ -68,7 +69,7 @@ class PostReadServiceNew:
                 ).label("mentions"),
             )
             .join(User, User.id == PostMention.user_id)
-            .where(User.status == "ACTIVE")
+            .where(User.status == UserStatus.ACTIVE)
             .group_by(PostMention.post_id)
         )
         if post_ids:

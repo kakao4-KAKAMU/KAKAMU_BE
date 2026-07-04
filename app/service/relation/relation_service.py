@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Block, Follow, User
+from app.models import Block, Follow, User, UserStatus
 from app.schemas.mapper.user import UserMapper
 from app.schemas.response.relation import FollowListResponse, RelationResponse
 
@@ -40,7 +40,7 @@ class RelationService:
             .join(User, Follow.follower_id == User.id)
             .filter(
                 Follow.following_id == target_user_id,
-                User.status == "ACTIVE",
+                User.status == UserStatus.ACTIVE,
             )
         )
 

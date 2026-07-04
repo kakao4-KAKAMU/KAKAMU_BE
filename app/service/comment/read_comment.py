@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Block, Comment, CommentHashtag, CommentMention, Hashtag, LikeLog, SaveLog, User
+from app.models import Block, Comment, CommentHashtag, CommentMention, Hashtag, LikeLog, SaveLog, User, UserStatus
 from app.schemas.base.mention import Mention
 from app.schemas.mapper.comment import CommentMapper
 from app.schemas.mapper.pagination import PaginationMapper
@@ -21,7 +21,7 @@ class CommentReadService:
 
         mentions_query = db.query(CommentMention.comment_id, User.id, User.nickname, User.tag)\
             .join(User, User.id == CommentMention.user_id)\
-            .filter(CommentMention.comment_id.in_(comment_ids), User.status == "ACTIVE").all()
+            .filter(CommentMention.comment_id.in_(comment_ids), User.status == UserStatus.ACTIVE).all()
 
         mentions_map: Dict[int, List[Mention]] = {cid: [] for cid in comment_ids}
         for m in mentions_query:
@@ -178,7 +178,7 @@ class CommentReadService:
         query = db.query(Comment).join(User, User.id == Comment.user_id).filter(
             Comment.id.in_(saved_comment_ids_subquery),
             Comment.status == "ACTIVE",
-            User.status == "ACTIVE",
+            User.status == UserStatus.ACTIVE,
         )
 
         blocked_by_me = select(Block.blocked_id).where(Block.blocker_id == current_user_id)

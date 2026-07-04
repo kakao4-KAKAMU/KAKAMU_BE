@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_
 from app.db.session import SessionLocal
-from app.models import User, Persona, Post, Comment, LikeLog, Follow, FavMovie, FavGenre, FavPeople, PostStatus
+from app.models import User, Persona, Post, Comment, LikeLog, Follow, FavMovie, FavGenre, FavPeople, PostStatus, UserStatus
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ def hard_delete_old_users():
         
         # 7일이 지나 영구 삭제 대상이 된 탈퇴 유저 조회
         target_users = db.query(User).filter(
-            User.status == "DELETED",
+            User.status == UserStatus.DELETED,
             User.deleted_at <= delete_threshold
         ).all()
 
