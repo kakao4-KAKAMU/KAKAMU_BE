@@ -67,13 +67,9 @@ class PostReadService:
         ]
 
     @staticmethod
-    def _mentions_from_raw(raw_mentions: List[dict]) -> List[Mention]:
-        return [Mention(**mention) for mention in raw_mentions]
-
-    @staticmethod
     def _movies_map_from_info(info_map: Dict[int, dict]) -> Dict[int, List[Movie]]:
         return {
-            post_id: [Movie(**movie) for movie in row.get("movies", [])]
+            post_id: row.get("movies", [])
             for post_id, row in info_map.items()
         }
 
@@ -130,7 +126,7 @@ class PostReadService:
                 comment_counts_map[post_id] = cached.comment_count
             elif info_map and post_id in info_map:
                 row = info_map[post_id]
-                mentions_map[post_id] = self._mentions_from_raw(row.get("mentions", []))
+                mentions_map[post_id] = row.get("mentions", [])
                 hashtags_map[post_id] = row.get("hashtags", [])
 
         if cache_miss_ids:
@@ -140,7 +136,7 @@ class PostReadService:
 
             for post_id in cache_miss_ids:
                 row = db_info_map.get(post_id, {}) | counts_map.get(post_id, {})
-                mentions = self._mentions_from_raw(row.get("mentions", []))
+                mentions = row.get("mentions", [])
                 hashtags = row.get("hashtags", [])
                 comment_count = row.get("comment_count") or 0
                 mentions_map[post_id] = mentions
