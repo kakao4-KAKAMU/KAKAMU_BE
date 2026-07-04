@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, and_
 from uuid import UUID
-from app.models import User, Follow, Post
+from app.models import User, Follow, Post, PostStatus
 from typing import Optional
 from app.schemas.mapper.user import UserMapper
 from app.schemas.response.user import UserPublicResponse
@@ -34,7 +34,7 @@ class UserService:
 
         follower_count = db.scalar(select(func.count(Follow.follower_id)).where(Follow.following_id == target_user_id))
         following_count = db.scalar(select(func.count(Follow.following_id)).where(Follow.follower_id == target_user_id))
-        post_count = db.scalar(select(func.count(Post.id)).where(Post.user_id == target_user_id, Post.status == "ACTIVE"))
+        post_count = db.scalar(select(func.count(Post.id)).where(Post.user_id == target_user_id, Post.status == PostStatus.ACTIVE))
 
         is_following = False
         if viewer_user_id:

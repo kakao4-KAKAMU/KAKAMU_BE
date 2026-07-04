@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Block, Comment, Follow, Hashtag, LikeLog, Post, PostHashtag, PostMention, User
+from app.models import Block, Comment, Follow, Hashtag, LikeLog, Post, PostHashtag, PostMention, User, PostStatus
 from app.models.movie import Genre, Movie, MovieStaff, People
 from app.models.search_log import SearchDailyStat
 from app.models.user import User as UserModel
@@ -160,7 +160,7 @@ class SearchService:
             db.query(Post, UserModel)
             .join(UserModel, Post.user_id == UserModel.id)
             .filter(
-                Post.status == "ACTIVE",
+                Post.status == PostStatus.ACTIVE,
                 UserModel.status == "ACTIVE",
                 or_(Post.title.ilike(search_pattern), Post.content.ilike(search_pattern)),
             )

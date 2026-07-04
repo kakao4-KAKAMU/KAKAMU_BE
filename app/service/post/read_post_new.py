@@ -17,6 +17,7 @@ from app.models import (
     PostMovie,
     SaveLog,
     User,
+    PostStatus,
 )
 from app.models.movie import MovieTitle
 
@@ -141,7 +142,7 @@ class PostReadServiceNew:
             query.outerjoin(mentions_subq, mentions_subq.c.post_id == Post.id)
             .outerjoin(hashtags_subq, hashtags_subq.c.post_id == Post.id)
             .outerjoin(movies_subq, movies_subq.c.post_id == Post.id)
-            .filter(Post.status == "ACTIVE")
+            .filter(Post.status == PostStatus.ACTIVE)
         )
 
         if post_ids is not None:

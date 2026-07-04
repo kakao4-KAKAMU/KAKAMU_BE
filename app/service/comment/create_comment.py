@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Comment, Post, User, CommentMention, Hashtag, CommentHashtag
+from app.models import Comment, Post, User, CommentMention, Hashtag, CommentHashtag, PostStatus
 from app.schemas.request.post import CommentCreate
 from app.service.comment.ml_sync import comment_ml_sync_service
 from app.service.post.redis import post_cache_service
@@ -19,7 +19,7 @@ class CommentCreateService:
         user_id: UUID,
         persona_id: UUID,
     ) -> int:
-        post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()
+        post = db.query(Post).filter(Post.id == post_id, Post.status == PostStatus.ACTIVE).first()
         if not post:
             raise HTTPException(status_code=404, detail={"code": "POST_NOT_FOUND", "message": "게시물을 찾을 수 없거나 삭제되었습니다."})
 
