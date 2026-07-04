@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 from uuid import UUID
 
-from app.models import User, Persona, UserStatus
+from app.models import User, Persona, UserStatus, PersonaStatus
 
 class AccountTerminationService:
     
@@ -32,10 +32,10 @@ class AccountTerminationService:
                 update(Persona)
                 .where(
                     Persona.user_id == user_id,
-                    Persona.status == "ACTIVE"
+                    Persona.status == PersonaStatus.ACTIVE
                 )
                 .values(
-                    status="DELETED",
+                    status=PersonaStatus.DELETED,
                     deleted_at=termination_time
                 )
             )

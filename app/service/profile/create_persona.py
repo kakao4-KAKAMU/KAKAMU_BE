@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from app.models import Persona
+from app.models import Persona, PersonaStatus
 from app.models import FavMovie, FavGenre, FavPeople
 from app.schemas.base.persona import Persona as PersonaSchema
 from app.schemas.mapper.persona import PersonaMapper
@@ -40,7 +40,7 @@ class PersonaCreateService:
                 
             with tracer.start_as_current_span("persona.check_duplicate_nickname"):
                 # 본인이 이미 같은 닉네임의 페르소나를 가지고 있는지 검사
-                duplicate_stmt = select(Persona).where(Persona.user_id == user_id, Persona.nickname == name, Persona.status != "DELETED")
+                duplicate_stmt = select(Persona).where(Persona.user_id == user_id, Persona.nickname == name, Persona.status != PersonaStatus.DELETED)
                 if db.scalar(duplicate_stmt):
                     span.set_attribute("error.reason", "duplicate_persona_nickname")
                     raise HTTPException(
@@ -72,7 +72,7 @@ class PersonaCreateService:
                     user_id=user_id,
                     nickname=name,
                     profile_image_url=profile_image_url,
-                    status="ACTIVE",
+                    status=PersonaStatus.ACTIVE,
                     deleted_at=None
                 )
                 with tracer.start_as_current_span("persona.db_insert_profile"):

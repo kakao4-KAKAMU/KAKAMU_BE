@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 from uuid import UUID
-from app.models import User, Persona, UserStatus
+from app.models import User, Persona, UserStatus, PersonaStatus
 
 class AccountRestoreService:
     
@@ -31,9 +31,9 @@ class AccountRestoreService:
             if user_deleted_at:
                 db.execute(update(Persona).where(
                     Persona.user_id == user_id,
-                    Persona.status == "DELETED",
+                    Persona.status == PersonaStatus.DELETED,
                     Persona.deleted_at == user_deleted_at
-                ).values(status="ACTIVE", deleted_at=None))
+                ).values(status=PersonaStatus.ACTIVE, deleted_at=None))
 
             db.commit()
             return True

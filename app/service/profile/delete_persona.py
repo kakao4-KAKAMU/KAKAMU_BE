@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
-from app.models import Persona
+from app.models import Persona, PersonaStatus
 from app.service.profile.ml_sync import persona_ml_sync_service
 from uuid import UUID
 
@@ -18,7 +18,7 @@ class PersonaDeleteService:
         stmt = select(Persona).where(
             Persona.id == persona_id,
             Persona.user_id == user_id,
-            Persona.status == "ACTIVE"
+            Persona.status == PersonaStatus.ACTIVE
         )
 
         persona = db.scalar(stmt)
@@ -32,7 +32,7 @@ class PersonaDeleteService:
         # 남은 활성 페르소나 개수 확인 (최소 1개는 유지)
         count_stmt = select(func.count(Persona.id)).where(
             Persona.user_id == user_id,
-            Persona.status == "ACTIVE"
+            Persona.status == PersonaStatus.ACTIVE
         )
         active_persona_count = db.scalar(count_stmt)
 

@@ -1,8 +1,15 @@
+import enum
 import uuid
-from sqlalchemy import Column, String, ForeignKey, DateTime
+from sqlalchemy import Column, String, ForeignKey, DateTime, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.db.base import Base
+
+
+class PersonaStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    DELETED = "DELETED"
+
 
 class Persona(Base):
     __tablename__ = "persona"
@@ -11,7 +18,7 @@ class Persona(Base):
     nickname = Column(String(50), nullable=False) # 내부 관리/식별용 이름
     profile_image_url = Column(String(500)) 
     persona_type = Column(String(50))      
-    status = Column(String(20), default="ACTIVE") 
+    status = Column(Enum(PersonaStatus), default=PersonaStatus.ACTIVE, nullable=False)
     deleted_at = Column(DateTime, nullable=True) 
 
     user = relationship("User", back_populates="personas")    

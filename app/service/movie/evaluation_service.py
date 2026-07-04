@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import MovieEvaluation, Persona, User
+from app.models import MovieEvaluation, Persona, User, PersonaStatus
 from app.models.movie import Movie, YoutubeVideo
 from app.schemas.errors import (
     ERROR_ALREADY_EVALUATED,
@@ -34,7 +34,7 @@ class MovieEvaluationService:
         self, db: Session, persona_id: UUID, current_user: User
     ) -> Persona:
         persona = db.get(Persona, persona_id)
-        if not persona or persona.user_id != current_user.id or persona.status == "DELETED":
+        if not persona or persona.user_id != current_user.id or persona.status == PersonaStatus.DELETED:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=_error_detail(ERROR_PERSONA_NOT_FOUND_OR_FORBIDDEN),

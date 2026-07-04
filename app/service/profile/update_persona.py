@@ -4,7 +4,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Persona, FavMovie, FavGenre, FavPeople
+from app.models import Persona, FavMovie, FavGenre, FavPeople, PersonaStatus
 from app.schemas.base.persona import Persona as PersonaSchema
 from app.schemas.mapper.persona import PersonaMapper
 from app.schemas.request.profile import PersonaEdit
@@ -32,7 +32,7 @@ class PersonaUpdateService:
                 and_(
                     Persona.id == persona_id,
                     Persona.user_id == user_id,
-                    Persona.status == "ACTIVE"
+                    Persona.status == PersonaStatus.ACTIVE
                 )
             )
             persona = db.scalar(stmt)
@@ -52,7 +52,7 @@ class PersonaUpdateService:
                     )
                     
                 # 변경하려는 닉네임이 다른 본인의 페르소나 닉네임과 중복되는지 검사
-                duplicate_stmt = select(Persona).where(Persona.user_id == user_id, Persona.nickname == persona_data.nickname, Persona.id != persona_id, Persona.status != "DELETED")
+                duplicate_stmt = select(Persona).where(Persona.user_id == user_id, Persona.nickname == persona_data.nickname, Persona.id != persona_id, Persona.status != PersonaStatus.DELETED)
                 if db.scalar(duplicate_stmt):
                     raise HTTPException(
                         status_code=400,
