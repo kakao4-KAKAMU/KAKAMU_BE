@@ -1,7 +1,7 @@
 """post status to enum
 
 Revision ID: d4e5f6a7b8c9
-Revises: b2c3d4e5f6a7
+Revises: c4d5e6f7a8b9
 Create Date: 2026-07-04 16:20:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 revision: str = "d4e5f6a7b8c9"
-down_revision: Union[str, None] = "b2c3d4e5f6a7"
+down_revision: Union[str, None] = "c4d5e6f7a8b9"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
