@@ -9,7 +9,7 @@ from app.models.search_log import SearchLog
 _rate_limit_store = {}
 _last_cleanup_time = time.time()
 RATE_LIMIT_WINDOW = 1.0  # 1초 기준
-RATE_LIMIT_MAX_REQUESTS = 5  # 1초당 최대 허용 횟수
+RATE_LIMIT_MAX_REQUESTS = 200  # 1초당 최대 허용 횟수
 
 search_log_buffer = []
 
