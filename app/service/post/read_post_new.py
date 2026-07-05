@@ -92,7 +92,7 @@ class PostReadServiceNew:
         if not post_ids:
             return {}
 
-        empty_json = text("'[]'::json")
+        empty_json = text("'[]'::jsonb")
         query_result = (
             db.query(
                 Post.id,
