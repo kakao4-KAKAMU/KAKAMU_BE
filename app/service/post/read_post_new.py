@@ -34,6 +34,14 @@ class PostInfoQueryOptions:
 class PostReadServiceNew:
 
     @staticmethod
+    def _apply_order_by(query, order_by):
+        if order_by is None:
+            return query
+        if isinstance(order_by, tuple):
+            return query.order_by(*order_by)
+        return query.order_by(order_by)
+
+    @staticmethod
     def _parse_json_col(value):
         if isinstance(value, str):
             return json.loads(value)
@@ -73,8 +81,7 @@ class PostReadServiceNew:
         if opts.loader_options:
             query = query.options(*opts.loader_options)
 
-        if opts.order_by is not None:
-            query = query.order_by(opts.order_by)
+        query = PostReadServiceNew._apply_order_by(query, opts.order_by)
 
         if opts.limit is not None:
             query = query.limit(opts.limit)
@@ -167,8 +174,7 @@ class PostReadServiceNew:
         if opts.loader_options:
             query = query.options(*opts.loader_options)
 
-        if opts.order_by is not None:
-            query = query.order_by(opts.order_by)
+        query = PostReadServiceNew._apply_order_by(query, opts.order_by)
 
         if opts.limit is not None:
             query = query.limit(opts.limit)

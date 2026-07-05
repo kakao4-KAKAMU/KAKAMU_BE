@@ -1,14 +1,13 @@
 from uuid import UUID
 
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
-from app.models import Post, User, PostStatus, UserStatus
 from app.schemas.mapper.pagination import PaginationMapper
 from app.schemas.request.ml.recommend import MlRecommendRequest
-from app.schemas.response.search import PostSearchResponse
+from app.schemas.response.search import PostSearchResponse, SearchPost
 from app.service.ml import ml_recommend_service
 from app.service.ml.sync import safe_ml_call
-from app.service.search.search_service import search_service
+from app.service.post.read_post import post_read_service
 
 
 class ForYouSearchService:
@@ -50,27 +49,15 @@ class ForYouSearchService:
                 meta=PaginationMapper.build_cursor_meta(),
             )
 
-        posts = (
-            db.query(Post, User)
-            .join(User, Post.user_id == User.id)
-            .filter(
-                Post.id.in_(feed_ids),
-                Post.status == PostStatus.ACTIVE,
-                User.status == UserStatus.ACTIVE,
-            )
-            .options(selectinload(Post.movies))
-            .all()
-        )
-        posts_by_id = {post.id: (post, author) for post, author in posts}
-        ordered_posts = [posts_by_id[feed_id] for feed_id in feed_ids if feed_id in posts_by_id]
+        post_items = post_read_service.get_posts_by_ids(db, feed_ids, current_user_id)
+        items = [SearchPost(**post.model_dump()) for post in post_items]
 
-        if not ordered_posts:
+        if not items:
             return PostSearchResponse(
                 items=[],
                 meta=PaginationMapper.build_cursor_meta(),
             )
 
-        items = search_service._map_posts(db, ordered_posts, current_user_id)
         return PostSearchResponse(
             items=items,
             meta=PaginationMapper.build_cursor_meta(has_next=False),

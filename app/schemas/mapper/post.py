@@ -138,3 +138,22 @@ class PostMapper:
                 like_count=like_count,
             ).model_dump()
         )
+
+    @staticmethod
+    def to_search_posts(
+        posts_with_author: List[tuple[PostModel, UserModel]],
+        *,
+        context,
+    ) -> List[SearchPost]:
+        items = PostMapper.to_post_responses(
+            posts_with_author,
+            hashtags_map=context.hashtags_map,
+            mentions_map=context.mentions_map,
+            comment_counts_map=context.comment_counts_map,
+            like_counts_map=context.like_counts_map,
+            liked_post_ids=context.liked_post_ids,
+            saved_post_ids=context.saved_post_ids,
+            followed_user_ids=context.followed_user_ids,
+            movies_map=context.movies_map,
+        )
+        return [SearchPost(**item.model_dump()) for item in items]
