@@ -59,7 +59,7 @@ def upgrade() -> None:
         """
         INSERT INTO post_hashtag_agg (post_id, hashtags)
         SELECT ph.post_id,
-               COALESCE(json_agg(h.normalized_keyword), '[]'::json)
+               COALESCE(json_agg(h.normalized_keyword), '[]')::jsonb
           FROM post_hashtag ph
           JOIN hashtag h ON h.id = ph.hashtag_id
          GROUP BY ph.post_id;
@@ -77,8 +77,8 @@ def upgrade() -> None:
                            'tag', u.tag
                        )
                    ),
-                   '[]'::json
-               )
+                   '[]'
+               )::jsonb
           FROM post_mention pm
           JOIN "user" u ON u.id = pm.user_id
          WHERE u.status = 'ACTIVE'
@@ -98,8 +98,8 @@ def upgrade() -> None:
                            'title', mot.title_name
                        )
                    ),
-                   '[]'::json
-               )
+                   '[]'
+               )::jsonb
           FROM post_movie pm
           JOIN movie m ON m.id = pm.movie_id
           JOIN movie_original_title mot ON mot.movie_id = m.id

@@ -133,7 +133,7 @@ class PostReadServiceNew:
         if post_ids is not None and not post_ids:
             return {}, []
 
-        empty_json = text("'[]'::json")
+        empty_json = text("'[]'::jsonb")
 
         query = db.query(
             Post,

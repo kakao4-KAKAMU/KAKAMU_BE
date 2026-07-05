@@ -17,8 +17,8 @@ class PostAggRefreshService:
                               FROM post_hashtag ph
                               JOIN hashtag h ON h.id = ph.hashtag_id
                              WHERE ph.post_id = :post_id),
-                           '[]'::json
-                       )
+                           '[]'
+                       )::jsonb
                 ON CONFLICT (post_id) DO UPDATE
                 SET hashtags = EXCLUDED.hashtags
                 """
@@ -45,8 +45,8 @@ class PostAggRefreshService:
                               JOIN "user" u ON u.id = pm.user_id
                              WHERE pm.post_id = :post_id
                                AND u.status = 'ACTIVE'),
-                           '[]'::json
-                       )
+                           '[]'
+                       )::jsonb
                 ON CONFLICT (post_id) DO UPDATE
                 SET mentions = EXCLUDED.mentions
                 """
@@ -74,8 +74,8 @@ class PostAggRefreshService:
                               JOIN movie m ON m.id = pm.movie_id
                               JOIN movie_original_title mot ON mot.movie_id = m.id
                              WHERE pm.post_id = :post_id),
-                           '[]'::json
-                       )
+                           '[]'
+                       )::jsonb
                 ON CONFLICT (post_id) DO UPDATE
                 SET movies = EXCLUDED.movies
                 """
