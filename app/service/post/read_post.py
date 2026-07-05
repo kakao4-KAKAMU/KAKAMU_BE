@@ -1,7 +1,7 @@
 import time
 from dataclasses import dataclass
 from uuid import UUID
-from typing import Optional, Dict, List, Set, Tuple
+from typing import Any, Optional, Dict, List, Set, Tuple
 
 from opentelemetry import trace
 from sqlalchemy.orm import Session
@@ -82,6 +82,7 @@ class PostReadService:
         filters: tuple = (),
         cursor: Optional[int] = None,
         limit: Optional[int] = None,
+        order_by: Any | None = None,
     ) -> Tuple[Dict[int, dict], List[int]]:
         """경량 피드 조회: post+user 선별 후 info_map 골격 생성."""
         with tracer.start_as_current_span("post.fetch_feed_posts") as span:
@@ -93,7 +94,7 @@ class PostReadService:
                 db,
                 options=PostInfoQueryOptions(
                     filters=tuple(query_filters),
-                    order_by=Post.id.desc(),
+                    order_by=order_by if order_by is not None else Post.id.desc(),
                     limit=limit,
                 ),
             )
@@ -114,6 +115,7 @@ class PostReadService:
         limit: Optional[int] = None,
         post_ids: List[int] | None = None,
         lightweight: bool = False,
+        order_by: Any | None = None,
     ) -> Tuple[Dict[int, dict], List[int]]:
         if lightweight:
             return self._fetch_feed_posts(
@@ -121,6 +123,7 @@ class PostReadService:
                 filters=filters,
                 cursor=cursor,
                 limit=limit,
+                order_by=order_by,
             )
 
         with tracer.start_as_current_span("post.fetch_posts") as span:
@@ -133,7 +136,7 @@ class PostReadService:
                 post_ids,
                 options=PostInfoQueryOptions(
                     filters=tuple(query_filters),
-                    order_by=Post.id.desc(),
+                    order_by=order_by if order_by is not None else Post.id.desc(),
                     limit=limit,
                 ),
             )
@@ -309,6 +312,40 @@ class PostReadService:
 
         next_cursor = result[-1].id if result else None
         return PostListResponse(items=result, next_cursor=next_cursor, has_next=len(result) == limit)
+
+    def fetch_filtered_posts_with_context(
+        self,
+        db: Session,
+        *,
+        filters: tuple = (),
+        cursor: Optional[int] = None,
+        limit: Optional[int] = None,
+        order_by: Any | None = None,
+        current_user_id: Optional[UUID] = None,
+        apply_block_filter: bool = True,
+        lightweight: bool = True,
+    ) -> Tuple[List[Tuple[Post, User]], PostListContext]:
+        blocked_user_ids = (
+            self._get_cached_blocked_user_ids(db, current_user_id)
+            if apply_block_filter
+            else set()
+        )
+        query_filters = list(filters)
+        if blocked_user_ids:
+            query_filters.append(Post.user_id.notin_(blocked_user_ids))
+
+        info_map, ordered_post_ids = self._fetch_posts(
+            db,
+            filters=tuple(query_filters),
+            cursor=cursor,
+            limit=limit,
+            order_by=order_by,
+            lightweight=lightweight,
+        )
+        posts_with_author = self._posts_with_author_from_info(info_map, ordered_post_ids)
+        posts = [post for post, _ in posts_with_author]
+        context = self._build_post_infos(db, posts, current_user_id, info_map)
+        return posts_with_author, context
 
     def get_posts(
         self, db: Session, current_user_id: Optional[UUID], cursor: Optional[int], limit: int
