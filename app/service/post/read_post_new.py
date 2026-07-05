@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.schemas.base.mention import Mention
@@ -50,6 +50,77 @@ class PostReadServiceNew:
     @staticmethod
     def _parse_movies(value):
         return TypeAdapter(List[MovieBase]).validate_python(value)
+
+    @staticmethod
+    def fetch_feed_posts(
+        db: Session,
+        *,
+        options: PostInfoQueryOptions | None = None,
+    ) -> Tuple[List[Tuple[Post, User]], List[int]]:
+        """피드 선별용 경량 쿼리: post + user만 조회 (aggregate view join 없음)."""
+        opts = options or PostInfoQueryOptions()
+
+        query = db.query(Post, User).join(User, Post.user_id == User.id).filter(
+            Post.status == PostStatus.ACTIVE
+        )
+
+        for join_clause in opts.joins:
+            query = query.join(*join_clause) if isinstance(join_clause, tuple) else query.join(join_clause)
+
+        for filter_clause in opts.filters:
+            query = query.filter(filter_clause)
+
+        if opts.loader_options:
+            query = query.options(*opts.loader_options)
+
+        if opts.order_by is not None:
+            query = query.order_by(opts.order_by)
+
+        if opts.limit is not None:
+            query = query.limit(opts.limit)
+
+        query_result = query.all()
+        ordered_post_ids = [post.id for post, _ in query_result]
+        return query_result, ordered_post_ids
+
+    @staticmethod
+    def get_post_agg_by_ids(
+        db: Session,
+        post_ids: List[int],
+    ) -> Dict[int, dict]:
+        """aggregate 테이블에서 mentions/hashtags/movies만 조회."""
+        if not post_ids:
+            return {}
+
+        empty_json = text("'[]'::json")
+        query_result = (
+            db.query(
+                Post.id,
+                func.coalesce(PostMentionAgg.mentions, empty_json).label("mentions"),
+                func.coalesce(PostHashtagAgg.hashtags, empty_json).label("hashtags"),
+                func.coalesce(PostMovieAgg.movies, empty_json).label("movies"),
+            )
+            .outerjoin(PostMentionAgg, PostMentionAgg.post_id == Post.id)
+            .outerjoin(PostHashtagAgg, PostHashtagAgg.post_id == Post.id)
+            .outerjoin(PostMovieAgg, PostMovieAgg.post_id == Post.id)
+            .filter(Post.id.in_(post_ids))
+            .all()
+        )
+
+        agg_map: Dict[int, dict] = {}
+        for post_id, mentions_raw, hashtags_raw, movies_raw in query_result:
+            agg_map[post_id] = {
+                "mentions": PostReadServiceNew._parse_mentions(
+                    PostReadServiceNew._parse_json_col(mentions_raw)
+                ),
+                "hashtags": PostReadServiceNew._parse_hashtags(
+                    PostReadServiceNew._parse_json_col(hashtags_raw)
+                ),
+                "movies": PostReadServiceNew._parse_movies(
+                    PostReadServiceNew._parse_json_col(movies_raw)
+                ),
+            }
+        return agg_map
 
     @staticmethod
     def get_post_info_by_ids(
@@ -159,34 +230,35 @@ class PostReadServiceNew:
                 for post_id in post_ids
             }
 
-        like_subq = (
-            select(LikeLog.target_id, func.count(LikeLog.id).label("is_liked"))
-            .where(LikeLog.target_type == "POST", LikeLog.is_active == 1)
-            .filter(LikeLog.target_id.in_(post_ids), LikeLog.user_id == current_user_id)
-            .group_by(LikeLog.target_id)
-            .subquery()
-        )
-        save_subq = (
-            select(SaveLog.target_id, func.count(SaveLog.id).label("is_saved"))
-            .where(SaveLog.target_type == "POST", SaveLog.is_active == 1)
-            .filter(SaveLog.target_id.in_(post_ids), SaveLog.user_id == current_user_id)
-            .group_by(SaveLog.target_id)
-            .subquery()
-        )
-
-        post_status_query = (
-            db.query(Post.id, like_subq.c.is_liked, save_subq.c.is_saved)
-            .outerjoin(like_subq, like_subq.c.target_id == Post.id)
-            .outerjoin(save_subq, save_subq.c.target_id == Post.id)
-            .filter(Post.id.in_(post_ids))
+        liked_rows = (
+            db.query(LikeLog.target_id)
+            .filter(
+                LikeLog.user_id == current_user_id,
+                LikeLog.target_type == "POST",
+                LikeLog.is_active == 1,
+                LikeLog.target_id.in_(post_ids),
+            )
             .all()
         )
+        saved_rows = (
+            db.query(SaveLog.target_id)
+            .filter(
+                SaveLog.user_id == current_user_id,
+                SaveLog.target_type == "POST",
+                SaveLog.is_active == 1,
+                SaveLog.target_id.in_(post_ids),
+            )
+            .all()
+        )
+        liked_ids = {row[0] for row in liked_rows}
+        saved_ids = {row[0] for row in saved_rows}
+
         return {
-            post_status.id: {
-                "is_liked": bool(post_status.is_liked),
-                "is_saved": bool(post_status.is_saved),
+            post_id: {
+                "is_liked": post_id in liked_ids,
+                "is_saved": post_id in saved_ids,
             }
-            for post_status in post_status_query
+            for post_id in post_ids
         }
 
     @staticmethod
