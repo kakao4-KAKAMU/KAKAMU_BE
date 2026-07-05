@@ -1,6 +1,6 @@
 import enum
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, JSON, SmallInteger, Index, Enum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base import Base
@@ -61,3 +61,31 @@ class PostMention(Base):
     __tablename__ = "post_mention"
     post_id = Column(Integer, ForeignKey("post.id", ondelete="CASCADE"), primary_key=True)    
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), primary_key=True)
+
+
+class PostHashtagAgg(Base):
+    __tablename__ = "post_hashtag_agg"
+
+    post_id = Column(Integer, ForeignKey("post.id"), primary_key=True)
+    hashtags = Column(JSONB, nullable=False)
+
+
+class PostMentionAgg(Base):
+    __tablename__ = "post_mention_agg"
+
+    post_id = Column(Integer, ForeignKey("post.id"), primary_key=True)
+    mentions = Column(JSONB, nullable=False)
+
+
+class PostMovieAgg(Base):
+    __tablename__ = "post_movie_agg"
+
+    post_id = Column(Integer, ForeignKey("post.id"), primary_key=True)
+    movies = Column(JSONB, nullable=False)
+
+
+class PostCommentCount(Base):
+    __tablename__ = "post_comment_count"
+
+    post_id = Column(Integer, ForeignKey("post.id"), primary_key=True)
+    comment_count = Column(Integer, nullable=False)
