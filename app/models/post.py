@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, JSON, SmallInteger, Index, Enum
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, JSON, SmallInteger, Index, Enum, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -36,6 +36,13 @@ class Post(Base):
     mentions = relationship("User", secondary="post_mention", backref="mentioned_in_posts")    
 
     __table_args__ = (
+        Index(
+            'ix_post_status_id_desc',
+            'status',
+            id.desc(),
+            postgresql_where=text("status = 'ACTIVE'"),
+        ),
+        Index('ix_post_user_id', 'user_id'),
         Index('ix_post_title_trgm', 'title', postgresql_using='gin', postgresql_ops={'title': 'gin_trgm_ops'}),
         Index('ix_post_content_trgm', 'content', postgresql_using='gin', postgresql_ops={'content': 'gin_trgm_ops'}),
     )
