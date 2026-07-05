@@ -23,25 +23,25 @@ personastatus = sa.Enum("ACTIVE", "DELETED", name="personastatus")
 
 def _to_enum(table: str, enum_type: sa.Enum, enum_name: str) -> None:
     enum_type.create(op.get_bind(), checkfirst=True)
-    op.execute(f"UPDATE {table} SET status = 'ACTIVE' WHERE status IS NULL")
-    op.execute(f"ALTER TABLE {table} ALTER COLUMN status DROP DEFAULT")
+    op.execute(f"UPDATE \"{table}\" SET status = 'ACTIVE' WHERE status IS NULL")
+    op.execute(f"ALTER TABLE \"{table}\" ALTER COLUMN status DROP DEFAULT")
     op.execute(
-        f"ALTER TABLE {table} ALTER COLUMN status TYPE {enum_name} "
+        f"ALTER TABLE \"{table}\" ALTER COLUMN status TYPE {enum_name} "
         f"USING status::{enum_name}"
     )
     op.execute(
-        f"ALTER TABLE {table} ALTER COLUMN status SET DEFAULT 'ACTIVE'::{enum_name}"
+        f"ALTER TABLE \"{table}\" ALTER COLUMN status SET DEFAULT 'ACTIVE'::{enum_name}"
     )
     op.alter_column(table, "status", existing_type=enum_type, nullable=False)
 
 
 def _to_varchar(table: str, enum_type: sa.Enum) -> None:
-    op.execute(f"ALTER TABLE {table} ALTER COLUMN status DROP DEFAULT")
+    op.execute(f"ALTER TABLE \"{table}\" ALTER COLUMN status DROP DEFAULT")
     op.execute(
-        f"ALTER TABLE {table} ALTER COLUMN status TYPE VARCHAR(20) "
+        f"ALTER TABLE \"{table}\" ALTER COLUMN status TYPE VARCHAR(20) "
         f"USING status::text"
     )
-    op.execute(f"ALTER TABLE {table} ALTER COLUMN status SET DEFAULT 'ACTIVE'")
+    op.execute(f"ALTER TABLE \"{table}\" ALTER COLUMN status SET DEFAULT 'ACTIVE'")
     op.alter_column(
         table,
         "status",
