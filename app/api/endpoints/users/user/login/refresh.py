@@ -5,7 +5,7 @@ from app.schemas.request.auth import RefreshRequest
 from app.schemas.response.auth import TokenResponse as Token
 from app.core.security import create_access_token, create_refresh_token
 from app.db.session import get_db
-from app.models import User
+from app.models import User, UserStatus
 import jwt
 from app.core.config import settings
 from app.schemas.errors import ERROR_REFRESH_TOKEN_FAILURES
@@ -32,7 +32,7 @@ def refresh_access_token(request: RefreshRequest, db: Session = Depends(get_db))
             
         # DB에서 유저 존재 여부 및 활성(탈퇴) 상태 확인
         user = db.scalar(select(User).where(User.id == user_id))
-        if not user or user.status == "DELETED":
+        if not user or user.status == UserStatus.DELETED:
             raise HTTPException(status_code=401, detail={"code": "USER_NOT_ACTIVE", "message": "유효하지 않거나 탈퇴 처리된 계정입니다. 다시 로그인해주세요."})
             
         provider = payload.get("provider", "unknown")

@@ -2,7 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Post, User
+from app.models import Post, User, PostStatus, UserStatus
 from app.schemas.mapper.pagination import PaginationMapper
 from app.schemas.request.ml.recommend import MlRecommendRequest
 from app.schemas.response.search import PostSearchResponse
@@ -55,8 +55,8 @@ class ForYouSearchService:
             .join(User, Post.user_id == User.id)
             .filter(
                 Post.id.in_(feed_ids),
-                Post.status == "ACTIVE",
-                User.status == "ACTIVE",
+                Post.status == PostStatus.ACTIVE,
+                User.status == UserStatus.ACTIVE,
             )
             .options(selectinload(Post.movies))
             .all()

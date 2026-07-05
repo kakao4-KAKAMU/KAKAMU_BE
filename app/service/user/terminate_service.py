@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, update
 from uuid import UUID
 
-from app.models import User, Persona
+from app.models import User, Persona, UserStatus, PersonaStatus
 
 class AccountTerminationService:
     
@@ -15,7 +15,7 @@ class AccountTerminationService:
         회원 탈퇴 처리 (Soft Delete 전환 및 종속 페르소나 일괄 처리)
         """
         # 1. 유저 조회
-        user = db.scalar(select(User).where(User.id == user_id, User.status == "ACTIVE"))
+        user = db.scalar(select(User).where(User.id == user_id, User.status == UserStatus.ACTIVE))
         if not user:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "유저를 찾을 수 없습니다."})
             
@@ -24,7 +24,7 @@ class AccountTerminationService:
             termination_time = datetime.now()
             
             # 3. 유저 상태를 DELETED로 변경하고 삭제 시점 기록
-            user.status = "DELETED"
+            user.status = UserStatus.DELETED
             user.deleted_at = termination_time
             
             # 4. 해당 유저가 소유한 ACTIVE 상태의 페르소나들도 일괄 DELETED 처리하며 삭제 시점을 동일하게 매핑
@@ -32,10 +32,10 @@ class AccountTerminationService:
                 update(Persona)
                 .where(
                     Persona.user_id == user_id,
-                    Persona.status == "ACTIVE"
+                    Persona.status == PersonaStatus.ACTIVE
                 )
                 .values(
-                    status="DELETED",
+                    status=PersonaStatus.DELETED,
                     deleted_at=termination_time
                 )
             )

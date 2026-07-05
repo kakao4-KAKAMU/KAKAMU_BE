@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
-from app.models import Persona
+from app.models import Persona, PersonaStatus
 from app.schemas.base.persona import Persona as PersonaSchema
 from app.schemas.mapper.persona import PersonaMapper
 from app.service.profile.read_persona import PersonaReadService
@@ -27,7 +27,7 @@ class PersonaRestoreService:
                 detail={"code": "PERSONA_NOT_FOUND", "message": "페르소나를 찾을 수 없습니다."}
             )
 
-        if persona.status == "ACTIVE":
+        if persona.status == PersonaStatus.ACTIVE:
             raise HTTPException(
                 status_code=400,
                 detail={"code": "ALREADY_ACTIVE", "message": "이미 활성화된 페르소나입니다."}
@@ -36,7 +36,7 @@ class PersonaRestoreService:
         # 활성 페르소나 개수 확인 (최대 5개 제한)
         count_stmt = select(func.count(Persona.id)).where(
             Persona.user_id == user_id,
-            Persona.status == "ACTIVE"
+            Persona.status == PersonaStatus.ACTIVE
         )
         active_persona_count = db.scalar(count_stmt)
 
@@ -48,7 +48,7 @@ class PersonaRestoreService:
 
         try:
             # DELETED -> ACTIVE 변경 및 삭제 예약 취소
-            persona.status = "ACTIVE"
+            persona.status = PersonaStatus.ACTIVE
             persona.deleted_at = None
             db.commit()
 

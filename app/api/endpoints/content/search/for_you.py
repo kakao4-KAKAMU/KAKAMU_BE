@@ -5,7 +5,7 @@ from uuid import UUID
 
 from app.core.logging import logger
 from app.db.session import get_db
-from app.models import User, Persona
+from app.models import User, Persona, PersonaStatus
 from app.api.deps.auth import get_optional_user
 from app.service.search import search_service
 from app.service.search.for_you_search import for_you_search_service
@@ -41,7 +41,7 @@ async def search_for_you(
         persona_id = None
         if x_persona_id:
             persona = db.get(Persona, x_persona_id)
-            if persona and persona.user_id == current_user.id and persona.status != "DELETED":
+            if persona and persona.user_id == current_user.id and persona.status != PersonaStatus.DELETED:
                 persona_id = persona.id
 
         ml_result = await for_you_search_service.search_for_you(

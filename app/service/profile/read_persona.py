@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import FavGenre, FavMovie, FavPeople, Persona
+from app.models import FavGenre, FavMovie, FavPeople, Persona, PersonaStatus
 from app.models.movie import Movie
 from app.schemas.base.persona import Persona as PersonaSchema
 from app.schemas.mapper.persona import PersonaMapper
@@ -26,7 +26,7 @@ class PersonaReadService:
             select(Persona)
             .where(
                 Persona.user_id == user_id,
-                Persona.status != "DELETED",
+                Persona.status != PersonaStatus.DELETED,
             )
             .options(*PersonaReadService._persona_load_options())
         )
@@ -45,7 +45,7 @@ class PersonaReadService:
             .where(
                 Persona.id == persona_id,
                 Persona.user_id == user_id,
-                Persona.status != "DELETED",
+                Persona.status != PersonaStatus.DELETED,
             )
             .options(*PersonaReadService._persona_load_options())
         )

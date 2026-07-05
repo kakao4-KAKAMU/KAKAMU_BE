@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.core.redis import sync_redis_client
 from app.db.session import get_db
-from app.models import User
+from app.models import User, UserStatus
 
 security = HTTPBearer()
 
@@ -81,7 +81,7 @@ def get_active_user(current_user: User = Depends(get_current_user)) -> User:
     일반적인 서비스 API 호출 시 사용되는 의존성입니다.
     현재 로그인한 유저가 탈퇴 유예 기간(DELETED)인 경우 접근을 403으로 차단합니다.
     """
-    if current_user.status == "DELETED":
+    if current_user.status == UserStatus.DELETED:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": "ACCOUNT_IN_GRACE_PERIOD", "message": "탈퇴 유예 기간 중인 계정입니다. 서비스 이용을 위해 계정을 복구해주세요."}
@@ -100,7 +100,7 @@ def get_optional_user(credentials: HTTPAuthorizationCredentials = Optional[Depen
         payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         if payload.get("type") == "refresh":
             return None
-        user = db.scalar(select(User).where(User.id == payload.get("sub"), User.status == "ACTIVE"))
+        user = db.scalar(select(User).where(User.id == payload.get("sub"), User.status == UserStatus.ACTIVE))
         return user
     except Exception:
         return None

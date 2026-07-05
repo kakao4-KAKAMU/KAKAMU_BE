@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from fastapi import HTTPException
 
-from app.models import Post, LikeLog, SaveLog, Block, User
+from app.models import Post, LikeLog, SaveLog, Block, User, UserStatus
 from app.schemas.base.mention import Mention
 from app.schemas.base.movie import Movie
 from app.schemas.mapper.post import PostMapper
@@ -67,13 +67,9 @@ class PostReadService:
         ]
 
     @staticmethod
-    def _mentions_from_raw(raw_mentions: List[dict]) -> List[Mention]:
-        return [Mention(**mention) for mention in raw_mentions]
-
-    @staticmethod
     def _movies_map_from_info(info_map: Dict[int, dict]) -> Dict[int, List[Movie]]:
         return {
-            post_id: [Movie(**movie) for movie in row.get("movies", [])]
+            post_id: row.get("movies", [])
             for post_id, row in info_map.items()
         }
 
@@ -130,7 +126,7 @@ class PostReadService:
                 comment_counts_map[post_id] = cached.comment_count
             elif info_map and post_id in info_map:
                 row = info_map[post_id]
-                mentions_map[post_id] = self._mentions_from_raw(row.get("mentions", []))
+                mentions_map[post_id] = row.get("mentions", [])
                 hashtags_map[post_id] = row.get("hashtags", [])
 
         if cache_miss_ids:
@@ -140,7 +136,7 @@ class PostReadService:
 
             for post_id in cache_miss_ids:
                 row = db_info_map.get(post_id, {}) | counts_map.get(post_id, {})
-                mentions = self._mentions_from_raw(row.get("mentions", []))
+                mentions = row.get("mentions", [])
                 hashtags = row.get("hashtags", [])
                 comment_count = row.get("comment_count") or 0
                 mentions_map[post_id] = mentions
@@ -236,7 +232,7 @@ class PostReadService:
     ) -> PostListResponse:
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
 
-        filters: list = [User.status == "ACTIVE"]
+        filters: list = [User.status == UserStatus.ACTIVE]
         if blocked_user_ids:
             filters.append(Post.user_id.notin_(blocked_user_ids))
 
@@ -270,7 +266,7 @@ class PostReadService:
 
         filters: list = [
             Post.id.in_(liked_post_ids_subquery),
-            User.status == "ACTIVE",
+            User.status == UserStatus.ACTIVE,
         ]
         if blocked_user_ids:
             filters.append(Post.user_id.notin_(blocked_user_ids))
@@ -308,7 +304,7 @@ class PostReadService:
 
         filters: list = [
             Post.id.in_(saved_post_ids_subquery),
-            User.status == "ACTIVE",
+            User.status == UserStatus.ACTIVE,
         ]
         if blocked_user_ids:
             filters.append(Post.user_id.notin_(blocked_user_ids))
@@ -347,7 +343,7 @@ class PostReadService:
 
         info_map, ordered_post_ids = self._fetch_posts(
             db,
-            filters=(Post.user_id == target_user_id, User.status == "ACTIVE"),
+            filters=(Post.user_id == target_user_id, User.status == UserStatus.ACTIVE),
             cursor=cursor,
             limit=limit,
         )
@@ -411,7 +407,7 @@ class PostReadService:
         unique_ids = list(dict.fromkeys(post_ids))
         blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
 
-        filters: list = [User.status == "ACTIVE"]
+        filters: list = [User.status == UserStatus.ACTIVE]
         if blocked_user_ids:
             filters.append(Post.user_id.notin_(blocked_user_ids))
 

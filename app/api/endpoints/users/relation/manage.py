@@ -8,7 +8,7 @@ from app.api.deps.auth import get_active_user, get_optional_user
 from app.schemas.mapper.user import UserMapper
 from app.schemas.response.relation import RelationResponse, FollowListResponse
 from app.service.relation.relation_service import relation_service
-from app.models import Follow, User
+from app.models import Follow, User, UserStatus
 from app.schemas.errors import (
     ERROR_CANNOT_FOLLOW_SELF,
     ERROR_CANNOT_BLOCK_SELF
@@ -122,7 +122,7 @@ def get_followings(
         User, Follow.following_id == User.id
     ).filter(
         Follow.follower_id == target_user_id,
-        User.status == "ACTIVE"
+        User.status == UserStatus.ACTIVE
     )
 
     if cursor:

@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.logging import logger
-from app.models import Comment, Hashtag, PostHashtag, PostMention, User
+from app.models import Comment, Hashtag, PostHashtag, PostMention, User, UserStatus, CommentStatus
 from app.schemas.base.mention import Mention
 from app.service.redis.keys.post import build_post_info_redis_key
 from app.service.redis.redis import redis_client
@@ -62,7 +62,7 @@ class PostInfoCacheService:
         mentions_query = (
             db.query(User.id, User.nickname, User.tag)
             .join(PostMention, PostMention.user_id == User.id)
-            .filter(PostMention.post_id == post_id, User.status == "ACTIVE")
+            .filter(PostMention.post_id == post_id, User.status == UserStatus.ACTIVE)
             .all()
         )
         mentions = [
@@ -80,7 +80,7 @@ class PostInfoCacheService:
 
         comment_count = (
             db.query(func.count(Comment.id))
-            .filter(Comment.post_id == post_id, Comment.status == "ACTIVE")
+            .filter(Comment.post_id == post_id, Comment.status == CommentStatus.ACTIVE)
             .scalar()
         ) or 0
 

@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, and_
 from uuid import UUID
-from app.models import User, Follow, Post
+from app.models import User, Follow, Post, PostStatus, UserStatus
 from typing import Optional
 from app.schemas.mapper.user import UserMapper
 from app.schemas.response.user import UserPublicResponse
@@ -13,7 +13,7 @@ class UserService:
     @staticmethod
     def get_user(db: Session, user_id: UUID) -> User:
         """특정 유저의 정보를 데이터베이스에서 조회합니다."""
-        user = db.scalar(select(User).where(User.id == user_id, User.status == "ACTIVE"))
+        user = db.scalar(select(User).where(User.id == user_id, User.status == UserStatus.ACTIVE))
 
         if not user:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "요청한 사용자를 찾을 수 없습니다."})
@@ -27,14 +27,14 @@ class UserService:
         viewer_user_id: Optional[UUID] = None,
     ) -> UserPublicResponse:
         """특정 유저의 공개 프로필 정보(팔로워, 팔로잉, 게시물 수 등 포함)를 반환합니다."""
-        user = db.scalar(select(User).where(User.id == target_user_id, User.status == "ACTIVE"))
+        user = db.scalar(select(User).where(User.id == target_user_id, User.status == UserStatus.ACTIVE))
 
         if not user:
             raise HTTPException(status_code=404, detail={"code": "USER_NOT_FOUND", "message": "요청한 사용자를 찾을 수 없습니다."})
 
         follower_count = db.scalar(select(func.count(Follow.follower_id)).where(Follow.following_id == target_user_id))
         following_count = db.scalar(select(func.count(Follow.following_id)).where(Follow.follower_id == target_user_id))
-        post_count = db.scalar(select(func.count(Post.id)).where(Post.user_id == target_user_id, Post.status == "ACTIVE"))
+        post_count = db.scalar(select(func.count(Post.id)).where(Post.user_id == target_user_id, Post.status == PostStatus.ACTIVE))
 
         is_following = False
         if viewer_user_id:

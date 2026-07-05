@@ -4,7 +4,7 @@ from uuid import UUID
 from typing import Optional
 
 from app.db.session import get_db
-from app.models import Persona, User
+from app.models import Persona, User, PersonaStatus
 from app.api.deps.auth import get_optional_user, get_current_user
 
 
@@ -20,7 +20,7 @@ async def get_optional_persona(
     if current_user is None:
         return None
     persona = db.get(Persona, x_persona_id)
-    if not persona or persona.user_id != current_user.id or persona.status == "DELETED":
+    if not persona or persona.user_id != current_user.id or persona.status == PersonaStatus.DELETED:
         raise HTTPException(status_code=403, detail={"code": "PERSONA_NOT_FOUND_OR_FORBIDDEN", "message": "요청한 페르소나에 대한 권한이 없거나 존재하지 않습니다."})
 
     return persona.id
@@ -41,7 +41,7 @@ async def get_current_persona(
         return None
 
     persona = db.get(Persona, x_persona_id)
-    if not persona or persona.user_id != current_user.id or persona.status == "DELETED":
+    if not persona or persona.user_id != current_user.id or persona.status == PersonaStatus.DELETED:
         raise HTTPException(status_code=403, detail={"code": "PERSONA_NOT_FOUND_OR_FORBIDDEN", "message": "요청한 페르소나에 대한 권한이 없거나 존재하지 않습니다."})
 
     return persona.id

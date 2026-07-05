@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from app.models.user import User as UserModel
+from app.models.user import User as UserModel, UserStatus
 from app.schemas.base.user import UserAccount, UserPublic, UserSimple, UserSimpleWithFollow
 
 
@@ -18,7 +18,7 @@ class UserMapper:
 
     @staticmethod
     def to_simple_or_anonymous(user: Optional[UserModel]) -> UserSimple:
-        if not user or user.status == "DELETED":
+        if not user or user.status == UserStatus.DELETED:
             return UserSimple(
                 id=None,
                 nickname="알 수 없음",

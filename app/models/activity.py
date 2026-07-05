@@ -1,8 +1,15 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, SmallInteger, Text, JSON, UniqueConstraint, Index, text
+import enum
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, SmallInteger, Text, JSON, UniqueConstraint, Index, text, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base import Base
+
+
+class CommentStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+
 
 class Comment(Base):
     __tablename__ = "comment"
@@ -13,7 +20,7 @@ class Comment(Base):
     parent_id = Column(Integer, ForeignKey("comment.id", ondelete="CASCADE"), nullable=True) 
     content = Column(String(1000))    
     is_spoiler = Column(SmallInteger, default=0) 
-    status = Column(String(20), default="ACTIVE") 
+    status = Column(Enum(CommentStatus), default=CommentStatus.ACTIVE, nullable=False) 
     created_at = Column(DateTime, server_default=func.now())    
     updated_at = Column(DateTime, onupdate=func.now())    
     is_pinned = Column(SmallInteger, default=0)    

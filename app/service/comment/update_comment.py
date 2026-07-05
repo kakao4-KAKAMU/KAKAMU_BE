@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from uuid import UUID
 
-from app.models import Comment, User, CommentMention, Hashtag, CommentHashtag
+from app.models import Comment, User, CommentMention, Hashtag, CommentHashtag, UserStatus, CommentStatus
 from app.schemas.request.post import CommentUpdate
 from app.service.comment.ml_sync import comment_ml_sync_service
 from app.utils.parser import parse_content
@@ -16,7 +16,7 @@ class CommentUpdateService:
         comment_in: CommentUpdate,
         user_id: UUID,
     ) -> int:
-        comment = db.query(Comment).filter(Comment.id == comment_id, Comment.status == "ACTIVE").first()
+        comment = db.query(Comment).filter(Comment.id == comment_id, Comment.status == CommentStatus.ACTIVE).first()
         if not comment:
             raise HTTPException(status_code=404, detail={"code": "COMMENT_NOT_FOUND", "message": "댓글을 찾을 수 없거나 삭제되었습니다."})
 
@@ -49,7 +49,7 @@ class CommentUpdateService:
                 if "#" not in mention_str:
                     continue
                 nickname, tag = mention_str.split("#", 1)
-                target_user = db.query(User).filter(User.nickname == nickname, User.tag == tag, User.status == "ACTIVE").first()
+                target_user = db.query(User).filter(User.nickname == nickname, User.tag == tag, User.status == UserStatus.ACTIVE).first()
                 if target_user:
                     db.add(CommentMention(comment_id=comment.id, user_id=target_user.id))
 

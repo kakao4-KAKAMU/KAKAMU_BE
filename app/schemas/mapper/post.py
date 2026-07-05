@@ -2,7 +2,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from app.models.post import Post as PostModel
-from app.models.user import User as UserModel
+from app.models.user import User as UserModel, UserStatus
 from app.schemas.base.mention import Mention
 from app.schemas.base.movie import Movie
 from app.schemas.base.post import PostItem
@@ -26,7 +26,7 @@ class PostMapper:
         is_following: bool,
         like_count: int | None = None,
     ) -> PostItem:
-        is_deleted = not author or author.status == "DELETED"
+        is_deleted = not author or author.status == UserStatus.DELETED
         return PostItem(
             id=post.id,
             user=UserMapper.to_simple_with_follow(

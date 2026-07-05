@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import Comment, Movie, Post, SaveLog
+from app.models import Comment, Movie, Post, SaveLog, PostStatus, CommentStatus
 from app.schemas.request.save import SaveToggleRequest
 from app.service.movie.get_movie import movie_read_service
 from app.service.save import save_lookup
@@ -20,10 +20,10 @@ class SaveService:
     ) -> bool:
         """게시물/댓글/영화 저장을 토글(Save/Unsave)합니다."""
         if req.target_type == "POST":
-            target = db.query(Post).filter(Post.id == req.target_id, Post.status == "ACTIVE").first()
+            target = db.query(Post).filter(Post.id == req.target_id, Post.status == PostStatus.ACTIVE).first()
             save_log = self._find_save_log(db, user_id, req.target_type, target_id=req.target_id)
         elif req.target_type == "COMMENT":
-            target = db.query(Comment).filter(Comment.id == req.target_id, Comment.status == "ACTIVE").first()
+            target = db.query(Comment).filter(Comment.id == req.target_id, Comment.status == CommentStatus.ACTIVE).first()
             save_log = self._find_save_log(db, user_id, req.target_type, target_id=req.target_id)
         else:
             target = movie_read_service.base_query(db).filter(Movie.id == req.movie_id).first()

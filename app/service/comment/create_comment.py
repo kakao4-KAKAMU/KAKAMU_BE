@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Comment, Post, User, CommentMention, Hashtag, CommentHashtag
+from app.models import Comment, Post, User, CommentMention, Hashtag, CommentHashtag, PostStatus, UserStatus, CommentStatus
 from app.schemas.request.post import CommentCreate
 from app.service.comment.ml_sync import comment_ml_sync_service
 from app.service.post.redis import post_cache_service
@@ -19,14 +19,14 @@ class CommentCreateService:
         user_id: UUID,
         persona_id: UUID,
     ) -> int:
-        post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()
+        post = db.query(Post).filter(Post.id == post_id, Post.status == PostStatus.ACTIVE).first()
         if not post:
             raise HTTPException(status_code=404, detail={"code": "POST_NOT_FOUND", "message": "게시물을 찾을 수 없거나 삭제되었습니다."})
 
         parent_id = comment_in.parent_id if comment_in.parent_id else None
 
         if parent_id:
-            parent_comment = db.query(Comment).filter(Comment.id == parent_id, Comment.status == "ACTIVE").first()
+            parent_comment = db.query(Comment).filter(Comment.id == parent_id, Comment.status == CommentStatus.ACTIVE).first()
             if not parent_comment:
                 raise HTTPException(status_code=404, detail={"code": "PARENT_COMMENT_NOT_FOUND", "message": "답글을 작성할 원본 댓글을 찾을 수 없습니다."})
             if parent_comment.post_id != post_id:
@@ -60,7 +60,7 @@ class CommentCreateService:
             if "#" not in mention_str:
                 continue
             nickname, tag = mention_str.split("#", 1)
-            target_user = db.query(User).filter(User.nickname == nickname, User.tag == tag, User.status == "ACTIVE").first()
+            target_user = db.query(User).filter(User.nickname == nickname, User.tag == tag, User.status == UserStatus.ACTIVE).first()
             if target_user:
                 db.add(CommentMention(comment_id=new_comment.id, user_id=target_user.id))
 

@@ -1,8 +1,15 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, JSON, SmallInteger, Index
+import enum
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, JSON, SmallInteger, Index, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base import Base
+
+
+class PostStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+
 
 class Post(Base):
     __tablename__ = "post"
@@ -13,7 +20,7 @@ class Post(Base):
     content = Column(Text)    
     image_urls = Column(JSON) 
     is_spoiler = Column(SmallInteger, default=0) 
-    status = Column(String(20), default="ACTIVE") 
+    status = Column(Enum(PostStatus), default=PostStatus.ACTIVE, nullable=False)
     is_analyzed = Column(SmallInteger, default=0)    
     created_at = Column(DateTime, server_default=func.now())    
     updated_at = Column(DateTime, onupdate=func.now())    

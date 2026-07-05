@@ -1,9 +1,16 @@
+import enum
 import uuid
-from sqlalchemy import Column, String, ForeignKey, DateTime, BigInteger, SmallInteger, UniqueConstraint, Index
+from sqlalchemy import Column, String, ForeignKey, DateTime, BigInteger, SmallInteger, UniqueConstraint, Index, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base import Base
+
+
+class UserStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    DELETED = "DELETED"
+
 
 class User(Base):
     __tablename__ = "user"
@@ -15,7 +22,7 @@ class User(Base):
     tag = Column(String(10), nullable=False, default="0000")
     profile_image_url = Column(String(500))
     profile_msg = Column(String(200))
-    status = Column(String(20), default="ACTIVE")
+    status = Column(Enum(UserStatus), default=UserStatus.ACTIVE, nullable=False)
     deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())    
     updated_at = Column(DateTime, onupdate=func.now())    

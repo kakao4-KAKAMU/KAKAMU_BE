@@ -2,7 +2,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention
+from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention, PostStatus, UserStatus
 from app.utils.parser import parse_content
 from app.service.post.ml_sync import post_ml_sync_service
 from app.service.post.redis import post_cache_service
@@ -11,7 +11,7 @@ from app.schemas.request.post import PostUpdate
 class PostUpdateService:
     async def update_post(self, db: Session, post_id: int, post_in: PostUpdate, user_id: UUID, persona_id: UUID) -> int:
         """게시물 수정 로직"""
-        post = db.query(Post).filter(Post.id == post_id, Post.status == "ACTIVE").first()
+        post = db.query(Post).filter(Post.id == post_id, Post.status == PostStatus.ACTIVE).first()
         if not post:
             raise HTTPException(status_code=404, detail={"code": "POST_NOT_FOUND", "message": "게시물을 찾을 수 없습니다."})
             
@@ -67,7 +67,7 @@ class PostUpdateService:
                     continue
                 nickname, tag = mention_str.split("#", 1)
                 target_user = db.query(User).filter(
-                    User.nickname == nickname, User.tag == tag, User.status == "ACTIVE"
+                    User.nickname == nickname, User.tag == tag, User.status == UserStatus.ACTIVE
                 ).first()
                 if target_user:
                     db.add(PostMention(post_id=post.id, user_id=target_user.id))
