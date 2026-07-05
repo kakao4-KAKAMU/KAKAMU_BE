@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from uuid import UUID
 from typing import Optional, Dict, List, Set, Tuple
 
+from opentelemetry import trace
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from fastapi import HTTPException
@@ -17,11 +18,14 @@ from app.service.like.like_count_service import like_count_service
 from app.service.post.redis import CachedPostInfo, post_cache_service
 from app.service.post.read_post_new import PostInfoQueryOptions, PostReadServiceNew
 
+tracer = trace.get_tracer(__name__)
+
 
 @dataclass
 class PostListContext:
     mentions_map: Dict[int, List[Mention]]
     hashtags_map: Dict[int, List[str]]
+    movies_map: Dict[int, List[Movie]]
     comment_counts_map: Dict[int, int]
     like_counts_map: Dict[int, int]
     liked_post_ids: Set[int]
@@ -67,11 +71,39 @@ class PostReadService:
         ]
 
     @staticmethod
-    def _movies_map_from_info(info_map: Dict[int, dict]) -> Dict[int, List[Movie]]:
-        return {
-            post_id: row.get("movies", [])
-            for post_id, row in info_map.items()
-        }
+    def _info_map_has_agg_data(info_map: Dict[int, dict], post_id: int) -> bool:
+        row = info_map.get(post_id)
+        return bool(row and "mentions" in row and "hashtags" in row and "movies" in row)
+
+    def _fetch_feed_posts(
+        self,
+        db: Session,
+        *,
+        filters: tuple = (),
+        cursor: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> Tuple[Dict[int, dict], List[int]]:
+        """경량 피드 조회: post+user 선별 후 info_map 골격 생성."""
+        with tracer.start_as_current_span("post.fetch_feed_posts") as span:
+            query_filters = list(filters)
+            if cursor is not None:
+                query_filters.append(Post.id < cursor)
+
+            posts_with_author, ordered_post_ids = PostReadServiceNew.fetch_feed_posts(
+                db,
+                options=PostInfoQueryOptions(
+                    filters=tuple(query_filters),
+                    order_by=Post.id.desc(),
+                    limit=limit,
+                ),
+            )
+            span.set_attribute("post.count", len(ordered_post_ids))
+
+            info_map = {
+                post.id: {"post": post, "author": author}
+                for post, author in posts_with_author
+            }
+            return info_map, ordered_post_ids
 
     def _fetch_posts(
         self,
@@ -81,21 +113,32 @@ class PostReadService:
         cursor: Optional[int] = None,
         limit: Optional[int] = None,
         post_ids: List[int] | None = None,
+        lightweight: bool = False,
     ) -> Tuple[Dict[int, dict], List[int]]:
-        query_filters = list(filters)
-        if cursor is not None:
-            query_filters.append(Post.id < cursor)
-
-        info_map, ordered_post_ids = PostReadServiceNew.get_post_info_by_ids(
-            db,
-            post_ids,
-            options=PostInfoQueryOptions(
-                filters=tuple(query_filters),
-                order_by=Post.id.desc(),
+        if lightweight:
+            return self._fetch_feed_posts(
+                db,
+                filters=filters,
+                cursor=cursor,
                 limit=limit,
-            ),
-        )
-        return info_map, ordered_post_ids
+            )
+
+        with tracer.start_as_current_span("post.fetch_posts") as span:
+            query_filters = list(filters)
+            if cursor is not None:
+                query_filters.append(Post.id < cursor)
+
+            info_map, ordered_post_ids = PostReadServiceNew.get_post_info_by_ids(
+                db,
+                post_ids,
+                options=PostInfoQueryOptions(
+                    filters=tuple(query_filters),
+                    order_by=Post.id.desc(),
+                    limit=limit,
+                ),
+            )
+            span.set_attribute("post.count", len(ordered_post_ids))
+            return info_map, ordered_post_ids
 
     def _build_post_infos(
         self,
@@ -109,96 +152,137 @@ class PostReadService:
     ) -> PostListContext:
         post_ids = [post.id for post in posts]
         if not post_ids:
-            return PostListContext({}, {}, {}, {}, set(), set(), set())
+            return PostListContext({}, {}, {}, {}, {}, set(), set(), set())
 
-        cached_infos = post_cache_service.get_post_infos(post_ids)
-        cache_miss_ids = [post_id for post_id in post_ids if cached_infos.get(post_id) is None]
+        with tracer.start_as_current_span("post.build_infos") as span:
+            cached_infos = post_cache_service.get_post_infos(post_ids)
+            cache_miss_ids = [post_id for post_id in post_ids if cached_infos.get(post_id) is None]
+            span.set_attribute("post.cache_miss_count", len(cache_miss_ids))
 
-        mentions_map: Dict[int, List[Mention]] = {}
-        hashtags_map: Dict[int, List[str]] = {}
-        comment_counts_map: Dict[int, int] = {}
+            mentions_map: Dict[int, List[Mention]] = {}
+            hashtags_map: Dict[int, List[str]] = {}
+            movies_map: Dict[int, List[Movie]] = {}
+            comment_counts_map: Dict[int, int] = {}
 
-        for post_id in post_ids:
-            cached = cached_infos.get(post_id)
-            if cached is not None:
-                mentions_map[post_id] = cached.mentions
-                hashtags_map[post_id] = cached.hashtags
-                comment_counts_map[post_id] = cached.comment_count
-            elif info_map and post_id in info_map:
-                row = info_map[post_id]
-                mentions_map[post_id] = row.get("mentions", [])
-                hashtags_map[post_id] = row.get("hashtags", [])
+            for post_id in post_ids:
+                cached = cached_infos.get(post_id)
+                if cached is not None:
+                    mentions_map[post_id] = cached.mentions
+                    hashtags_map[post_id] = cached.hashtags
+                    movies_map[post_id] = cached.movies
+                    comment_counts_map[post_id] = cached.comment_count
+                elif info_map and self._info_map_has_agg_data(info_map, post_id):
+                    row = info_map[post_id]
+                    mentions_map[post_id] = row.get("mentions", [])
+                    hashtags_map[post_id] = row.get("hashtags", [])
+                    movies_map[post_id] = row.get("movies", [])
 
-        if cache_miss_ids:
-            db_info_map, _ = PostReadServiceNew.get_post_info_by_ids(db, cache_miss_ids)
-            counts_map = PostReadServiceNew.get_post_counts_by_ids(db, cache_miss_ids)
+            db_miss_ids = [
+                post_id
+                for post_id in cache_miss_ids
+                if not (info_map and self._info_map_has_agg_data(info_map, post_id))
+            ]
+
+            counts_needed_ids = [
+                post_id for post_id in cache_miss_ids if post_id not in comment_counts_map
+            ]
+            counts_map: Dict[int, dict] = {}
+            if counts_needed_ids:
+                counts_map = PostReadServiceNew.get_post_counts_by_ids(db, counts_needed_ids)
+
+            if db_miss_ids:
+                with tracer.start_as_current_span("post.enrich_agg") as enrich_span:
+                    enrich_span.set_attribute("post.db_miss_count", len(db_miss_ids))
+                    agg_map = PostReadServiceNew.get_post_agg_by_ids(db, db_miss_ids)
+            else:
+                agg_map = {}
+
             to_cache: Dict[int, CachedPostInfo] = {}
-
             for post_id in cache_miss_ids:
-                row = db_info_map.get(post_id, {}) | counts_map.get(post_id, {})
-                mentions = row.get("mentions", [])
-                hashtags = row.get("hashtags", [])
-                comment_count = row.get("comment_count") or 0
-                mentions_map[post_id] = mentions
-                hashtags_map[post_id] = hashtags
+                agg_row = agg_map.get(post_id, {})
+                if post_id not in mentions_map:
+                    mentions_map[post_id] = agg_row.get("mentions", [])
+                if post_id not in hashtags_map:
+                    hashtags_map[post_id] = agg_row.get("hashtags", [])
+                if post_id not in movies_map:
+                    movies_map[post_id] = agg_row.get("movies", [])
+
+                comment_count = comment_counts_map.get(
+                    post_id,
+                    counts_map.get(post_id, {}).get("comment_count", 0),
+                )
                 comment_counts_map[post_id] = comment_count
+
+                if info_map is not None and post_id in info_map:
+                    info_map[post_id].update(
+                        {
+                            "mentions": mentions_map[post_id],
+                            "hashtags": hashtags_map[post_id],
+                            "movies": movies_map[post_id],
+                        }
+                    )
+
                 to_cache[post_id] = CachedPostInfo(
-                    mentions=mentions,
-                    hashtags=hashtags,
+                    mentions=mentions_map[post_id],
+                    hashtags=hashtags_map[post_id],
+                    movies=movies_map[post_id],
                     comment_count=comment_count,
                 )
 
-            post_cache_service.set_post_infos(to_cache)
+            if to_cache:
+                post_cache_service.set_post_infos(to_cache)
 
-        for post_id in post_ids:
-            comment_counts_map.setdefault(post_id, 0)
-            mentions_map.setdefault(post_id, [])
-            hashtags_map.setdefault(post_id, [])
+            for post_id in post_ids:
+                comment_counts_map.setdefault(post_id, 0)
+                mentions_map.setdefault(post_id, [])
+                hashtags_map.setdefault(post_id, [])
+                movies_map.setdefault(post_id, [])
 
-        liked_post_ids: Set[int] = set()
-        saved_post_ids: Set[int] = set()
-        followed_user_ids: Set[UUID] = set()
+            liked_post_ids: Set[int] = set()
+            saved_post_ids: Set[int] = set()
+            followed_user_ids: Set[UUID] = set()
 
-        if current_user_id:
-            if force_liked:
-                liked_post_ids = set(post_ids)
-            if force_saved:
-                saved_post_ids = set(post_ids)
+            if current_user_id:
+                if force_liked:
+                    liked_post_ids = set(post_ids)
+                if force_saved:
+                    saved_post_ids = set(post_ids)
 
-            if not (force_liked and force_saved):
-                status_map = PostReadServiceNew.get_post_status_by_user_and_post_ids(
-                    db, current_user_id, post_ids
+                if not (force_liked and force_saved):
+                    status_map = PostReadServiceNew.get_post_status_by_user_and_post_ids(
+                        db, current_user_id, post_ids
+                    )
+                    if not force_liked:
+                        liked_post_ids = {
+                            post_id
+                            for post_id in post_ids
+                            if status_map.get(post_id, {}).get("is_liked", False)
+                        }
+                    if not force_saved:
+                        saved_post_ids = {
+                            post_id
+                            for post_id in post_ids
+                            if status_map.get(post_id, {}).get("is_saved", False)
+                        }
+
+                author_user_ids = list({post.user_id for post in posts})
+                followed_user_ids = RelationService.get_followed_user_ids(
+                    db, current_user_id, author_user_ids
                 )
-                if not force_liked:
-                    liked_post_ids = {
-                        post_id
-                        for post_id in post_ids
-                        if status_map.get(post_id, {}).get("is_liked", False)
-                    }
-                if not force_saved:
-                    saved_post_ids = {
-                        post_id
-                        for post_id in post_ids
-                        if status_map.get(post_id, {}).get("is_saved", False)
-                    }
 
-            author_user_ids = list({post.user_id for post in posts})
-            followed_user_ids = RelationService.get_followed_user_ids(
-                db, current_user_id, author_user_ids
+            return PostListContext(
+                mentions_map=mentions_map,
+                hashtags_map=hashtags_map,
+                movies_map=movies_map,
+                comment_counts_map=comment_counts_map,
+                like_counts_map=like_count_service.resolve_like_counts(
+                    "POST",
+                    {post.id: post.like_count or 0 for post in posts},
+                ),
+                liked_post_ids=liked_post_ids,
+                saved_post_ids=saved_post_ids,
+                followed_user_ids=followed_user_ids,
             )
-
-        return PostListContext(
-            mentions_map=mentions_map,
-            hashtags_map=hashtags_map,
-            comment_counts_map=comment_counts_map,
-            like_counts_map=like_count_service.resolve_like_counts(
-                "POST",
-                {post.id: post.like_count or 0 for post in posts},
-            ),
-            liked_post_ids=liked_post_ids,
-            saved_post_ids=saved_post_ids,
-            followed_user_ids=followed_user_ids,
-        )
 
     def _build_post_list(
         self,
@@ -206,7 +290,6 @@ class PostReadService:
         *,
         context: PostListContext,
         limit: int,
-        info_map: Dict[int, dict],
         force_liked: bool = False,
         force_saved: bool = False,
     ) -> PostListResponse:
@@ -219,7 +302,7 @@ class PostReadService:
             liked_post_ids=context.liked_post_ids,
             saved_post_ids=context.saved_post_ids,
             followed_user_ids=context.followed_user_ids,
-            movies_map=self._movies_map_from_info(info_map),
+            movies_map=context.movies_map,
             force_liked=force_liked,
             force_saved=force_saved,
         )
@@ -241,6 +324,7 @@ class PostReadService:
             filters=tuple(filters),
             cursor=cursor,
             limit=limit,
+            lightweight=True,
         )
         posts_with_author = self._posts_with_author_from_info(info_map, ordered_post_ids)
         posts = [post for post, _ in posts_with_author]
@@ -250,7 +334,6 @@ class PostReadService:
             posts_with_author,
             context=context,
             limit=limit,
-            info_map=info_map,
         )
 
     def get_my_liked_posts(
@@ -276,6 +359,7 @@ class PostReadService:
             filters=tuple(filters),
             cursor=cursor,
             limit=limit,
+            lightweight=True,
         )
         posts_with_author = self._posts_with_author_from_info(info_map, ordered_post_ids)
         posts = [post for post, _ in posts_with_author]
@@ -287,7 +371,6 @@ class PostReadService:
             posts_with_author,
             context=context,
             limit=limit,
-            info_map=info_map,
             force_liked=True,
         )
 
@@ -314,6 +397,7 @@ class PostReadService:
             filters=tuple(filters),
             cursor=cursor,
             limit=limit,
+            lightweight=True,
         )
         posts_with_author = self._posts_with_author_from_info(info_map, ordered_post_ids)
         posts = [post for post, _ in posts_with_author]
@@ -325,7 +409,6 @@ class PostReadService:
             posts_with_author,
             context=context,
             limit=limit,
-            info_map=info_map,
             force_saved=True,
         )
 
@@ -346,6 +429,7 @@ class PostReadService:
             filters=(Post.user_id == target_user_id, User.status == UserStatus.ACTIVE),
             cursor=cursor,
             limit=limit,
+            lightweight=True,
         )
         posts_with_author = self._posts_with_author_from_info(info_map, ordered_post_ids)
         posts = [post for post, _ in posts_with_author]
@@ -355,7 +439,6 @@ class PostReadService:
             posts_with_author,
             context=context,
             limit=limit,
-            info_map=info_map,
         )
 
     def get_post_detail(
@@ -391,7 +474,7 @@ class PostReadService:
             liked_post_ids=context.liked_post_ids,
             saved_post_ids=context.saved_post_ids,
             followed_user_ids=context.followed_user_ids,
-            movies_map=self._movies_map_from_info(info_map),
+            movies_map=context.movies_map,
         )
         return responses[0]
 
@@ -436,7 +519,7 @@ class PostReadService:
             liked_post_ids=context.liked_post_ids,
             saved_post_ids=context.saved_post_ids,
             followed_user_ids=context.followed_user_ids,
-            movies_map=self._movies_map_from_info(info_map),
+            movies_map=context.movies_map,
         )
 
 

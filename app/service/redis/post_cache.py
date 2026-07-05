@@ -1,12 +1,13 @@
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.core.logging import logger
 from app.models import Comment, Hashtag, PostHashtag, PostMention, User, UserStatus, CommentStatus
 from app.schemas.base.mention import Mention
+from app.schemas.base.movie import Movie
 from app.service.redis.keys.post import build_post_info_redis_key
 from app.service.redis.redis import redis_client
 
@@ -16,6 +17,7 @@ POST_INFO_CACHE_TTL_SECONDS = 3600
 class CachedPostInfo(BaseModel):
     mentions: List[Mention] = []
     hashtags: List[str] = []
+    movies: List[Movie] = []
     like_count: int = 0
     comment_count: int = 0
 
@@ -78,6 +80,30 @@ class PostInfoCacheService:
         )
         hashtags = [row.normalized_keyword for row in hashtags_query]
 
+        movies_row = db.execute(
+            text(
+                """
+                SELECT COALESCE(
+                    (SELECT json_agg(
+                        json_build_object(
+                            'id', m.id,
+                            'poster_url', m.poster_url,
+                            'release_date', m.release_date,
+                            'title', mot.title_name
+                        )
+                    )
+                       FROM post_movie pm
+                       JOIN movie m ON m.id = pm.movie_id
+                       JOIN movie_original_title mot ON mot.movie_id = m.id
+                      WHERE pm.post_id = :post_id),
+                    '[]'::json
+                ) AS movies
+                """
+            ),
+            {"post_id": post_id},
+        ).scalar()
+        movies = [Movie.model_validate(m) for m in (movies_row or [])]
+
         comment_count = (
             db.query(func.count(Comment.id))
             .filter(Comment.post_id == post_id, Comment.status == CommentStatus.ACTIVE)
@@ -89,6 +115,7 @@ class PostInfoCacheService:
                 post_id: CachedPostInfo(
                     mentions=mentions,
                     hashtags=hashtags,
+                    movies=movies,
                     comment_count=comment_count,
                 )
             }

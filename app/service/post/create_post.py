@@ -6,6 +6,8 @@ from fastapi import HTTPException
 from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention, UserStatus
 from app.utils.parser import parse_content
 from app.service.post.ml_sync import post_ml_sync_service
+from app.service.post.post_agg_refresh import post_agg_refresh_service
+from app.service.post.redis import post_cache_service
 from app.schemas.request.post import PostCreate
 
 class PostCreateService:
@@ -49,7 +51,9 @@ class PostCreateService:
                 if target_user:
                     db.add(PostMention(post_id=new_post.id, user_id=target_user.id))
 
+            post_agg_refresh_service.refresh_post(db, new_post.id)
             db.commit()
+            post_cache_service._populate_post_info_from_db(db, new_post.id)
 
             await post_ml_sync_service.sync_create(
                 db,

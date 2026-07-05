@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from app.models import Post, PostMovie, Hashtag, PostHashtag, User, PostMention, PostStatus, UserStatus
 from app.utils.parser import parse_content
 from app.service.post.ml_sync import post_ml_sync_service
+from app.service.post.post_agg_refresh import post_agg_refresh_service
 from app.service.post.redis import post_cache_service
 from app.schemas.request.post import PostUpdate
 
@@ -72,8 +73,10 @@ class PostUpdateService:
                 if target_user:
                     db.add(PostMention(post_id=post.id, user_id=target_user.id))
 
+        post_agg_refresh_service.refresh_post(db, post.id)
         db.commit()
         post_cache_service.invalidate_post(post.id)
+        post_cache_service._populate_post_info_from_db(db, post.id)
 
         await post_ml_sync_service.sync_update(
             db,
