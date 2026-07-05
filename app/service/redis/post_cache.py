@@ -96,7 +96,7 @@ class PostInfoCacheService:
                        JOIN movie m ON m.id = pm.movie_id
                        JOIN movie_original_title mot ON mot.movie_id = m.id
                       WHERE pm.post_id = :post_id),
-                    '[]'::json
+                    '[]'::jsonb
                 ) AS movies
                 """
             ),
