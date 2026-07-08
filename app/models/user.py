@@ -1,6 +1,6 @@
 import enum
 import uuid
-from sqlalchemy import Column, String, ForeignKey, DateTime, BigInteger, SmallInteger, UniqueConstraint, Index, Enum
+from sqlalchemy import Column, String, ForeignKey, DateTime, BigInteger, SmallInteger, UniqueConstraint, Index, Enum, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -38,6 +38,12 @@ class User(Base):
     __table_args__ = (
         UniqueConstraint('nickname', 'tag', name='uq_user_nickname_tag'),
         Index('ix_user_nickname_trgm', 'nickname', postgresql_using='gin', postgresql_ops={'nickname': 'gin_trgm_ops'}),
+        Index(
+            'ix_user_nickname_tag_trgm',
+            text("(nickname || '#' || tag)"),
+            postgresql_using='gin',
+            postgresql_ops={"(nickname || '#' || tag)": 'gin_trgm_ops'},
+        ),
     )
 
 class LocalAuth(Base):
