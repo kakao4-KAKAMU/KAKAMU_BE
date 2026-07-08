@@ -52,8 +52,15 @@ class Post(Base):
         ),
         # 워커/배치: user_id 기준 전체 상태 조회
         Index('ix_post_user_id', 'user_id'),
-        Index('ix_post_title_trgm', 'title', postgresql_using='gin', postgresql_ops={'title': 'gin_trgm_ops'}),
-        Index('ix_post_content_trgm', 'content', postgresql_using='gin', postgresql_ops={'content': 'gin_trgm_ops'}),
+        # 검색: title/content 부분 일치 (pg_trgm, ACTIVE만)
+        Index(
+            'ix_post_title_content_trgm',
+            'title',
+            'content',
+            postgresql_using='gin',
+            postgresql_ops={'title': 'gin_trgm_ops', 'content': 'gin_trgm_ops'},
+            postgresql_where=text("status = 'ACTIVE'"),
+        ),
         # for-you fallback·인기순 검색: like_count DESC, id DESC
         Index(
             'ix_post_active_like_count_id_desc',
