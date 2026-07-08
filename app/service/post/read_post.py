@@ -17,6 +17,7 @@ from app.service.relation.relation_service import RelationService
 from app.service.like.like_count_service import like_count_service
 from app.service.post.redis import CachedPostInfo, post_cache_service
 from app.service.post.read_post_new import PostInfoQueryOptions, PostReadServiceNew
+from app.utils.trgm_search import post_trgm_match_subquery
 
 tracer = trace.get_tracer(__name__)
 
@@ -343,6 +344,53 @@ class PostReadService:
             lightweight=lightweight,
         )
         posts_with_author = self._posts_with_author_from_info(info_map, ordered_post_ids)
+        posts = [post for post, _ in posts_with_author]
+        context = self._build_post_infos(db, posts, current_user_id, info_map)
+        return posts_with_author, context
+
+    def fetch_search_posts_with_context(
+        self,
+        db: Session,
+        *,
+        search_pattern: str,
+        cursor: Optional[int] = None,
+        limit: Optional[int] = None,
+        order_by_likes: bool = False,
+        current_user_id: Optional[UUID] = None,
+    ) -> Tuple[List[Tuple[Post, User]], PostListContext]:
+        """trgm GIN 인덱스 우선 게시물 검색 (user Nested Loop 방지)."""
+        effective_limit = limit or 20
+        order_by = (
+            (Post.like_count.desc(), Post.id.desc())
+            if order_by_likes
+            else Post.id.desc()
+        )
+        oversample_limit = min(max(effective_limit * 5, effective_limit + 20), 200)
+
+        matching_subq = post_trgm_match_subquery(
+            search_pattern,
+            cursor=cursor,
+            limit=oversample_limit,
+            order_by_likes=order_by_likes,
+        )
+
+        blocked_user_ids = self._get_cached_blocked_user_ids(db, current_user_id)
+        extra_filters: list = [User.status == UserStatus.ACTIVE]
+        if blocked_user_ids:
+            extra_filters.append(Post.user_id.notin_(blocked_user_ids))
+
+        posts_with_author, ordered_post_ids = PostReadServiceNew.fetch_search_posts(
+            db,
+            matching_posts_subq=matching_subq,
+            extra_filters=tuple(extra_filters),
+            order_by=order_by,
+            limit=effective_limit,
+        )
+
+        info_map = {
+            post.id: {"post": post, "author": author}
+            for post, author in posts_with_author
+        }
         posts = [post for post, _ in posts_with_author]
         context = self._build_post_infos(db, posts, current_user_id, info_map)
         return posts_with_author, context

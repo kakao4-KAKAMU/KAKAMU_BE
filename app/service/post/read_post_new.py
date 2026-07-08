@@ -91,6 +91,34 @@ class PostReadServiceNew:
         return query_result, ordered_post_ids
 
     @staticmethod
+    def fetch_search_posts(
+        db: Session,
+        *,
+        matching_posts_subq,
+        extra_filters: tuple = (),
+        order_by: Any | None = None,
+        limit: int | None = None,
+    ) -> Tuple[List[Tuple[Post, User]], List[int]]:
+        """trgm 선별 서브쿼리 결과를 작성자와 조인 (GIN 인덱스 우선 활용)."""
+        query = (
+            db.query(Post, User)
+            .join(matching_posts_subq, Post.id == matching_posts_subq.c.id)
+            .join(User, Post.user_id == User.id)
+        )
+
+        for filter_clause in extra_filters:
+            query = query.filter(filter_clause)
+
+        query = PostReadServiceNew._apply_order_by(query, order_by)
+
+        if limit is not None:
+            query = query.limit(limit)
+
+        query_result = query.all()
+        ordered_post_ids = [post.id for post, _ in query_result]
+        return query_result, ordered_post_ids
+
+    @staticmethod
     def get_post_agg_by_ids(
         db: Session,
         post_ids: List[int],
