@@ -5,7 +5,7 @@ from firebase_admin import credentials, auth
 # firebase-adminsdk.json 파일 경로
 # 실제 서비스 시 환경 변수로 관리하거나 안전한 경로에 배치해야 합니다.
 # 환경 변수로 적용, 기본 경로 수정 필요
-cred_path = os.getenv("FIREBASE_CONFIG_PATH", "/app/auth/firebase-adminsdk.json")
+cred_path = os.getenv("FIREBASE_CONFIG_PATH", "./firebase-adminsdk.json")
 
 if os.path.exists(cred_path):
     cred = credentials.Certificate(cred_path)
