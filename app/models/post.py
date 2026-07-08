@@ -26,7 +26,7 @@ class Post(Base):
     updated_at = Column(DateTime, onupdate=func.now())    
 
     # [성능 최적화] 서브쿼리 대신 물리적 컬럼으로 관리 (Redis Sync Task가 5분 주기로 업데이트)
-    like_count = Column(Integer, default=0, nullable=False, index=True)
+    like_count = Column(Integer, default=0, nullable=False)
 
     user = relationship("User", back_populates="posts")    
     persona = relationship("Persona")
@@ -36,15 +36,31 @@ class Post(Base):
     mentions = relationship("User", secondary="post_mention", backref="mentioned_in_posts")    
 
     __table_args__ = (
+        # 메인 피드: ACTIVE 게시물 최신순 (id DESC keyset pagination)
         Index(
             'ix_post_status_id_desc',
             'status',
             id.desc(),
             postgresql_where=text("status = 'ACTIVE'"),
         ),
+        # 프로필 게시물·게시물 수: user_id별 ACTIVE 최신순
+        Index(
+            'ix_post_user_active_id_desc',
+            'user_id',
+            id.desc(),
+            postgresql_where=text("status = 'ACTIVE'"),
+        ),
+        # 워커/배치: user_id 기준 전체 상태 조회
         Index('ix_post_user_id', 'user_id'),
         Index('ix_post_title_trgm', 'title', postgresql_using='gin', postgresql_ops={'title': 'gin_trgm_ops'}),
         Index('ix_post_content_trgm', 'content', postgresql_using='gin', postgresql_ops={'content': 'gin_trgm_ops'}),
+        # for-you fallback·인기순 검색: like_count DESC, id DESC
+        Index(
+            'ix_post_active_like_count_id_desc',
+            like_count.desc(),
+            id.desc(),
+            postgresql_where=text("status = 'ACTIVE'"),
+        ),
     )
 
 class PostMovie(Base):
