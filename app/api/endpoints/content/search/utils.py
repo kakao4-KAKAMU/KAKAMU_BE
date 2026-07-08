@@ -4,6 +4,7 @@ from fastapi import BackgroundTasks, HTTPException, Request
 from typing import Optional
 from app.db.session import SessionLocal
 from app.models.search_log import SearchLog
+from app.utils.trgm_search import build_ilike_pattern
 
 # 인메모리 Rate Limit 저장소: { "client_id": [timestamp1, timestamp2, ...] }
 _rate_limit_store = {}
@@ -73,4 +74,4 @@ def handle_search_request(request: Request, background_tasks: BackgroundTasks, u
 
 def get_search_pattern(q: str) -> str:
     """검색어 패턴 생성 (양방향 부분 일치)"""
-    return f"%{q}%"
+    return build_ilike_pattern(q)

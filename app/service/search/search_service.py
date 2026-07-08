@@ -2,10 +2,10 @@ from datetime import date, datetime, timedelta
 from typing import List, Optional, Set
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Block, Follow, Post
+from app.models import Block, Follow
 from app.models.movie import Genre, MovieStaff, People
 from app.models.search_log import SearchDailyStat
 from app.models.user import User as UserModel, UserStatus
@@ -23,6 +23,7 @@ from app.schemas.mapper.person import PersonMapper
 from app.schemas.mapper.post import PostMapper
 from app.schemas.mapper.user import UserMapper
 from app.service.post.read_post import post_read_service
+from app.utils.trgm_search import build_user_trgm_filter
 
 
 class SearchService:
@@ -84,11 +85,7 @@ class SearchService:
     ) -> UserSearchResponse:
         query = db.query(UserModel).filter(
             UserModel.status == UserStatus.ACTIVE,
-            or_(
-                UserModel.username.ilike(search_pattern),
-                UserModel.nickname.ilike(search_pattern),
-                func.concat(UserModel.nickname, "#", UserModel.tag).ilike(search_pattern),
-            ),
+            build_user_trgm_filter(search_pattern, UserModel),
         )
 
         if current_user_id:
@@ -152,22 +149,12 @@ class SearchService:
         fallback: bool = False,
         message: Optional[str] = None,
     ) -> PostSearchResponse:
-        filters = (
-            UserModel.status == UserStatus.ACTIVE,
-            or_(Post.title.ilike(search_pattern), Post.content.ilike(search_pattern)),
-        )
-        order_by = (
-            (Post.like_count.desc(), Post.id.desc())
-            if order_by_likes
-            else Post.id.desc()
-        )
-
-        posts_with_author, context = post_read_service.fetch_filtered_posts_with_context(
+        posts_with_author, context = post_read_service.fetch_search_posts_with_context(
             db,
-            filters=filters,
+            search_pattern=search_pattern,
             cursor=cursor,
             limit=limit,
-            order_by=order_by,
+            order_by_likes=order_by_likes,
             current_user_id=current_user_id,
         )
 

@@ -16,6 +16,7 @@ from app.schemas.response.search import MovieFilterSearchResponse, MovieTabSearc
 from app.schemas.mapper.movie import MovieMapper
 from app.schemas.mapper.pagination import PaginationMapper
 from app.service.save.save_lookup import is_movie_saved
+from app.utils.trgm_search import movie_title_exists, movie_title_search_scores_subquery
 
 
 def _error_detail(error_schema: dict) -> dict:
@@ -56,13 +57,23 @@ class MovieReadService:
         db: Session,
         search_pattern: str,
         *,
+        search_query: Optional[str] = None,
         sort: str = "accuracy",
         cursor: Optional[str] = None,
         limit: int = 20,
     ) -> List[Movie]:
-        query = self.base_query(db).filter(
-            Movie.titles.any(MovieTitle.title_name.ilike(search_pattern))
-        )
+        if sort == "accuracy" and search_query:
+            title_scores = movie_title_search_scores_subquery(search_query, search_pattern)
+            query = self.base_query(db).join(title_scores, Movie.id == title_scores.c.movie_id)
+            if cursor:
+                query = query.filter(Movie.id < cursor)
+            query = query.order_by(
+                title_scores.c.score.desc().nullslast(),
+                Movie.id.desc(),
+            )
+            return query.options(selectinload(Movie.titles)).limit(limit).all()
+
+        query = self.base_query(db).filter(movie_title_exists(Movie, search_pattern))
 
         if sort == "popularity":
             query = query.order_by(Movie.producing_year.desc().nullslast(), Movie.id.desc())
@@ -88,6 +99,7 @@ class MovieReadService:
         db: Session,
         search_pattern: str,
         *,
+        search_query: Optional[str] = None,
         sort: str = "accuracy",
         cursor: Optional[str] = None,
         limit: int = 20,
@@ -95,6 +107,7 @@ class MovieReadService:
         movies = self.search_content_tab(
             db,
             search_pattern,
+            search_query=search_query,
             sort=sort,
             cursor=cursor,
             limit=limit,
@@ -149,9 +162,7 @@ class MovieReadService:
         query = self.base_query(db).options(selectinload(Movie.titles))
 
         if search_pattern:
-            query = query.filter(
-                Movie.titles.any(MovieTitle.title_name.ilike(search_pattern))
-            )
+            query = query.filter(movie_title_exists(Movie, search_pattern))
         if year:
             query = query.filter(extract("year", Movie.release_date) == year)
         if genre:

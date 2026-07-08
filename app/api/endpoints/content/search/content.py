@@ -43,6 +43,7 @@ def search_content(
     return movie_read_service.search_content_tab_response(
         db,
         search_pattern,
+        search_query=q,
         sort=sort,
         cursor=cursor,
         limit=limit,
