@@ -1,7 +1,10 @@
+from opentelemetry import trace
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 from app.core.logging import logger
+
+tracer = trace.get_tracer(__name__)
 
 # 1. settings.DATABASE_URL을 사용하여 엔진 생성
 # (settings.py에서 이미 POSTGRES_SERVER 등을 읽어 URL을 만들었으므로 이를 믿고 사용합니다.)
@@ -18,12 +21,14 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # 3. 의존성 주입을 위한 DB 세션 함수
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    except Exception as e:
-        db.rollback()
-        logger.error(f"DB 세션 오류: {e}")
-        raise e
-    finally:
-        db.close()
+    with tracer.start_as_current_span("db.get_session") as span:
+        db = SessionLocal()
+        try:
+            yield db
+        except Exception as e:
+            db.rollback()
+            span.set_attribute("db.session.error", True)
+            logger.error(f"DB 세션 오류: {e}")
+            raise e
+        finally:
+            db.close()
